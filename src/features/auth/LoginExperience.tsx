@@ -76,43 +76,15 @@ export function LoginExperience() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col justify-between p-4 sm:p-6 lg:p-10">
-      {/* Top minimal utility bar */}
-      <header className="w-full max-w-[1360px] mx-auto flex items-center justify-between py-2">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#08190C] dark:bg-[#1F6A37] flex items-center justify-center text-[#4EB462]">
-            <Leaf className="w-4 h-4" />
-          </div>
-          <span className="font-heading text-sm font-semibold tracking-tight">
-            AGRO-DELIVERIES KE.
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setTheme(resolvedDark ? 'light' : 'dark')}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
-          aria-label="Toggle color theme"
-        >
-          {resolvedDark ? (
-            <>
-              <Sun className="w-3.5 h-3.5 text-[#4EB462]" />
-              <span>Light Workspace</span>
-            </>
-          ) : (
-            <>
-              <Moon className="w-3.5 h-3.5 text-[#1F6A37]" />
-              <span>Dark Workspace</span>
-            </>
-          )}
-        </button>
-      </header>
-
       {/* Main Split Rounded Authentication Surface */}
       <main className="w-full max-w-[1280px] mx-auto my-auto py-4">
         <div className="rounded-[24px] bg-[var(--bg-card)] border border-[var(--border-subtle)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[640px]">
           {/* LEFT COLUMN: Branding, Heading, Authentication Form */}
           <div className="lg:col-span-6 xl:col-span-5 p-6 sm:p-10 lg:p-12 flex flex-col justify-between">
             <div>
+              <div className="w-8 h-8 rounded-lg bg-[#08190C] dark:bg-[#1F6A37] flex items-center justify-center text-[#4EB462]">
+                <Leaf className="w-4 h-4" />
+              </div>
               <div className="text-xs font-semibold tracking-wider text-[#1F6A37] dark:text-[#4EB462]">
                 AGRO-DELIVERIES KE.
               </div>
