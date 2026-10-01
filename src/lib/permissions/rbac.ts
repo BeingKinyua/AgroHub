@@ -1,5 +1,4 @@
 import {
-  InternalRoleId,
   InternalUser,
   PermissionKey,
   RoleDefinition,
@@ -64,6 +63,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
     name: 'Business Owner / Executive',
     description: 'Full visibility across revenue, margins, receivables, payables, inventory value, approvals, and audit trails.',
     defaultFocus: 'Executive Margin, Cash Flow & Governance Overview',
+    lastModified: '2026-09-28',
     permissions: [
       'dashboard.view',
       'orders.view',
@@ -95,6 +95,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
     name: 'Operations Manager',
     description: 'End-to-end command of order fulfillment, warehouse stock, procurement pipelines, delivery dispatch, and operational approvals.',
     defaultFocus: 'Fulfillment SLA, FEFO Risk & Dispatch Control',
+    lastModified: '2026-09-29',
     permissions: [
       'dashboard.view',
       'orders.view',
@@ -134,6 +135,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
     name: 'Sales Representative',
     description: 'Manages institutional accounts, school/hospital/hotel tenders, customer orders, contract renewals, and CRM follow-ups.',
     defaultFocus: 'Institutional Orders, Contracts & Client Follow-ups',
+    lastModified: '2026-09-24',
     permissions: [
       'dashboard.view',
       'orders.view',
@@ -157,6 +159,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
     name: 'Procurement Officer',
     description: 'Manages farm cooperatives, vendor pricing, purchase requests, purchase orders, receiving coordination, and reorder thresholds.',
     defaultFocus: 'Purchase Requests, Supplier Prices & Replenishment',
+    lastModified: '2026-09-27',
     permissions: [
       'dashboard.view',
       'products.view',
@@ -179,6 +182,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
     name: 'Storekeeper',
     description: 'Controls cold-chain and dry-bulk warehouses, FEFO stock batches, GRN receiving, order picking/packing, and wastage logs.',
     defaultFocus: 'Warehouse Stock, FEFO Expiry, Receiving & Picking',
+    lastModified: '2026-09-26',
     permissions: [
       'dashboard.view',
       'orders.view',
@@ -200,6 +204,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
     name: 'Accounts Clerk',
     description: 'Handles customer invoicing, M-Pesa/EFT payment recording, invoice allocations, and daily billing documentation.',
     defaultFocus: 'Invoicing, Payment Recording & AR Allocations',
+    lastModified: '2026-09-21',
     permissions: [
       'dashboard.view',
       'orders.view',
@@ -217,6 +222,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
     name: 'Finance Manager',
     description: 'Oversees Accounts Receivable, Accounts Payable, cash flow, bank reconciliation, credit approvals, and financial reporting.',
     defaultFocus: 'Receivables Aging, Payables, Cash Flow & Reconciliation',
+    lastModified: '2026-09-29',
     permissions: [
       'dashboard.view',
       'orders.view',
@@ -246,6 +252,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
     name: 'Delivery Driver',
     description: 'Executes assigned route runs, inspects loaded orders, updates dispatch status, and captures electronic Proof of Delivery (POD).',
     defaultFocus: 'Assigned Delivery Runs, Route Manifests & POD Capture',
+    lastModified: '2026-09-20',
     permissions: [
       'dashboard.view',
       'orders.view',
@@ -261,6 +268,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
     name: 'Administrator',
     description: 'System governance, administrator-controlled member onboarding, role & permission matrix management, and security audit logs.',
     defaultFocus: 'Identity Governance, Role Matrix & System Audit',
+    lastModified: '2026-09-30',
     permissions: ALL_PERMISSIONS.map((p) => p.key),
   },
 ];
@@ -312,5 +320,7 @@ export const ROUTE_REQUIRED_PERMISSION: Record<string, PermissionKey> = {
   '/administration/users': 'administration.users.view',
   '/administration/roles': 'administration.roles.view',
   '/administration/audit-logs': 'audit.view',
+  '/audit-logs': 'audit.view',
   '/settings': 'dashboard.view',
+  '/profile': 'dashboard.view',
 };

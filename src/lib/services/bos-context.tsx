@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   AccountStatus,
   ApprovalRequestRecord,
@@ -51,6 +51,13 @@ import {
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+export interface ToastItem {
+  id: string;
+  title: string;
+  description?: string;
+  tone: 'success' | 'warning' | 'error' | 'info';
+}
+
 interface BosContextValue {
   // Authentication & Session
   currentUser: InternalUser | null;
@@ -61,11 +68,27 @@ interface BosContextValue {
   ) => Promise<{ ok: boolean; error?: string; status?: AccountStatus }>;
   logout: () => void;
   switchTestPersona: (userId: string) => void;
+  updateCurrentUserProfile: (updates: {
+    fullName: string;
+    nickname: string;
+    phone: string;
+    department: string;
+    branch: string;
+  }) => void;
+
+  // Demo / Prototype Mode
+  demoModeEnabled: boolean;
+  setDemoModeEnabled: (enabled: boolean) => void;
 
   // Theme
   theme: ThemeMode;
   resolvedDark: boolean;
   setTheme: (mode: ThemeMode) => void;
+
+  // Toast Notifications
+  toasts: ToastItem[];
+  pushToast: (toast: Omit<ToastItem, 'id'>) => void;
+  dismissToast: (id: string) => void;
 
   // RBAC
   roles: RoleDefinition[];
@@ -162,6 +185,7 @@ interface BosContextValue {
   ) => Promise<{ ok: boolean; message: string }>;
   inviteInternalMember: (input: {
     fullName: string;
+    nickname?: string;
     email: string;
     roleId: string;
     department: string;
@@ -201,6 +225,8 @@ interface BosContextValue {
     category: DocumentRecord['category'];
     linkedEntity: string;
   }) => Promise<{ ok: boolean; message: string }>;
+  verifyDocumentRecord: (docId: string) => Promise<{ ok: boolean; message: string }>;
+  deleteDocumentRecord: (docId: string) => Promise<{ ok: boolean; message: string }>;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
 }
@@ -219,13 +245,16 @@ const BosContext = createContext<BosContextValue | undefined>(undefined);
 const STORAGE_KEY_USER = 'agro_bos_session_user_v1';
 const STORAGE_KEY_THEME = 'agro_bos_theme_v1';
 const STORAGE_KEY_WIDGETS = 'agro_bos_widgets_v1';
+const STORAGE_KEY_DEMO = 'agro_bos_demo_mode_v1';
 
 export function BosProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<InternalUser | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [demoModeEnabled, setDemoModeState] = useState(false);
 
   const [theme, setThemeState] = useState<ThemeMode>('light');
   const [resolvedDark, setResolvedDark] = useState(false);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const [roles, setRoles] = useState<RoleDefinition[]>(DEFAULT_ROLES);
   const [users, setUsers] = useState<InternalUser[]>(INITIAL_USERS);
@@ -261,6 +290,18 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
   const [enabledWidgets, setEnabledWidgets] =
     useState<string[]>(DEFAULT_WIDGETS);
 
+  const pushToast = useCallback((toast: Omit<ToastItem, 'id'>) => {
+    const id = `tst-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setToasts((prev) => [...prev.slice(-3), { ...toast, id }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4200);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   // Hydrate session and theme preference
   useEffect(() => {
     try {
@@ -279,6 +320,10 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         if (Array.isArray(parsed) && parsed.length > 0) {
           setEnabledWidgets(parsed);
         }
+      }
+      const savedDemo = localStorage.getItem(STORAGE_KEY_DEMO);
+      if (savedDemo === 'true') {
+        setDemoModeState(true);
       }
     } catch {
       // ignore storage errors
@@ -316,6 +361,22 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
+  };
+
+  const setDemoModeEnabled = (enabled: boolean) => {
+    setDemoModeState(enabled);
+    try {
+      localStorage.setItem(STORAGE_KEY_DEMO, String(enabled));
+    } catch {
+      // ignore
+    }
+    pushToast({
+      title: enabled ? 'Prototype Evaluation Mode Enabled' : 'Prototype Mode Hidden',
+      description: enabled
+        ? 'Persona testing controls are now available in Settings → Preferences.'
+        : 'Production UI mode active.',
+      tone: 'info',
+    });
   };
 
   const appendAudit = (
@@ -364,7 +425,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       return {
         ok: false,
         error:
-          'Invalid work email or password. Remember: Agro-Deliveries BOS is strictly internal and requires an Administrator-issued account.',
+          'Invalid work email or password. Agro-Deliveries BOS is strictly internal and requires an Administrator-issued account.',
       };
     }
 
@@ -431,6 +492,35 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
+    pushToast({
+      title: `Active Persona: ${target.fullName}`,
+      description: `Switched workspace context to ${target.roleName}.`,
+      tone: 'info',
+    });
+  };
+
+  const updateCurrentUserProfile: BosContextValue['updateCurrentUserProfile'] = (
+    updates
+  ) => {
+    if (!currentUser) return;
+    const updated: InternalUser = {
+      ...currentUser,
+      ...updates,
+    };
+    setCurrentUser(updated);
+    setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+    appendAudit(
+      'Account',
+      `Profile (${updated.email})`,
+      'Updated Operator Profile Details',
+      `${currentUser.fullName} ("${currentUser.nickname}")`,
+      `${updated.fullName} ("${updated.nickname}") · ${updated.branch}`
+    );
+    pushToast({
+      title: 'Profile Updated',
+      description: 'Your operator account details have been saved in workspace state.',
+      tone: 'success',
+    });
   };
 
   const toggleDashboardWidget = (widgetId: string) => {
@@ -472,9 +562,13 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
+    pushToast({
+      title: 'Dashboard Layout Reset',
+      description: 'Restored default role-aware operational widget arrangement.',
+      tone: 'info',
+    });
   };
 
-  // Server-verified helper
   const verifyServerAction = async (
     requiredPermission: PermissionKey,
     actionName: string
@@ -483,10 +577,13 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       return { ok: false, error: 'Not authenticated.' };
     }
     if (!can(requiredPermission)) {
-      return {
-        ok: false,
-        error: `Unauthorized: Your role (${currentUser.roleName}) lacks '${requiredPermission}' permission.`,
-      };
+      const msg = `Unauthorized: Your role (${currentUser.roleName}) lacks '${requiredPermission}' permission.`;
+      pushToast({
+        title: 'Action Restricted',
+        description: msg,
+        tone: 'error',
+      });
+      return { ok: false, error: msg };
     }
     try {
       const res = await fetch('/api/bos/action', {
@@ -518,15 +615,12 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       return { ok: false, message: 'Selected customer or product not found.' };
     }
 
-    // Business Rule: Do not sell unavailable stock without authorized override
     if (input.quantity > product.availableQty && !can('orders.approve')) {
-      return {
-        ok: false,
-        message: `Insufficient FEFO stock (${product.availableQty} ${product.unit} available). Stock override requires 'orders.approve' authority.`,
-      };
+      const msg = `Insufficient FEFO stock (${product.availableQty} ${product.unit} available). Stock override requires 'orders.approve' authority.`;
+      pushToast({ title: 'FEFO Stock Constraint', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
     }
 
-    // Allocate earliest expiring non-expired FEFO batch
     const matchingBatch =
       stockBatches
         .filter((b) => b.productId === product.id && b.daysToExpiry > 0)
@@ -565,7 +659,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         customer.paymentTerms === 'Prepaid / M-Pesa'
           ? 'Pending Payment'
           : 'Invoiced (Net 30)',
-      orderDate: '2026-09-30',
+      orderDate: '2026-10-01',
       deliveryDate: input.deliveryDate,
       warehouseName: input.warehouseName,
       assignedActor: needsPriceApproval
@@ -594,7 +688,6 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
 
     setOrders((prev) => [newOrder, ...prev]);
 
-    // Reserve stock on product
     setProducts((prev) =>
       prev.map((p) =>
         p.id === product.id
@@ -631,12 +724,17 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `${customer.name} · KES ${lineTotalKes.toLocaleString()} (${newOrder.status})`
     );
 
-    return {
-      ok: true,
-      message: needsPriceApproval
-        ? `Order ${orderNumber} created and routed to Approval Center for price override review.`
-        : `Order ${orderNumber} confirmed with FEFO batch ${matchingBatch} reserved.`,
-    };
+    const msg = needsPriceApproval
+      ? `Order ${orderNumber} created and routed to Approval Center for price override review.`
+      : `Order ${orderNumber} confirmed with FEFO batch ${matchingBatch} reserved.`;
+
+    pushToast({
+      title: `Order ${orderNumber} Created`,
+      description: msg,
+      tone: 'success',
+    });
+
+    return { ok: true, message: msg };
   };
 
   const advanceOrderStatus: BosContextValue['advanceOrderStatus'] = async (
@@ -693,10 +791,14 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `Status: ${nextStatus}`
     );
 
-    return {
-      ok: true,
-      message: `${target.orderNumber} moved from ${target.status} to ${nextStatus}.`,
-    };
+    const msg = `${target.orderNumber} moved from ${target.status} to ${nextStatus}.`;
+    pushToast({
+      title: 'Order Status Updated',
+      description: msg,
+      tone: 'success',
+    });
+
+    return { ok: true, message: msg };
   };
 
   const createProduct: BosContextValue['createProduct'] = async (input) => {
@@ -712,7 +814,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       incomingQty: 0,
       priceHistory: [
         {
-          date: '2026-09-30',
+          date: '2026-10-01',
           tier: 'Institutional',
           priceKes: input.pricing.institutionalKes,
           changedBy: currentUser?.fullName || 'System',
@@ -729,7 +831,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `Unit: ${newProd.unit} · Inst. Price: KES ${newProd.pricing.institutionalKes}`
     );
 
-    return { ok: true, message: `Product ${newProd.name} (${newProd.sku}) added to catalog.` };
+    const msg = `Product ${newProd.name} (${newProd.sku}) added to catalog.`;
+    pushToast({ title: 'Product SKU Added', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const updateProductPrice: BosContextValue['updateProductPrice'] = async (
@@ -757,7 +861,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
               },
               priceHistory: [
                 {
-                  date: '2026-09-30',
+                  date: '2026-10-01',
                   tier: 'Institutional',
                   priceKes: institutionalKes,
                   changedBy: currentUser?.fullName || 'Operator',
@@ -777,10 +881,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `Inst: KES ${institutionalKes} | Whl: KES ${wholesaleKes}`
     );
 
-    return {
-      ok: true,
-      message: `Updated pricing for ${target.name}. Previous pricing preserved in history.`,
-    };
+    const msg = `Updated pricing for ${target.name}. Previous pricing preserved in history.`;
+    pushToast({ title: 'Pricing Tiers Updated', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const recordStockMovement: BosContextValue['recordStockMovement'] = async (
@@ -843,10 +946,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `Available: ${newAvailable} ${batch.unit} (${input.reason})`
     );
 
-    return {
-      ok: true,
-      message: `${input.type} recorded for batch ${batch.batchNumber}. Stock updated to ${newAvailable} ${batch.unit}.`,
-    };
+    const msg = `${input.type} recorded for batch ${batch.batchNumber}. Stock updated to ${newAvailable} ${batch.unit}.`;
+    pushToast({ title: 'Stock Movement Logged', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const createPurchaseOrder: BosContextValue['createPurchaseOrder'] = async (
@@ -906,10 +1008,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `${supplier.name} · KES ${input.totalKes.toLocaleString()} (${newPo.stage})`
     );
 
-    return {
-      ok: true,
-      message: `${poNumber} created (${newPo.stage}).`,
-    };
+    const msg = `${poNumber} created (${newPo.stage}).`;
+    pushToast({ title: 'Purchase Requisition Created', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const advanceProcurementStage: BosContextValue['advanceProcurementStage'] =
@@ -967,10 +1068,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         `Stage: ${nextStage}`
       );
 
-      return {
-        ok: true,
-        message: `${target.poNumber} advanced from ${target.stage} to ${nextStage}.`,
-      };
+      const msg = `${target.poNumber} advanced from ${target.stage} to ${nextStage}.`;
+      pushToast({ title: 'Procurement Stage Advanced', description: msg, tone: 'success' });
+      return { ok: true, message: msg };
     };
 
   const updateDeliveryStatus: BosContextValue['updateDeliveryStatus'] = async (
@@ -1016,10 +1116,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `Status: ${status}${isDelivered ? ' (POD Verified)' : ''}`
     );
 
-    return {
-      ok: true,
-      message: `Delivery run ${run.runNumber} updated to ${status}.`,
-    };
+    const msg = `Delivery run ${run.runNumber} updated to ${status}.`;
+    pushToast({ title: 'Delivery Run Updated', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const recordPayment: BosContextValue['recordPayment'] = async (input) => {
@@ -1035,7 +1134,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       direction: input.direction,
       counterpartyName: input.counterpartyName,
       method: input.method,
-      date: '2026-09-30',
+      date: '2026-10-01',
       amountKes: input.amountKes,
       allocatedToDoc: input.allocatedToDoc,
       reconciled: false,
@@ -1044,7 +1143,6 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
 
     setPayments((prev) => [newPay, ...prev]);
 
-    // Update matching invoice if Inbound AR
     if (input.direction === 'Inbound (Customer AR)') {
       setInvoices((prev) =>
         prev.map((inv) => {
@@ -1071,10 +1169,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `KES ${input.amountKes.toLocaleString()} allocated to ${input.allocatedToDoc}`
     );
 
-    return {
-      ok: true,
-      message: `Payment ${input.referenceCode} (KES ${input.amountKes.toLocaleString()}) recorded and allocated to ${input.allocatedToDoc}.`,
-    };
+    const msg = `Payment ${input.referenceCode} (KES ${input.amountKes.toLocaleString()}) recorded and allocated to ${input.allocatedToDoc}.`;
+    pushToast({ title: 'Payment Recorded', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const reconcilePayment: BosContextValue['reconcilePayment'] = async (
@@ -1101,10 +1198,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       'Reconciled: true'
     );
 
-    return {
-      ok: true,
-      message: `Settlement ${target.referenceCode} marked as reconciled.`,
-    };
+    const msg = `Settlement ${target.referenceCode} marked as reconciled.`;
+    pushToast({ title: 'Settlement Reconciled', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const resolveApproval: BosContextValue['resolveApproval'] = async (
@@ -1135,7 +1231,6 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       )
     );
 
-    // If linked to a PO or Order, release it automatically on approval
     if (decision === 'Approved') {
       setProcurementOrders((prev) =>
         prev.map((po) =>
@@ -1165,10 +1260,13 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `Status: ${decision} (${comment || 'No comment'})`
     );
 
-    return {
-      ok: true,
-      message: `Request ${target.reference} has been ${decision.toLowerCase()}.`,
-    };
+    const msg = `Request ${target.reference} has been ${decision.toLowerCase()}.`;
+    pushToast({
+      title: `Approval ${decision}`,
+      description: msg,
+      tone: decision === 'Approved' ? 'success' : 'warning',
+    });
+    return { ok: true, message: msg };
   };
 
   const inviteInternalMember: BosContextValue['inviteInternalMember'] = async (
@@ -1191,10 +1289,14 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     }
 
     const roleObj = roles.find((r) => r.id === input.roleId);
+    const derivedNickname =
+      input.nickname?.trim() || input.fullName.trim().split(' ')[0];
+
     const newUser: InternalUser = {
       id: `USR-0${users.length + 1}`,
       email: input.email.trim().toLowerCase(),
       fullName: input.fullName.trim(),
+      nickname: derivedNickname,
       roleId: input.roleId,
       roleName: roleObj?.name || input.roleId,
       status: 'Invited',
@@ -1215,10 +1317,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `Role: ${newUser.roleName} · Status: Invited`
     );
 
-    return {
-      ok: true,
-      message: `Invitation dispatched to ${newUser.fullName} (${newUser.email}) with role ${newUser.roleName}.`,
-    };
+    const msg = `Invitation dispatched to ${newUser.fullName} (${newUser.email}) with role ${newUser.roleName}.`;
+    pushToast({ title: 'Internal Member Invited', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const updateUserAccountStatus: BosContextValue['updateUserAccountStatus'] =
@@ -1244,10 +1345,13 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         `Status: ${status}`
       );
 
-      return {
-        ok: true,
-        message: `${target.fullName}'s account status is now ${status}.`,
-      };
+      const msg = `${target.fullName}'s account status is now ${status}.`;
+      pushToast({
+        title: `Account ${status}`,
+        description: msg,
+        tone: status === 'Active' ? 'success' : 'warning',
+      });
+      return { ok: true, message: msg };
     };
 
   const toggleRolePermission: BosContextValue['toggleRolePermission'] = async (
@@ -1270,7 +1374,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
 
     setRoles((prev) =>
       prev.map((r) =>
-        r.id === roleId ? { ...r, permissions: updatedPerms } : r
+        r.id === roleId
+          ? { ...r, permissions: updatedPerms, lastModified: '2026-10-01' }
+          : r
       )
     );
 
@@ -1282,10 +1388,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `${permission}: ${!hadPerm}`
     );
 
-    return {
-      ok: true,
-      message: `${hadPerm ? 'Removed' : 'Granted'} '${permission}' on ${targetRole.name}.`,
-    };
+    const msg = `${hadPerm ? 'Removed' : 'Granted'} '${permission}' on ${targetRole.name}.`;
+    pushToast({ title: 'Role Permissions Updated', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const createCustomer: BosContextValue['createCustomer'] = async (input) => {
@@ -1334,10 +1439,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `${newCust.segment} · Credit Limit KES ${newCust.creditLimitKes.toLocaleString()}`
     );
 
-    return {
-      ok: true,
-      message: `${newCust.name} added to customer directory.`,
-    };
+    const msg = `${newCust.name} added to customer directory.`;
+    pushToast({ title: 'Customer Onboarded', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const createCrmTicket: BosContextValue['createCrmTicket'] = async (input) => {
@@ -1365,10 +1469,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `${ticket.customerName} (${ticket.priority})`
     );
 
-    return {
-      ok: true,
-      message: `CRM record ${ticket.ticketNumber} created.`,
-    };
+    const msg = `CRM record ${ticket.ticketNumber} created.`;
+    pushToast({ title: 'CRM Follow-Up Logged', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const resolveCrmTicket: BosContextValue['resolveCrmTicket'] = async (
@@ -1392,10 +1495,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       'Status: Resolved'
     );
 
-    return {
-      ok: true,
-      message: `${target.ticketNumber} marked as Resolved.`,
-    };
+    const msg = `${target.ticketNumber} marked as Resolved.`;
+    pushToast({ title: 'CRM Ticket Resolved', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
   };
 
   const uploadDocumentRecord: BosContextValue['uploadDocumentRecord'] = async (
@@ -1414,7 +1516,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       category: input.category,
       linkedEntity: input.linkedEntity,
       uploadedBy: currentUser?.fullName || 'Operator',
-      uploadedAt: 'Just now',
+      uploadedAt: '2026-10-01',
       fileSize: '380 KB',
       storageBucket: 'bos-operational-docs',
       verified: true,
@@ -1429,10 +1531,61 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       `${doc.title} (Linked: ${doc.linkedEntity})`
     );
 
-    return {
-      ok: true,
-      message: `Document ${doc.docNumber} stored and linked to ${doc.linkedEntity}.`,
-    };
+    const msg = `Document ${doc.docNumber} stored and linked to ${input.linkedEntity}.`;
+    pushToast({ title: 'Document Uploaded', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
+  };
+
+  const verifyDocumentRecord: BosContextValue['verifyDocumentRecord'] = async (
+    docId
+  ) => {
+    const auth = await verifyServerAction(
+      'documents.manage',
+      'Verify Operational Document'
+    );
+    if (!auth.ok) return { ok: false, message: auth.error! };
+
+    const target = documents.find((d) => d.id === docId);
+    if (!target) return { ok: false, message: 'Document not found.' };
+
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === docId ? { ...d, verified: true } : d))
+    );
+    appendAudit(
+      'Documents',
+      target.docNumber,
+      'Verified Operational Document',
+      'Verified: false',
+      'Verified: true'
+    );
+    const msg = `${target.docNumber} marked as verified.`;
+    pushToast({ title: 'Document Verified', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
+  };
+
+  const deleteDocumentRecord: BosContextValue['deleteDocumentRecord'] = async (
+    docId
+  ) => {
+    const auth = await verifyServerAction(
+      'documents.manage',
+      'Remove Operational Document'
+    );
+    if (!auth.ok) return { ok: false, message: auth.error! };
+
+    const target = documents.find((d) => d.id === docId);
+    if (!target) return { ok: false, message: 'Document not found.' };
+
+    setDocuments((prev) => prev.filter((d) => d.id !== docId));
+    appendAudit(
+      'Documents',
+      target.docNumber,
+      'Deleted Document Record',
+      `${target.title}`,
+      'Removed from registry'
+    );
+    const msg = `${target.docNumber} removed from registry.`;
+    pushToast({ title: 'Document Removed', description: msg, tone: 'warning' });
+    return { ok: true, message: msg };
   };
 
   const markNotificationRead = (id: string) => {
@@ -1453,9 +1606,15 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         loginWithCredentials,
         logout,
         switchTestPersona,
+        updateCurrentUserProfile,
+        demoModeEnabled,
+        setDemoModeEnabled,
         theme,
         resolvedDark,
         setTheme,
+        toasts,
+        pushToast,
+        dismissToast,
         roles,
         can,
         activePermissions,
@@ -1498,6 +1657,8 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         createCrmTicket,
         resolveCrmTicket,
         uploadDocumentRecord,
+        verifyDocumentRecord,
+        deleteDocumentRecord,
         markNotificationRead,
         markAllNotificationsRead,
       }}

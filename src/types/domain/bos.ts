@@ -64,12 +64,15 @@ export interface RoleDefinition {
   description: string;
   permissions: PermissionKey[];
   defaultFocus: string;
+  lastModified?: string;
 }
 
 export interface InternalUser {
   id: string;
   email: string;
   fullName: string;
+  nickname: string;
+  avatarUrl?: string;
   roleId: InternalRoleId | string;
   roleName: string;
   status: AccountStatus;
@@ -379,7 +382,8 @@ export interface DocumentRecord {
     | 'Purchase Order'
     | 'Goods Received Note (GRN)'
     | 'KEBS / Quality Certificate'
-    | 'Proof of Delivery (POD)';
+    | 'Proof of Delivery (POD)'
+    | 'Supplier Document';
   linkedEntity: string;
   uploadedBy: string;
   uploadedAt: string;
