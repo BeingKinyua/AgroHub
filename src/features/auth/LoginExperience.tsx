@@ -82,16 +82,14 @@ export function LoginExperience() {
           {/* LEFT COLUMN: Branding, Heading, Authentication Form */}
           <div className="lg:col-span-6 xl:col-span-5 p-6 sm:p-10 lg:p-12 flex flex-col justify-between">
             <div>
-              <div className="w-8 h-8 rounded-lg bg-[#08190C] dark:bg-[#1F6A37] flex items-center justify-center text-[#4EB462]">
-                <Leaf className="w-4 h-4" />
+              <div className='flex flex-row align-center'>
+                  <div className="w-8 h-8 rounded-lg mr-4 bg-[#08190C] dark:bg-[#1F6A37] flex items-center justify-center text-[#4EB462]">
+                    <Leaf className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs font-semibold tracking-wider text-[#1F6A37] dark:text-[#4EB462]">
+                    AGRO-DELIVERIES KE.
+                  </div>
               </div>
-              <div className="text-xs font-semibold tracking-wider text-[#1F6A37] dark:text-[#4EB462]">
-                AGRO-DELIVERIES KE.
-              </div>
-              <div className="text-xs text-[var(--text-secondary)] mt-0.5">
-                BUSINESS OPERATING SYSTEM
-              </div>
-
               <h1 className="font-heading text-3xl sm:text-4xl font-semibold tracking-tight text-[var(--text-primary)] mt-8">
                 Welcome back.
               </h1>
@@ -263,6 +261,9 @@ export function LoginExperience() {
                 </div>
               )}
             </div>
+            <footer className="w-full max-w-[1360px] mx-auto py-2 flex flex-col sm:flex-row items-center justify-between text-xs text-[var(--text-secondary)] gap-2">
+              <span>© {new Date().getFullYear()} Agro-Deliveries Kenya Internal Business Operating System.</span>
+            </footer>
           </div>
 
           {/* RIGHT COLUMN: Immersive Agricultural / Distribution Imagery */}
@@ -304,11 +305,6 @@ export function LoginExperience() {
           </div>
         </div>
       </main>
-
-      <footer className="w-full max-w-[1360px] mx-auto py-2 flex flex-col sm:flex-row items-center justify-between text-xs text-[var(--text-secondary)] gap-2">
-        <span>© {new Date().getFullYear()} Agro-Deliveries Kenya Ltd. Internal Business Operating System.</span>
-        <span>Nairobi Cold Hub A · Embakasi Dry Bulk B · Westlands Cross-Dock C</span>
-      </footer>
     </div>
   );
 }
