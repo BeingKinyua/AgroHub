@@ -261,7 +261,7 @@ export function LoginExperience() {
                 </div>
               )}
             </div>
-            <footer className="w-full max-w-[1360px] mx-auto py-2 flex flex-col sm:flex-row items-center justify-between text-xs text-[var(--text-secondary)] gap-2">
+            <footer className="w-full max-w-[1360px] mx-auto py-2 flex flex-col sm:flex-row items-center justify-center text-xs text-[var(--text-secondary)] gap-2">
               <span>© {new Date().getFullYear()} Agro-Deliveries Kenya Internal Business Operating System.</span>
             </footer>
           </div>
