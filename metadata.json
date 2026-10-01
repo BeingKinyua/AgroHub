@@ -1,0 +1,6 @@
+{
+  "name": "Agro-Deliveries Kenya BOS",
+  "description": "Unified Business Operating System for Agro-Deliveries Kenya covering institutional supply, FEFO inventory, procurement, warehouse fulfillment, deliveries, finance, CRM, and RBAC governance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
