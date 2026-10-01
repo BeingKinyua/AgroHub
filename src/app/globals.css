@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  /* Agro-Deliveries Brand Color System */
+  --agro-deep-forest: #08190C;
+  --agro-forest-green: #1F6A37;
+  --agro-emerald: #4EB462;
+  --agro-deep-green: #12512C;
+  --agro-soft-mint: #E5EFE6;
+  --agro-off-white: #F4F6F3;
+  --agro-white: #FFFFFF;
+  --agro-ink: #111D12;
+  --agro-muted-green: #3D694A;
+
+  /* Light Mode Operational Surfaces */
+  --bg-canvas: #F4F6F3;
+  --bg-elevated: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #E5EFE6;
+  --text-primary: #111D12;
+  --text-secondary: #3D694A;
+  --border-subtle: rgba(17, 29, 18, 0.08);
+  --brand-accent: #1F6A37;
+  --brand-emerald: #4EB462;
+
+  /* Design System Radius & Transitions */
+  --radius-card: 18px;
+  --radius-control: 10px;
+}
+
+.dark {
+  /* Deliberate Dark Mode Operational Surfaces */
+  --bg-canvas: #08190C;
+  --bg-elevated: #0C1B11;
+  --bg-card: #142B1B;
+  --bg-subtle: #122719;
+  --text-primary: #F4F6F3;
+  --text-secondary: #A9BEAE;
+  --border-subtle: rgba(78, 180, 98, 0.16);
+  --brand-accent: #4EB462;
+  --brand-emerald: #4EB462;
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-heading {
+  font-family: var(--font-manrope), var(--font-inter), sans-serif;
+}
+
+.font-mono-tabular {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
