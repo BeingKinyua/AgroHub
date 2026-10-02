@@ -1260,7 +1260,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div
               role="group"
               aria-label="Theme Mode"
-              className="hidden sm:flex items-center p-1 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)]"
+              className="hidden sm:flex items-center p-1 rounded-full bg-[var(--bg-canvas)]/50 border border-[var(--border-subtle)]"
             >
               <button
                 type="button"
@@ -1273,7 +1273,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                <Sun className="w-3.5 h-3.5" color='yellow'/>
+                <Sun className="w-3.5 h-3.5" fill='yellow'/>
               </button>
               <button
                 type="button"
@@ -1286,7 +1286,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                <Moon className="w-3.5 h-3.5" color='gray' />
+                <Moon className="w-3.5 h-3.5" fill='gray' />
               </button>
               <button
                 type="button"
@@ -1299,7 +1299,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                <Monitor className="w-3.5 h-3.5" color='#1F6A37' />
+                <Monitor className="w-3.5 h-3.5" fill='#1F6A37' />
               </button>
             </div>
 
@@ -1429,22 +1429,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
                 aria-expanded={profileMenuOpen}
                 aria-label="Account and Profile Menu"
-                className="h-10 pl-1.5 pr-2.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center gap-2 text-left hover:border-[#4EB462]/60 transition-colors cursor-pointer"
+                className="h-10 pl-1.5 pr-2.5 rounded-full flex items-center gap-2 text-left hover:border-[#4EB462]/60 transition-colors cursor-pointer"
               >
                 <Avatar
                   fullName={currentUser.fullName}
                   avatarUrl={currentUser.avatarUrl}
-                  size="sm"
+                  size="md"
                 />
-                {/* // <div className="hidden xl:block max-w-[140px]">
-                //   <div className="text-xs font-medium text-[var(--text-primary)] truncate leading-none">
-                //     {currentUser.nickname || currentUser.fullName.split(' ')[0]}
-                //   </div>
-                //   <div className="text-[10px] text-[#1F6A37] dark:text-[#4EB462] truncate mt-0.5">
-                //     {currentUser.roleName}
-                //   </div>
-                // </div> 
-                */}
               </button>
 
               <AnimatePresence>
@@ -1458,13 +1449,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <Avatar
                         fullName={currentUser.fullName}
                         avatarUrl={currentUser.avatarUrl}
-                        size="lg"
+                        size="xl"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                        <div className="text-sm txt-center font-semibold text-[var(--text-primary)] truncate">
                           {currentUser.fullName}
                         </div>
-                        <div className="text-xs text-[var(--text-secondary)] truncate">
+                        <div className="text-xs text-center text-[var(--text-secondary)] truncate">
                           @{currentUser.nickname} · {currentUser.email}
                         </div>
                         <div className="mt-1 flex items-center gap-1.5">

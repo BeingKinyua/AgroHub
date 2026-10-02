@@ -205,7 +205,7 @@ export function Tooltip({
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 transition-opacity duration-150 z-[var(--z-dropdown)] whitespace-nowrap px-2.5 py-1 rounded-lg bg-[#08190C] text-[#F4F6F3] border border-white/12 text-[11px] font-medium shadow-md ${
+        className={`pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 transition-opacity duration-150 z-[var(--z-dropdown)] whitespace-nowrap px-2.5 py-1 rounded-full bg-[#08190C] text-[#F4F6F3] border border-white/12 text-[11px] font-medium shadow-md ${
           side === 'right'
             ? 'absolute left-full top-1/2 -translate-y-1/2 ml-2.5'
             : 'absolute top-full left-1/2 -translate-x-1/2 mt-2'
