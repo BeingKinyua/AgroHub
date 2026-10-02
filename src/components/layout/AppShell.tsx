@@ -1087,7 +1087,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Menu className="w-4 h-4" />
             </button>
-            // BreadCrumb Component
+            {/* BreadCrumb Component */}
             <div className="flex items-center gap-2 text-xs sm:text-sm min-w-0">
               <Link
                 href="/dashboard"
@@ -1315,9 +1315,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
                 aria-label="Notifications"
                 aria-expanded={notificationsOpen}
-                className="relative h-10 w-10 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] hover:border-[#4EB462]/60 transition-colors cursor-pointer"
+                className="relative h-10 w-10 rounded-full hover:bg-[var(--bg-canvas)] flex items-center justify-center text-[var(--text-primary)] transition-colors cursor-pointer"
               >
-                <Bell className="w-4 h-4" color='#1F6A37'/>
+                <Bell className="w-4 h-4" fill='#1F6A37'/>
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#CC310E] text-white font-mono-tabular text-[10px] flex items-center justify-center">
                     {unreadCount}
@@ -1436,14 +1436,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   avatarUrl={currentUser.avatarUrl}
                   size="sm"
                 />
-                // <div className="hidden xl:block max-w-[140px]">
+                {/* // <div className="hidden xl:block max-w-[140px]">
                 //   <div className="text-xs font-medium text-[var(--text-primary)] truncate leading-none">
                 //     {currentUser.nickname || currentUser.fullName.split(' ')[0]}
                 //   </div>
                 //   <div className="text-[10px] text-[#1F6A37] dark:text-[#4EB462] truncate mt-0.5">
                 //     {currentUser.roleName}
                 //   </div>
-                // </div>
+                // </div> 
+                */}
               </button>
 
               <AnimatePresence>
