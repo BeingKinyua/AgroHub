@@ -1087,6 +1087,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Menu className="w-4 h-4" />
             </button>
+            // BreadCrumb Component
             <div className="flex items-center gap-2 text-xs sm:text-sm min-w-0">
               <Link
                 href="/dashboard"
@@ -1111,7 +1112,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="w-full h-10 px-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] flex items-center justify-between gap-2 hover:border-[#4EB462]/60 transition-colors cursor-pointer"
+              className="w-full h-10 px-3.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] flex items-center justify-between gap-2 hover:border-[#4EB462]/60 transition-colors cursor-pointer"
             >
               <span className="flex items-center gap-2 truncate">
                 <Search className="w-3.5 h-3.5 shrink-0 text-[#1F6A37] dark:text-[#4EB462]" />
@@ -1119,7 +1120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   Search orders, FEFO batches, institutions, SKUs...
                 </span>
               </span>
-              <kbd className="hidden sm:inline-block font-mono-tabular text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+              <kbd className="hidden sm:inline-block font-mono-tabular text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)]">
                 ⌘K
               </kbd>
             </button>
@@ -1142,7 +1143,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     setDemoSwitcherOpen(false);
                   }}
                   aria-expanded={quickActionsOpen}
-                  className="h-10 px-3.5 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+                  className="h-10 px-3.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span className="hidden md:inline">Quick Action</span>
@@ -1259,46 +1260,46 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div
               role="group"
               aria-label="Theme Mode"
-              className="hidden sm:flex items-center p-1 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]"
+              className="hidden sm:flex items-center p-1 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)]"
             >
               <button
                 type="button"
                 onClick={() => setTheme('light')}
                 title="Light mode"
                 aria-label="Light mode"
-                className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                className={`p-1.5 rounded-full text-xs transition-colors cursor-pointer ${
                   theme === 'light'
                     ? 'bg-[var(--bg-card)] text-[#1F6A37] shadow-xs'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                <Sun className="w-3.5 h-3.5" />
+                <Sun className="w-3.5 h-3.5" color='yellow'/>
               </button>
               <button
                 type="button"
                 onClick={() => setTheme('dark')}
                 title="Dark mode"
                 aria-label="Dark mode"
-                className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                className={`p-1.5 rounded-full text-xs transition-colors cursor-pointer ${
                   theme === 'dark'
                     ? 'bg-[var(--bg-card)] text-[#4EB462] shadow-xs'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                <Moon className="w-3.5 h-3.5" />
+                <Moon className="w-3.5 h-3.5" color='gray' />
               </button>
               <button
                 type="button"
                 onClick={() => setTheme('system')}
                 title="System theme"
                 aria-label="System theme"
-                className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                className={`p-1.5 rounded-full text-xs transition-colors cursor-pointer ${
                   theme === 'system'
                     ? 'bg-[var(--bg-card)] text-[#1F6A37] dark:text-[#4EB462] shadow-xs'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                <Monitor className="w-3.5 h-3.5" />
+                <Monitor className="w-3.5 h-3.5" color='#1F6A37' />
               </button>
             </div>
 
@@ -1314,11 +1315,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
                 aria-label="Notifications"
                 aria-expanded={notificationsOpen}
-                className="relative h-10 w-10 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] hover:border-[#4EB462]/60 transition-colors cursor-pointer"
+                className="relative h-10 w-10 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] hover:border-[#4EB462]/60 transition-colors cursor-pointer"
               >
-                <Bell className="w-4 h-4" />
+                <Bell className="w-4 h-4" color='#1F6A37'/>
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#1F6A37] text-white font-mono-tabular text-[10px] flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#CC310E] text-white font-mono-tabular text-[10px] flex items-center justify-center">
                     {unreadCount}
                   </span>
                 )}
@@ -1428,21 +1429,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
                 aria-expanded={profileMenuOpen}
                 aria-label="Account and Profile Menu"
-                className="h-10 pl-1.5 pr-2.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center gap-2 text-left hover:border-[#4EB462]/60 transition-colors cursor-pointer"
+                className="h-10 pl-1.5 pr-2.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center gap-2 text-left hover:border-[#4EB462]/60 transition-colors cursor-pointer"
               >
                 <Avatar
                   fullName={currentUser.fullName}
                   avatarUrl={currentUser.avatarUrl}
                   size="sm"
                 />
-                <div className="hidden xl:block max-w-[140px]">
-                  <div className="text-xs font-medium text-[var(--text-primary)] truncate leading-none">
-                    {currentUser.nickname || currentUser.fullName.split(' ')[0]}
-                  </div>
-                  <div className="text-[10px] text-[#1F6A37] dark:text-[#4EB462] truncate mt-0.5">
-                    {currentUser.roleName}
-                  </div>
-                </div>
+                // <div className="hidden xl:block max-w-[140px]">
+                //   <div className="text-xs font-medium text-[var(--text-primary)] truncate leading-none">
+                //     {currentUser.nickname || currentUser.fullName.split(' ')[0]}
+                //   </div>
+                //   <div className="text-[10px] text-[#1F6A37] dark:text-[#4EB462] truncate mt-0.5">
+                //     {currentUser.roleName}
+                //   </div>
+                // </div>
               </button>
 
               <AnimatePresence>
@@ -1452,7 +1453,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     className="absolute right-0 mt-2 w-80 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-lg)] p-3.5 z-[var(--z-dropdown)]"
                   >
                     {/* Identity Header */}
-                    <div className="flex items-center gap-3 pb-3 mb-2.5 border-b border-[var(--border-subtle)]">
+                    <div className="flex flex-col items-center gap-3 pb-3 mb-2.5 border-b border-[var(--border-subtle)]">
                       <Avatar
                         fullName={currentUser.fullName}
                         avatarUrl={currentUser.avatarUrl}
