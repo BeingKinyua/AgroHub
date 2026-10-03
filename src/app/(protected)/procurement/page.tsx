@@ -66,7 +66,7 @@ export default function ProcurementPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>New Purchase Requisition</span>
@@ -169,7 +169,7 @@ export default function ProcurementPage() {
                   <button
                     type="button"
                     onClick={() => handleAdvance(po.id)}
-                    className="px-3.5 py-2 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>Advance Stage</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -266,13 +266,13 @@ export default function ProcurementPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(false)}
-              className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-[#1F6A37] text-white text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
             >
               Submit Requisition
             </button>

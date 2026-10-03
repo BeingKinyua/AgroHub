@@ -115,7 +115,7 @@ export default function ProfilePage() {
         actions={
           <Link
             href="/settings"
-            className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-2 transition-colors"
+            className="h-10 px-4 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
           >
             <span>Workspace Settings</span>
           </Link>
@@ -323,7 +323,7 @@ export default function ProfilePage() {
                 </Link>
                 <button
                   type="submit"
-                  className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+                  className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Save Profile Changes</span>
@@ -345,7 +345,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between gap-3">
+            <div className="p-3.5 rounded-2xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold text-[var(--text-primary)]">
                   Color Theme Mode
@@ -354,14 +354,14 @@ export default function ProfilePage() {
                   Switch between light operational canvas and dark forest mode
                 </div>
               </div>
-              <div className="flex items-center p-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+              <div className="flex items-center p-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)]">
                 <button
                   type="button"
                   onClick={() => setTheme('light')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1 cursor-pointer ${
+                  className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors ${
                     theme === 'light'
                       ? 'bg-[#1F6A37] text-white'
-                      : 'text-[var(--text-secondary)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <Sun className="w-3.5 h-3.5" />
@@ -370,10 +370,10 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => setTheme('dark')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1 cursor-pointer ${
+                  className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors ${
                     theme === 'dark'
                       ? 'bg-[#1F6A37] text-white'
-                      : 'text-[var(--text-secondary)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <Moon className="w-3.5 h-3.5" />
@@ -382,10 +382,10 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => setTheme('system')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1 cursor-pointer ${
+                  className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors ${
                     theme === 'system'
                       ? 'bg-[#1F6A37] text-white'
-                      : 'text-[var(--text-secondary)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <Monitor className="w-3.5 h-3.5" />
@@ -394,7 +394,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between gap-3">
+            <div className="p-3.5 rounded-2xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
@@ -407,7 +407,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => setDemoModeEnabled(!demoModeEnabled)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                   demoModeEnabled
                     ? 'bg-[#1F6A37] text-white'
                     : 'bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)]'

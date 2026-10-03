@@ -19,7 +19,7 @@ export default function InstitutionsPage() {
         actions={
           <Link
             href="/orders"
-            className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2"
+            className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2"
           >
             <span>View Institutional Orders</span>
           </Link>

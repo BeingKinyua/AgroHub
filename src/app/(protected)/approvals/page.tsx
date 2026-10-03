@@ -116,7 +116,7 @@ export default function ApprovalsPage() {
                     <button
                       type="button"
                       onClick={() => handleDecision(apr.id, 'Approved')}
-                      className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                      className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Approve</span>
@@ -124,7 +124,7 @@ export default function ApprovalsPage() {
                     <button
                       type="button"
                       onClick={() => handleDecision(apr.id, 'Rejected')}
-                      className="h-10 px-4 rounded-xl bg-red-600/15 hover:bg-red-600/25 text-red-700 dark:text-red-300 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                      className="h-10 px-4 rounded-full bg-red-600/15 hover:bg-red-600/25 text-red-700 dark:text-red-300 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <XCircle className="w-4 h-4" />
                       <span>Reject</span>

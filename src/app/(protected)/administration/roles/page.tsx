@@ -93,7 +93,7 @@ export default function RolesAdministrationPage() {
                 key={r.id}
                 type="button"
                 onClick={() => setSelectedRoleId(r.id)}
-                className={`w-full text-left p-4 rounded-[18px] border transition-all cursor-pointer ${
+                className={`w-full text-left p-4 rounded-full border transition-all cursor-pointer ${
                   active
                     ? 'bg-[#142B1B] text-[#F4F6F3] border-[#4EB462]/45 shadow-[var(--shadow-md)]'
                     : 'bg-[var(--bg-card)] text-[var(--text-primary)] border-[var(--border-subtle)] hover:border-[#4EB462]/40'
@@ -193,7 +193,7 @@ export default function RolesAdministrationPage() {
                               type="button"
                               disabled={!editable}
                               onClick={() => handleToggle(p.key)}
-                              className={`p-3 rounded-xl border text-left flex items-start justify-between gap-3 transition-colors ${
+                              className={`px-4 py-3 rounded-full border text-left flex items-start justify-between gap-3 transition-colors ${
                                 granted
                                   ? 'bg-[var(--bg-card)] border-[#4EB462]/45'
                                   : 'bg-[var(--bg-card)]/50 border-[var(--border-subtle)] opacity-70'

@@ -73,7 +73,7 @@ export default function ResetPasswordPage() {
             </div>
             <button
               type="submit"
-              className="w-full h-11 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-sm font-medium cursor-pointer"
+              className="w-full h-11 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-sm font-medium cursor-pointer"
             >
               Update password
             </button>

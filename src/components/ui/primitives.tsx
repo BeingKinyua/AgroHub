@@ -340,7 +340,6 @@ export function StatusBadge({ status }: { status: string }) {
 
 export function PageHeader({
   kicker,
-  breadcrumbs,
   title,
   description,
   actions,
@@ -357,7 +356,6 @@ export function PageHeader({
       className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-[var(--border-subtle)] mb-6"
     >
       <div>
-        {breadcrumbs && <Breadcrumbs items={breadcrumbs} />}
         {kicker && (
           <div className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] mb-1">
             {kicker}
@@ -398,7 +396,7 @@ export function FilterBar({
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className="sm:hidden h-9 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1.5 shrink-0 cursor-pointer"
+            className="sm:hidden h-9 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1.5 shrink-0 cursor-pointer"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
             <span>
@@ -435,7 +433,7 @@ export function FilterBar({
                   type="button"
                   onClick={() => setDrawerOpen(false)}
                   aria-label="Close filter drawer"
-                  className="p-1.5 rounded-lg text-[var(--text-secondary)]"
+                  className="p-1.5 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-canvas)]"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -444,7 +442,7 @@ export function FilterBar({
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="w-full h-10 rounded-xl bg-[#1F6A37] text-white text-xs font-medium"
+                className="w-full h-10 rounded-full bg-[#1F6A37] text-white text-xs font-medium"
               >
                 Apply Filters
               </button>
@@ -482,7 +480,7 @@ export function EmptyState({
         <button
           type="button"
           onClick={onAction}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-[#1F6A37] text-white hover:bg-[#12512C] transition-colors cursor-pointer"
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium bg-[#1F6A37] text-white hover:bg-[#12512C] transition-colors cursor-pointer"
         >
           {actionLabel}
         </button>
@@ -515,7 +513,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onRetry}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-[#1F6A37] text-white hover:bg-[#12512C] transition-colors cursor-pointer"
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium bg-[#1F6A37] text-white hover:bg-[#12512C] transition-colors cursor-pointer"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Try again</span>
@@ -550,7 +548,7 @@ export function AccessDenied({
           across all operational records.
         </p>
         {requiredPermission && (
-          <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+          <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
             <span>Required authority:</span>
             <code className="font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]">
               {requiredPermission}
@@ -560,7 +558,7 @@ export function AccessDenied({
         <div className="mt-6 flex items-center justify-center gap-3">
           <Link
             href="/dashboard"
-            className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors"
+            className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Return to Dashboard</span>
@@ -643,7 +641,7 @@ export function Modal({
                 type="button"
                 onClick={onClose}
                 aria-label="Close modal"
-                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] cursor-pointer"
+                className="p-1.5 rounded-full text-[var(--text-secondary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -696,7 +694,7 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+            className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
           >
             Cancel
           </button>
@@ -706,7 +704,7 @@ export function ConfirmDialog({
               onConfirm();
               onClose();
             }}
-            className={`h-10 px-4 rounded-xl text-white text-xs font-medium cursor-pointer transition-colors ${
+            className={`h-10 px-4 rounded-full text-white text-xs font-medium cursor-pointer transition-colors ${
               destructive
                 ? 'bg-red-600 hover:bg-red-700'
                 : 'bg-[#1F6A37] hover:bg-[#12512C]'
@@ -784,7 +782,7 @@ export function FeedbackBanner({
       <button
         type="button"
         onClick={onDismiss}
-        className="p-1 rounded hover:opacity-75 cursor-pointer"
+        className="p-1 rounded-full hover:opacity-75 cursor-pointer"
         aria-label="Dismiss alert"
       >
         <X className="w-3.5 h-3.5" />

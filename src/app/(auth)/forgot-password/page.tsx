@@ -78,7 +78,7 @@ export default function ForgotPasswordPage() {
 
             <button
               type="submit"
-              className="w-full h-11 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-sm font-medium transition-colors cursor-pointer"
+              className="w-full h-11 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-sm font-medium transition-colors cursor-pointer"
             >
               Send recovery link
             </button>

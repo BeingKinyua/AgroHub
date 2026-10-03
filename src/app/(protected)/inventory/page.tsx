@@ -73,7 +73,7 @@ export default function InventoryPage() {
             <button
               type="button"
               onClick={() => setModalOpen(true)}
-              className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Record Adjustment / Transfer / Wastage</span>
@@ -127,14 +127,14 @@ export default function InventoryPage() {
       </div>
 
       {/* Interactive View Switcher */}
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit mb-6">
+      <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit mb-6">
         <button
           type="button"
           onClick={() => setActiveTab('batches')}
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
             activeTab === 'batches'
               ? 'bg-[#1F6A37] text-white'
-              : 'text-[var(--text-secondary)]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
           FEFO Stock Batches ({stockBatches.length})
@@ -142,10 +142,10 @@ export default function InventoryPage() {
         <button
           type="button"
           onClick={() => setActiveTab('movements')}
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
             activeTab === 'movements'
               ? 'bg-[#1F6A37] text-white'
-              : 'text-[var(--text-secondary)]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
           Stock Movements & Wastage Ledger ({stockMovements.length})
@@ -153,10 +153,10 @@ export default function InventoryPage() {
         <button
           type="button"
           onClick={() => setActiveTab('warehouses')}
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
             activeTab === 'warehouses'
               ? 'bg-[#1F6A37] text-white'
-              : 'text-[var(--text-secondary)]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
           Cold-Chain Facility Visual
@@ -416,13 +416,13 @@ export default function InventoryPage() {
             <button
               type="button"
               onClick={() => setModalOpen(false)}
-              className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-[#1F6A37] text-white text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
             >
               Post Stock Movement
             </button>

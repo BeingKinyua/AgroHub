@@ -144,7 +144,7 @@ export default function OrdersPage() {
               <button
                 type="button"
                 onClick={handleExportCsv}
-                className="h-10 px-3.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-2 hover:border-[#4EB462] cursor-pointer"
+                className="h-10 px-4 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-2 hover:border-[#4EB462] cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
                 <span>Export Manifest</span>
@@ -154,7 +154,7 @@ export default function OrdersPage() {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+                className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Order</span>
@@ -212,13 +212,13 @@ export default function OrdersPage() {
       <Card className="mb-6" padding="p-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Interactive Segmented Status Filter */}
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-canvas)] overflow-x-auto">
+          <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-canvas)] overflow-x-auto">
             {STATUS_FILTERS.map((st) => (
               <button
                 key={st}
                 type="button"
                 onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
                   statusFilter === st
                     ? 'bg-[#1F6A37] text-white'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -307,7 +307,7 @@ export default function OrdersPage() {
                         <button
                           type="button"
                           onClick={() => setSelectedOrder(ord)}
-                          className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] inline-flex items-center gap-1 cursor-pointer"
+                          className="px-3 py-1.5 rounded-full border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] inline-flex items-center gap-1 cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>Inspect</span>
@@ -345,7 +345,7 @@ export default function OrdersPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedOrder(ord)}
-                    className="px-3 py-1.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium"
+                    className="px-3 py-1.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
                   >
                     Inspect Order
                   </button>
@@ -451,7 +451,7 @@ export default function OrdersPage() {
                       });
                       if (res.ok) setSelectedOrder(null);
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
                       selectedOrder.status === st
                         ? 'bg-[#E5EFE6] border-[#4EB462] text-[#12512C] opacity-60 cursor-default'
                         : 'bg-[var(--bg-canvas)] border-[var(--border-subtle)] hover:border-[#4EB462]'
@@ -611,13 +611,13 @@ export default function OrdersPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(false)}
-              className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
             >
               <ShoppingBag className="w-3.5 h-3.5" />
               <span>Confirm & Reserve FEFO Stock</span>

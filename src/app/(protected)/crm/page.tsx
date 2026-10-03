@@ -57,7 +57,7 @@ export default function CrmPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Log Ticket / Follow-Up</span>
@@ -128,7 +128,7 @@ export default function CrmPage() {
                       type: res.ok ? 'success' : 'error',
                     });
                   }}
-                  className="px-3.5 py-2 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+                  className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Mark Resolved</span>
@@ -225,13 +225,13 @@ export default function CrmPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(false)}
-              className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-[#1F6A37] text-white text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
             >
               Save CRM Record
             </button>

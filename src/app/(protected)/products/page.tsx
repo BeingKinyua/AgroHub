@@ -132,7 +132,7 @@ export default function ProductsPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>New Product SKU</span>
@@ -179,13 +179,13 @@ export default function ProductsPage() {
       {/* Filter Bar */}
       <Card className="mb-6" padding="p-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-canvas)] overflow-x-auto">
+          <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-canvas)] overflow-x-auto">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setCategoryFilter(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap cursor-pointer ${
+                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap cursor-pointer ${
                   categoryFilter === cat
                     ? 'bg-[#1F6A37] text-white'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -308,7 +308,7 @@ export default function ProductsPage() {
               <button
                 type="button"
                 onClick={() => setHistoryProduct(prod)}
-                className="text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1 rounded-full text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <History className="w-3.5 h-3.5" />
                 <span>Price History ({prod.priceHistory.length})</span>
@@ -317,7 +317,7 @@ export default function ProductsPage() {
                 <button
                   type="button"
                   onClick={() => openPriceEditor(prod)}
-                  className="px-3 py-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium hover:border-[#4EB462] inline-flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium hover:border-[#4EB462] inline-flex items-center gap-1.5 cursor-pointer"
                 >
                   <Tag className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
                   <span>Edit Tiers</span>
@@ -406,13 +406,13 @@ export default function ProductsPage() {
             <button
               type="button"
               onClick={() => setEditingProduct(null)}
-              className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-[#1F6A37] text-white text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
             >
               Save & Log Price Revision
             </button>
@@ -541,13 +541,13 @@ export default function ProductsPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(false)}
-              className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-[#1F6A37] text-white text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
             >
               Create Product SKU
             </button>

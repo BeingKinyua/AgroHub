@@ -172,7 +172,7 @@ export function LoginExperience() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? (
@@ -187,7 +187,7 @@ export function LoginExperience() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full h-11 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white font-medium text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
+                  className="w-full h-11 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white font-medium text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
                 >
                   <span>{submitting ? 'Signing in...' : 'Sign in'}</span>
                   <ArrowRight className="w-4 h-4" />
@@ -222,7 +222,7 @@ export function LoginExperience() {
                 <button
                   type="button"
                   onClick={() => setShowQuickFill((v) => !v)}
-                  className="inline-flex items-center gap-1 font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-medium text-xs text-[#1F6A37] dark:text-[#4EB462] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors cursor-pointer"
                 >
                   <KeyRound className="w-3.5 h-3.5" />
                   <span>Test Accounts</span>
@@ -244,7 +244,7 @@ export function LoginExperience() {
                       key={u.id}
                       type="button"
                       onClick={() => handleQuickFill(u.email)}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                      className={`w-full text-left px-3 py-1.5 rounded-full text-xs flex items-center justify-between transition-colors cursor-pointer ${
                         email.toLowerCase() === u.email.toLowerCase()
                           ? 'bg-[#E5EFE6] text-[#12512C] dark:bg-[#142B1B] dark:text-[#4EB462] font-medium'
                           : 'hover:bg-[#E5EFE6]/50 dark:hover:bg-[#122719]'

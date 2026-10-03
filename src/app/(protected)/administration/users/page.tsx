@@ -122,7 +122,7 @@ export default function UsersAdministrationPage() {
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
-              className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
               <span>Invite Internal Member</span>
@@ -227,16 +227,16 @@ export default function UsersAdministrationPage() {
           </div>
 
           <div className="hidden sm:flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-canvas)]">
               {STATUS_FILTERS.map((st) => (
                 <button
                   key={st}
                   type="button"
                   onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                     statusFilter === st
                       ? 'bg-[#1F6A37] text-white'
-                      : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   {st}
@@ -340,7 +340,7 @@ export default function UsersAdministrationPage() {
                                   nextStatus: 'Active',
                                 })
                               }
-                              className="px-2.5 py-1.5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               <span>Activate</span>
@@ -355,7 +355,7 @@ export default function UsersAdministrationPage() {
                                   nextStatus: 'Suspended',
                                 })
                               }
-                              className="px-2.5 py-1.5 rounded-lg border border-amber-500/35 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 text-xs font-medium cursor-pointer"
+                              className="px-3 py-1.5 rounded-full border border-amber-500/35 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 text-xs font-medium cursor-pointer"
                             >
                               Suspend
                             </button>
@@ -369,7 +369,7 @@ export default function UsersAdministrationPage() {
                                   nextStatus: 'Disabled',
                                 })
                               }
-                              className="px-2.5 py-1.5 rounded-lg border border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-500/10 text-xs font-medium cursor-pointer"
+                              className="px-3 py-1.5 rounded-full border border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-500/10 text-xs font-medium cursor-pointer"
                             >
                               Disable
                             </button>
@@ -423,7 +423,7 @@ export default function UsersAdministrationPage() {
                         onClick={() =>
                           setPendingAction({ user: u, nextStatus: 'Active' })
                         }
-                        className="px-2.5 py-1 rounded-lg bg-[#1F6A37] text-white text-xs font-medium"
+                        className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
                       >
                         Activate
                       </button>
@@ -437,7 +437,7 @@ export default function UsersAdministrationPage() {
                             nextStatus: 'Suspended',
                           })
                         }
-                        className="px-2.5 py-1 rounded-lg border border-amber-500/35 text-amber-800 dark:text-amber-300 text-xs font-medium"
+                        className="px-3 py-1.5 rounded-full border border-amber-500/35 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 text-xs font-medium cursor-pointer"
                       >
                         Suspend
                       </button>
@@ -451,7 +451,7 @@ export default function UsersAdministrationPage() {
                             nextStatus: 'Disabled',
                           })
                         }
-                        className="px-2.5 py-1 rounded-lg border border-red-500/30 text-red-700 dark:text-red-300 text-xs font-medium"
+                        className="px-3 py-1.5 rounded-full border border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-500/10 text-xs font-medium cursor-pointer"
                       >
                         Disable
                       </button>
@@ -583,13 +583,13 @@ export default function UsersAdministrationPage() {
             <button
               type="button"
               onClick={() => setInviteOpen(false)}
-              className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Send Workspace Invitation</span>

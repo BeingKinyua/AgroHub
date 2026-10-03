@@ -49,6 +49,7 @@ import { PermissionKey } from '@/types/domain/bos';
 import { ROUTE_REQUIRED_PERMISSION } from '@/lib/permissions/rbac';
 import {
   Avatar,
+  Breadcrumbs,
   DROPDOWN_MOTION,
   PermissionGateBanner,
   StatusBadge,
@@ -681,7 +682,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => switchTestPersona('USR-001')}
-              className="px-4 py-2.5 rounded-xl bg-[#1F6A37] text-white text-xs font-medium hover:bg-[#12512C] cursor-pointer"
+              className="px-4 py-2.5 rounded-full bg-[#1F6A37] text-white text-xs font-medium hover:bg-[#12512C] cursor-pointer"
             >
               Switch to Active Executive Account
             </button>
@@ -691,7 +692,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 logout();
                 router.push('/login');
               }}
-              className="px-4 py-2.5 rounded-xl border border-[var(--border-subtle)] text-xs font-medium hover:bg-[#E5EFE6] dark:hover:bg-[#122719] cursor-pointer"
+              className="px-4 py-2.5 rounded-full border border-[var(--border-subtle)] text-xs font-medium hover:bg-[#E5EFE6] dark:hover:bg-[#122719] cursor-pointer"
             >
               Return to Login
             </button>
@@ -717,6 +718,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       : pathname.includes('audit-logs')
       ? 'Audit Logs'
       : 'Workspace');
+
+  const mainBreadcrumbs = useMemo(() => {
+    if (pathname === '/dashboard') {
+      return [{ label: 'AgroHub BOS', href: '/dashboard' }, { label: 'Command Center' }];
+    }
+    if (pathname.startsWith('/administration/')) {
+      const sub =
+        pathname === '/administration/users'
+          ? 'Internal Operators'
+          : pathname === '/administration/roles'
+          ? 'RBAC Roles Matrix'
+          : 'System Audit Trail';
+      return [
+        { label: 'AgroHub BOS', href: '/dashboard' },
+        { label: 'Administration', href: '/administration/users' },
+        { label: sub },
+      ];
+    }
+    return [
+      { label: 'AgroHub BOS', href: '/dashboard' },
+      { label: currentPageLabel },
+    ];
+  }, [pathname, currentPageLabel]);
 
   return (
     <div className="min-h-dvh bg-[var(--bg-canvas)] text-[var(--text-primary)] flex">
@@ -759,7 +783,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={toggleSidebarCollapsed}
                 aria-label="Expand sidebar"
-                className="w-10 h-10 rounded-xl bg-[#142B1B] text-[#4EB462] border border-[#4EB462]/25 flex items-center justify-center hover:bg-[#1F6A37]/40 transition-colors cursor-pointer"
+                className="w-10 h-10 rounded-full bg-[#142B1B] text-[#4EB462] border border-[#4EB462]/25 flex items-center justify-center hover:bg-[#1F6A37]/40 transition-colors cursor-pointer"
               >
                 <PanelLeftOpen className="w-4 h-4" />
               </button>
@@ -770,7 +794,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={toggleSidebarCollapsed}
-              className="p-1.5 rounded-lg text-[#A9BEAE] hover:text-white hover:bg-white/8 transition-colors cursor-pointer"
+              className="p-2 rounded-full text-[#A9BEAE] hover:text-white hover:bg-white/8 transition-colors cursor-pointer"
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
             >
@@ -911,7 +935,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
                 title="Sign out of workspace"
                 aria-label="Sign out of workspace"
-                className="p-1.5 rounded-lg text-[#A9BEAE] hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                className="p-2 rounded-full text-[#A9BEAE] hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer shrink-0"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -938,7 +962,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     router.push('/login');
                   }}
                   aria-label="Sign out"
-                  className="w-9 h-9 flex items-center justify-center rounded-xl text-[#A9BEAE] hover:text-red-400 hover:bg-white/5 cursor-pointer"
+                  className="w-9 h-9 flex items-center justify-center rounded-full text-[#A9BEAE] hover:text-red-400 hover:bg-white/5 cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -989,7 +1013,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   type="button"
                   onClick={() => setMobileDrawerOpen(false)}
                   aria-label="Close navigation menu"
-                  className="p-1.5 rounded-lg text-[#A9BEAE] hover:text-white"
+                  className="p-2 rounded-full text-[#A9BEAE] hover:text-white cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1062,7 +1086,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     logout();
                     router.push('/login');
                   }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-red-500/15 text-red-300 text-xs font-medium flex items-center justify-center gap-2"
+                  className="w-full py-2.5 px-3 rounded-full bg-red-500/15 text-red-300 text-xs font-medium flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Sign Out</span>
@@ -1077,34 +1101,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
         {/* STICKY TOP UTILITY HEADER */}
         <header className="sticky top-0 z-[var(--z-header)] h-16 bg-[var(--bg-card)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
-          {/* Left: Mobile Menu + Current Page Context */}
+          {/* Left: Mobile Menu + Current Page Context Title (Breadcrumb moved to main area) */}
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setMobileDrawerOpen(true)}
-              className="lg:hidden p-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-canvas)]"
+              className="lg:hidden p-2 rounded-full border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] cursor-pointer"
               aria-label="Open navigation menu"
             >
               <Menu className="w-4 h-4" />
             </button>
-            {/* BreadCrumb Component */}
-            <div className="flex items-center gap-2 text-xs sm:text-sm min-w-0">
-              <Link
-                href="/dashboard"
-                className="hidden sm:inline text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                AgroHub BOS
-              </Link>
-              <span
-                className="hidden sm:inline text-[var(--text-secondary)]/60"
-                aria-hidden="true"
-              >
-                /
-              </span>
-              <span className="font-heading font-semibold text-[var(--text-primary)] truncate">
-                {currentPageLabel}
-              </span>
-            </div>
+            <span className="font-heading font-semibold text-sm sm:text-base text-[var(--text-primary)] truncate">
+              {currentPageLabel}
+            </span>
           </div>
 
           {/* Center: Command Global Search Trigger */}
@@ -1194,7 +1203,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }}
                   aria-expanded={demoSwitcherOpen}
                   title="Switch RBAC Evaluation Role"
-                  className="h-10 px-3 rounded-xl bg-[#E5EFE6] dark:bg-[#142B1B] border border-[#4EB462]/35 text-[#12512C] dark:text-[#4EB462] text-xs font-medium inline-flex items-center gap-1.5 hover:border-[#4EB462] transition-colors cursor-pointer"
+                  className="h-10 px-3.5 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] border border-[#4EB462]/35 text-[#12512C] dark:text-[#4EB462] text-xs font-medium inline-flex items-center gap-1.5 hover:border-[#4EB462] transition-colors cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5 shrink-0" />
                   <span className="max-w-[130px] truncate">
@@ -1217,7 +1226,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             Instant prototype persona switch
                           </div>
                         </div>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]">
                           9 Roles
                         </span>
                       </div>
@@ -1232,7 +1241,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                 switchTestPersona(u.id);
                                 setDemoSwitcherOpen(false);
                               }}
-                              className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                              className={`w-full text-left px-3 py-2 rounded-full text-xs flex items-center justify-between transition-colors cursor-pointer ${
                                 u.id === currentUser.id
                                   ? 'bg-[#E5EFE6] text-[#12512C] dark:bg-[#142B1B] dark:text-[#4EB462] font-semibold'
                                   : 'hover:bg-[var(--bg-canvas)] text-[var(--text-primary)]'
@@ -1343,7 +1352,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <button
                         type="button"
                         onClick={markAllNotificationsRead}
-                        className="text-[11px] font-medium text-[#1F6A37] dark:text-[#4EB462] inline-flex items-center gap-1 hover:underline cursor-pointer"
+                        className="px-2.5 py-1 rounded-full bg-[var(--bg-canvas)] text-[11px] font-medium text-[#1F6A37] dark:text-[#4EB462] inline-flex items-center gap-1 hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors cursor-pointer"
                       >
                         <CheckCheck className="w-3.5 h-3.5" />
                         <span>Mark all read</span>
@@ -1354,7 +1363,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <button
                         type="button"
                         onClick={() => setNotificationTab('all')}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer ${
+                        className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
                           notificationTab === 'all'
                             ? 'bg-[#1F6A37] text-white'
                             : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)]'
@@ -1365,7 +1374,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <button
                         type="button"
                         onClick={() => setNotificationTab('unread')}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer ${
+                        className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
                           notificationTab === 'unread'
                             ? 'bg-[#1F6A37] text-white'
                             : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)]'
@@ -1518,7 +1527,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <button
                           type="button"
                           onClick={() => setDemoModeEnabled(!demoModeEnabled)}
-                          className="text-[11px] font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline cursor-pointer"
+                          className="px-2.5 py-0.5 rounded-full bg-[var(--bg-canvas)] text-[11px] font-medium text-[#1F6A37] dark:text-[#4EB462] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors cursor-pointer"
                         >
                           {demoModeEnabled ? 'Hide Header Pill' : 'Show Header Pill'}
                         </button>
@@ -1534,7 +1543,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                 switchTestPersona(u.id);
                                 setProfileMenuOpen(false);
                               }}
-                              className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer ${
+                              className={`w-full text-left px-3 py-1.5 rounded-full text-xs flex items-center justify-between cursor-pointer transition-colors ${
                                 u.id === currentUser.id
                                   ? 'bg-[#E5EFE6] text-[#12512C] dark:bg-[#142B1B] dark:text-[#4EB462] font-semibold'
                                   : 'hover:bg-[var(--bg-canvas)] text-[var(--text-primary)]'
@@ -1556,7 +1565,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         logout();
                         router.push('/login');
                       }}
-                      className="w-full px-3 py-2 rounded-xl text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 flex items-center justify-between transition-colors cursor-pointer"
+                      className="w-full px-4 py-2 rounded-full text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 flex items-center justify-between transition-colors cursor-pointer"
                     >
                       <span>Sign out of AgroHub BOS</span>
                       <LogOut className="w-3.5 h-3.5" />
@@ -1570,6 +1579,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* WORKSPACE CONTENT CANVAS */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
+          {/* Breadcrumb relocated from top nav bar into main content area */}
+          <div className="mb-4">
+            <Breadcrumbs items={mainBreadcrumbs} />
+          </div>
           {isRouteAuthorized ? (
             <AnimatedPage key={pathname}>{children}</AnimatedPage>
           ) : (
@@ -1649,7 +1662,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <button
           type="button"
           onClick={() => setMobileDrawerOpen(true)}
-          className="flex flex-col items-center justify-center py-1 text-[10px]"
+          className="flex flex-col items-center justify-center py-1 text-[10px] rounded-full hover:text-white"
         >
           <Menu className="w-4 h-4 mb-0.5" />
           <span>Modules</span>
@@ -1682,7 +1695,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => setSearchOpen(false)}
-                  className="text-xs px-2 py-1 rounded bg-[var(--bg-canvas)] text-[var(--text-secondary)] cursor-pointer"
+                  className="text-xs px-2.5 py-1 rounded-full bg-[var(--bg-canvas)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
                 >
                   ESC
                 </button>
@@ -1696,7 +1709,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <button
                       type="button"
                       onClick={() => setSearchQuery('Tomatoes')}
-                      className="underline text-[#1F6A37] dark:text-[#4EB462] cursor-pointer"
+                      className="px-2 py-0.5 rounded-full bg-[var(--bg-canvas)] text-[#1F6A37] dark:text-[#4EB462] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] font-medium cursor-pointer"
                     >
                       Tomatoes
                     </button>
@@ -1704,7 +1717,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <button
                       type="button"
                       onClick={() => setSearchQuery('Alliance')}
-                      className="underline text-[#1F6A37] dark:text-[#4EB462] cursor-pointer"
+                      className="px-2 py-0.5 rounded-full bg-[var(--bg-canvas)] text-[#1F6A37] dark:text-[#4EB462] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] font-medium cursor-pointer"
                     >
                       Alliance
                     </button>
@@ -1712,7 +1725,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <button
                       type="button"
                       onClick={() => setSearchQuery('ORD-2026')}
-                      className="underline text-[#1F6A37] dark:text-[#4EB462] cursor-pointer"
+                      className="px-2 py-0.5 rounded-full bg-[var(--bg-canvas)] text-[#1F6A37] dark:text-[#4EB462] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] font-medium cursor-pointer"
                     >
                       ORD-2026
                     </button>
@@ -1785,7 +1798,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={() => dismissToast(t.id)}
                 aria-label="Dismiss notification"
-                className="p-1 rounded text-[#A9BEAE] hover:text-white cursor-pointer"
+                className="p-1 rounded-full text-[#A9BEAE] hover:text-white cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
