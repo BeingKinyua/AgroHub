@@ -428,7 +428,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setCustomizeOpen(true)}
-              className="h-10 px-3.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] inline-flex items-center gap-2 hover:border-[#4EB462] transition-colors cursor-pointer"
+              className="h-10 px-4 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] inline-flex items-center gap-2 hover:border-[#4EB462] transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
               <span>Customize Dashboard</span>
@@ -436,7 +436,7 @@ export default function DashboardPage() {
             {can('orders.create') && (
               <Link
                 href="/orders?action=new"
-                className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors"
+                className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors"
               >
                 <span>New Institutional Order</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -766,14 +766,14 @@ export default function DashboardPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleQuickApprove(apr.id)}
-                                  className="px-3 py-1.5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                                  className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5" />
                                   <span>Approve Request</span>
                                 </button>
                                 <Link
                                   href="/approvals"
-                                  className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                  className="px-3 py-1.5 rounded-full border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                                 >
                                   Inspect
                                 </Link>
@@ -919,7 +919,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => moveDashboardWidget(widget.id, 'up')}
-                      className="p-1 rounded hover:bg-[var(--bg-card)] text-[var(--text-secondary)] cursor-pointer"
+                      className="p-1 rounded-full hover:bg-[var(--bg-card)] text-[var(--text-secondary)] cursor-pointer"
                       title="Move widget up"
                     >
                       <ArrowUp className="w-3.5 h-3.5" />
@@ -927,7 +927,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => moveDashboardWidget(widget.id, 'down')}
-                      className="p-1 rounded hover:bg-[var(--bg-card)] text-[var(--text-secondary)] cursor-pointer"
+                      className="p-1 rounded-full hover:bg-[var(--bg-card)] text-[var(--text-secondary)] cursor-pointer"
                       title="Move widget down"
                     >
                       <ArrowDown className="w-3.5 h-3.5" />
@@ -943,7 +943,7 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={resetDashboardWidgets}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset to default layout</span>
@@ -951,7 +951,7 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={() => setCustomizeOpen(false)}
-            className="px-4 py-2 rounded-xl bg-[#1F6A37] text-white text-xs font-medium cursor-pointer"
+            className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
           >
             Done
           </button>

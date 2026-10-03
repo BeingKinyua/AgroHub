@@ -31,7 +31,7 @@ export default function InvoicesPage() {
         actions={
           <Link
             href="/payments"
-            className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2"
+            className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2"
           >
             <span>Record / Allocate Payment</span>
           </Link>
@@ -103,7 +103,7 @@ export default function InvoicesPage() {
                     <button
                       type="button"
                       onClick={() => setSelectedInvoice(inv)}
-                      className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                      className="px-3 py-1.5 rounded-full border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Preview</span>

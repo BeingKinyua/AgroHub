@@ -52,7 +52,7 @@ export default function ReportsPage() {
             <button
               type="button"
               onClick={handleExport}
-              className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
             >
               <Download className="w-4 h-4" />
               <span>Export Analytics CSV</span>

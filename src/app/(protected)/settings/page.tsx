@@ -68,7 +68,7 @@ export default function SettingsPage() {
         actions={
           <Link
             href="/profile"
-            className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors"
+            className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
           >
             <User className="w-4 h-4" />
             <span>My Operator Profile</span>
@@ -132,14 +132,14 @@ export default function SettingsPage() {
                   Agro-Deliveries soft-mint light mode or deep forest dark mode
                 </div>
               </div>
-              <div className="flex items-center p-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+              <div className="flex items-center p-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)]">
                 <button
                   type="button"
                   onClick={() => setTheme('light')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
                     theme === 'light'
                       ? 'bg-[#1F6A37] text-white'
-                      : 'text-[var(--text-secondary)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <Sun className="w-3.5 h-3.5" />
@@ -148,10 +148,10 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setTheme('dark')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
                     theme === 'dark'
                       ? 'bg-[#1F6A37] text-white'
-                      : 'text-[var(--text-secondary)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <Moon className="w-3.5 h-3.5" />
@@ -160,10 +160,10 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setTheme('system')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
                     theme === 'system'
                       ? 'bg-[#1F6A37] text-white'
-                      : 'text-[var(--text-secondary)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <Monitor className="w-3.5 h-3.5" />
@@ -186,7 +186,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={() => setDemoModeEnabled(!demoModeEnabled)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                className={`px-3.5 py-2 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                   demoModeEnabled
                     ? 'bg-[#1F6A37] text-white'
                     : 'bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)]'
@@ -213,7 +213,7 @@ export default function SettingsPage() {
                     'Dashboard widgets restored to default role-aware configuration.'
                   );
                 }}
-                className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Reset Widgets</span>
@@ -278,7 +278,7 @@ export default function SettingsPage() {
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+                  className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Save Governance Thresholds</span>

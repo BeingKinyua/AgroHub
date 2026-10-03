@@ -107,7 +107,7 @@ export default function DocumentsPage() {
             <button
               type="button"
               onClick={() => setUploadOpen(true)}
-              className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
             >
               <Upload className="w-4 h-4" />
               <span>Upload Document</span>
@@ -196,7 +196,7 @@ export default function DocumentsPage() {
                 key={cat}
                 type="button"
                 onClick={() => setCategoryFilter(cat)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                   categoryFilter === cat
                     ? 'bg-[#1F6A37] text-white'
                     : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -276,7 +276,7 @@ export default function DocumentsPage() {
                         <button
                           type="button"
                           onClick={() => setPreviewDoc(doc)}
-                          className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                          className="px-3 py-1.5 rounded-full border border-[var(--border-subtle)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>Inspect</span>
@@ -291,7 +291,7 @@ export default function DocumentsPage() {
                                 type: res.ok ? 'success' : 'error',
                               });
                             }}
-                            className="px-2.5 py-1.5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                            className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             <span>Verify</span>
@@ -302,7 +302,7 @@ export default function DocumentsPage() {
                             type="button"
                             onClick={() => setDeleteTarget(doc)}
                             aria-label={`Remove ${doc.docNumber}`}
-                            className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-red-600 hover:border-red-500/30 cursor-pointer"
+                            className="p-1.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-red-600 hover:border-red-500/30 cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -341,7 +341,7 @@ export default function DocumentsPage() {
                     <button
                       type="button"
                       onClick={() => setPreviewDoc(doc)}
-                      className="px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] text-xs font-medium"
+                      className="px-3 py-1.5 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
                     >
                       Inspect
                     </button>
@@ -355,7 +355,7 @@ export default function DocumentsPage() {
                             type: res.ok ? 'success' : 'error',
                           });
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-[#1F6A37] text-white text-xs font-medium"
+                        className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
                       >
                         Verify
                       </button>
@@ -428,13 +428,13 @@ export default function DocumentsPage() {
             <button
               type="button"
               onClick={() => setUploadOpen(false)}
-              className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Index Document Record</span>

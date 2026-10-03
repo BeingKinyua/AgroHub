@@ -161,7 +161,7 @@ export default function FulfillmentPage() {
                                 onClick={() =>
                                   handleAdvance(ord.id, stage.nextStatus!)
                                 }
-                                className="px-3 py-1.5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+                                className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0"
                               >
                                 <span>{stage.nextButtonLabel}</span>
                                 <ArrowRight className="w-3.5 h-3.5" />

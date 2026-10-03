@@ -71,7 +71,7 @@ export default function AuditLogsAdministrationPage() {
           <button
             type="button"
             onClick={handleExportCsv}
-            className="h-10 px-4 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+            className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Export Audit CSV</span>
@@ -155,7 +155,7 @@ export default function AuditLogsAdministrationPage() {
                 key={mod}
                 type="button"
                 onClick={() => setModuleFilter(mod)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                   moduleFilter === mod
                     ? 'bg-[#1F6A37] text-white'
                     : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'

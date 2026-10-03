@@ -146,7 +146,7 @@ export default function DeliveriesPage() {
                     <button
                       type="button"
                       onClick={() => handleStatusChange(run.id, 'Loaded')}
-                      className="px-3.5 py-2 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium hover:border-[#4EB462] cursor-pointer"
+                      className="px-4 py-2 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium hover:border-[#4EB462] cursor-pointer"
                     >
                       Mark Vehicle Loaded
                     </button>
@@ -155,7 +155,7 @@ export default function DeliveriesPage() {
                     <button
                       type="button"
                       onClick={() => handleStatusChange(run.id, 'Dispatched')}
-                      className="px-3.5 py-2 rounded-xl bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                      className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <Truck className="w-3.5 h-3.5" />
                       <span>Dispatch Route Run</span>
@@ -165,7 +165,7 @@ export default function DeliveriesPage() {
                     <button
                       type="button"
                       onClick={() => setPodRun(run)}
-                      className="px-3.5 py-2 rounded-xl bg-[#12512C] hover:bg-[#1F6A37] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                      className="px-4 py-2 rounded-full bg-[#12512C] hover:bg-[#1F6A37] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Capture POD & Complete</span>
@@ -211,13 +211,13 @@ export default function DeliveriesPage() {
             <button
               type="button"
               onClick={() => setPodRun(null)}
-              className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-[#1F6A37] text-white text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
             >
               Confirm POD & Mark Delivered
             </button>
