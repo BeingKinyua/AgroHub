@@ -14,24 +14,31 @@ import {
   CartesianGrid,
 } from 'recharts';
 import {
+  AlertCircle,
   AlertTriangle,
-  ArrowDown,
   ArrowRight,
-  ArrowUp,
   CheckCircle2,
+  Clock,
+  Download,
+  Filter,
+  Plus,
+  RotateCcw,
   SlidersHorizontal,
   Sparkles,
-  RotateCcw,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
 import {
+  ActionableMetricCard,
   Card,
   ChartCard,
   FeedbackBanner,
-  KPI,
   Modal,
+  OperationalPulse,
+  OperationalPulseItem,
   PageHeader,
   StatusBadge,
+  WorkQueue,
+  WorkQueueItem,
 } from '@/components/ui/primitives';
 import { PermissionKey } from '@/types/domain/bos';
 
@@ -51,37 +58,24 @@ const SEGMENT_MIX_DATA = [
   { segment: 'Restaurants', volumeKg: 3800, revenueKes: 280000 },
 ];
 
+const FEFO_RISK_DATA = [
+  { category: 'Leafy Greens', atRiskKg: 420, batches: 2 },
+  { category: 'Salad Produce', atRiskKg: 380, batches: 1 },
+  { category: 'Root Crops', atRiskKg: 150, batches: 1 },
+  { category: 'Culinary Herbs', atRiskKg: 65, batches: 1 },
+];
+
 const WIDGET_REGISTRY: {
   id: string;
   label: string;
   permission: PermissionKey;
 }[] = [
-  { id: 'kpi_row', label: 'Role-Aware KPI Summary Row', permission: 'dashboard.view' },
-  {
-    id: 'operational_intelligence',
-    label: 'Operational Shift Intelligence Brief',
-    permission: 'dashboard.view',
-  },
-  {
-    id: 'revenue_fulfillment_chart',
-    label: 'Revenue, Procurement & Segment Analytics',
-    permission: 'dashboard.view',
-  },
-  {
-    id: 'fefo_expiry_radar',
-    label: 'FEFO Perishable Stock & Expiry Radar',
-    permission: 'inventory.view',
-  },
-  {
-    id: 'pending_approvals',
-    label: 'Governance Approval Queue',
-    permission: 'approvals.view',
-  },
-  {
-    id: 'recent_orders_table',
-    label: 'Active Institutional Order Pipeline',
-    permission: 'orders.view',
-  },
+  { id: 'operational_pulse', label: 'Operational Pulse & Immediate Attention', permission: 'dashboard.view' },
+  { id: 'role_kpis', label: 'Role-Specific Decision KPIs', permission: 'dashboard.view' },
+  { id: 'ai_brief', label: 'Shift Operational AI Intelligence', permission: 'dashboard.view' },
+  { id: 'primary_visualizations', label: 'Primary Trend & Cash/FEFO Visualizations', permission: 'dashboard.view' },
+  { id: 'work_queues', label: 'Operational Work Queues (Approvals & Fulfillment)', permission: 'dashboard.view' },
+  { id: 'recent_orders_table', label: 'Active Order Pipeline Workbench', permission: 'orders.view' },
 ];
 
 export default function DashboardPage() {
@@ -95,10 +89,8 @@ export default function DashboardPage() {
     suppliers,
     deliveries,
     approvals,
-    users,
     enabledWidgets,
     toggleDashboardWidget,
-    moveDashboardWidget,
     resetDashboardWidgets,
     resolveApproval,
   } = useBos();
@@ -111,23 +103,17 @@ export default function DashboardPage() {
     riskAlert: string;
   } | null>(null);
 
-  // Derived real metrics from operational store
+  // Derived operational data
   const totalOrderValueKes = useMemo(
     () => orders.reduce((acc, o) => acc + o.totalKes, 0),
     [orders]
   );
   const openOrdersCount = useMemo(
-    () =>
-      orders.filter((o) => o.status !== 'Delivered' && o.status !== 'Closed')
-        .length,
+    () => orders.filter((o) => o.status !== 'Delivered' && o.status !== 'Closed').length,
     [orders]
   );
   const inventoryValueKes = useMemo(
-    () =>
-      products.reduce(
-        (acc, p) => acc + p.availableQty * p.pricing.supplierCostKes,
-        0
-      ),
+    () => products.reduce((acc, p) => acc + p.availableQty * p.pricing.supplierCostKes, 0),
     [products]
   );
   const totalReceivablesKes = useMemo(
@@ -151,7 +137,7 @@ export default function DashboardPage() {
     [approvals]
   );
 
-  // Fetch RBAC-safe operational intelligence brief
+  // Fetch operational intelligence brief
   useEffect(() => {
     if (!currentUser) return;
     let active = true;
@@ -172,7 +158,7 @@ export default function DashboardPage() {
         if (active && data.headline) setAiBrief(data);
       })
       .catch(() => {
-        // fallback handled
+        // Fallback gracefully handled
       });
     return () => {
       active = false;
@@ -186,43 +172,125 @@ export default function DashboardPage() {
     totalPayablesKes,
   ]);
 
-  // Role-specific KPI configuration (Section 22)
-  const roleKpis = useMemo(() => {
+  // Operational Pulse items (Section 5)
+  const operationalPulseItems: OperationalPulseItem[] = useMemo(() => {
+    const items: OperationalPulseItem[] = [];
+
+    // 1. Perishable batch expiring soon
+    if (expiringBatches.length > 0) {
+      items.push({
+        id: 'pulse-fefo',
+        severity: 'critical',
+        title: `${expiringBatches.length} Perishable Batches Expiring <= 72h`,
+        detail: 'Roma Tomatoes (420 kg) & Sukuma Wiki (180 kg) at Nairobi Cold Hub A require urgent FIFO dispatch or discounted bulk promotion.',
+        value: `${expiringBatches.length} Batches`,
+        timestamp: 'As of 07:45 EAT',
+        actionLabel: 'Review Inventory',
+        actionHref: '/inventory?filter=expiring',
+      });
+    }
+
+    // 2. High-value PO awaiting approval
+    const highValuePo = pendingApprovals.find((a) => a.category === 'Purchase Order');
+    if (highValuePo) {
+      items.push({
+        id: 'pulse-po',
+        severity: 'critical',
+        title: `PO Awaiting Authorization: ${highValuePo.reference}`,
+        detail: `${highValuePo.entityTitle} for KES ${highValuePo.valueKes.toLocaleString()}. Supplier delivery waiting for formal sign-off.`,
+        value: `KES ${(highValuePo.valueKes / 1000).toFixed(0)}K`,
+        timestamp: 'As of 07:30 EAT',
+        actionLabel: 'Review & Approve',
+        actionHref: '/approvals?status=pending',
+      });
+    }
+
+    // 3. Overdue customer invoice
+    if (overdueReceivablesKes > 0) {
+      items.push({
+        id: 'pulse-ar',
+        severity: 'warning',
+        title: 'Overdue Institutional Receivables (>45 Days)',
+        detail: 'Alliance High School invoice balance of KES 295,000 is past contracted Net 30 terms. Termly delivery hold may apply.',
+        value: `KES ${(overdueReceivablesKes / 1000).toFixed(0)}K`,
+        timestamp: 'As of 07:15 EAT',
+        actionLabel: 'Open Collections',
+        actionHref: '/finance?status=overdue',
+      });
+    }
+
+    // 4. Delivery delay / fleet exception
+    items.push({
+      id: 'pulse-delivery',
+      severity: 'warning',
+      title: 'Delivery Run DR-2026-081 Traffic Delay',
+      detail: 'Refrigerated Van KDC-304L delayed by +35 min on Waiyaki Way. Hospital commissary receiving window closes at 11:00 EAT.',
+      value: '+35 min Delay',
+      timestamp: 'As of 07:40 EAT',
+      actionLabel: 'Resolve Fleet',
+      actionHref: '/deliveries?filter=exceptions',
+    });
+
+    // 5. Critical low-stock item
+    items.push({
+      id: 'pulse-reorder',
+      severity: 'warning',
+      title: 'Safety Buffer Deficit on Contracted Staples',
+      detail: 'Fresh Spinach and Red Onions are at 65% of minimum contracted buffer stock across Nairobi hubs.',
+      value: '2 SKUs Low',
+      timestamp: 'As of 07:20 EAT',
+      actionLabel: 'Create Reorder',
+      actionHref: '/procurement?filter=reorder',
+    });
+
+    return items.slice(0, 3); // Keep top 3 most critical items
+  }, [expiringBatches, pendingApprovals, overdueReceivablesKes]);
+
+  // Role-Specific Actionable Decision KPIs (Sections 7, 10, 11, 13)
+  const roleDecisionKpis = useMemo(() => {
     const roleId = currentUser?.roleId || 'executive';
 
     if (roleId === 'storekeeper') {
       return [
         {
-          label: 'Total Warehouse Inventory Value',
-          value: `KES ${(inventoryValueKes / 1000000).toFixed(2)}M`,
-          sublabel: 'Across 3 Nairobi cold & dry bulk hubs',
-          delta: '98.4% Bin Accuracy',
-          tone: 'positive' as const,
-        },
-        {
-          label: 'FEFO Batches Expiring <= 7d',
+          metric: 'Expiring Batches (<= 72h)',
           value: `${expiringBatches.length} Batches`,
-          sublabel: 'LOT-2609-SKM-C1 & LOT-2609-TOM-A1 priority',
-          delta: 'Action Required',
-          tone: 'warning' as const,
+          context: '600 kg produce at Cold Hub A',
+          delta: 'FEFO Picking Priority',
+          status: 'critical' as const,
+          description: 'Allocate to today’s school orders first',
+          actionLabel: 'Pick First',
+          actionHref: '/inventory?filter=expiring',
         },
         {
-          label: 'Orders in Picking / Packing',
-          value: `${
-            orders.filter(
-              (o) => o.status === 'Picking' || o.status === 'Confirmed'
-            ).length
-          } Orders`,
-          sublabel: 'Nairobi West Hospital & Alliance High',
-          delta: '06:30 EAT Cutoff',
-          tone: 'neutral' as const,
+          metric: 'Orders in Picking Queue',
+          value: `${orders.filter((o) => o.status === 'Picking' || o.status === 'Confirmed').length} Orders`,
+          context: 'Alliance High & Nairobi West',
+          delta: '09:00 EAT Cutoff',
+          status: 'warning' as const,
+          description: 'Staged at cold packing line 2',
+          actionLabel: 'Fulfill Orders',
+          actionHref: '/orders?filter=needs-action',
         },
         {
-          label: 'Recorded Shift Wastage',
+          metric: 'Cold Hub A Bin Utilization',
+          value: '88.4%',
+          context: '185 of 210 bins allocated',
+          delta: '+4.2% vs Wk 38',
+          status: 'warning' as const,
+          description: 'Transfer non-chilled stock to Dry Hub B',
+          actionLabel: 'Transfer Stock',
+          actionHref: '/inventory?tab=warehouses',
+        },
+        {
+          metric: 'Shift Spoilage Wastage',
           value: '18 kg',
-          sublabel: '0.32% of cold-chain throughput (below 1.0% cap)',
-          delta: '-0.4% vs Wk 38',
-          tone: 'positive' as const,
+          context: '0.32% of cold throughput (cap 1.0%)',
+          delta: 'Well Below Cap',
+          status: 'healthy' as const,
+          description: 'Quarantine and compost logged',
+          actionLabel: 'Log Wastage',
+          actionHref: '/inventory?tab=movements',
         },
       ];
     }
@@ -230,32 +298,44 @@ export default function DashboardPage() {
     if (roleId === 'finance_manager' || roleId === 'accounts_clerk') {
       return [
         {
-          label: 'Institutional Accounts Receivable',
-          value: `KES ${totalReceivablesKes.toLocaleString()}`,
-          sublabel: `KES ${overdueReceivablesKes.toLocaleString()} overdue (>45d)`,
+          metric: 'Institutional Receivables',
+          value: `KES ${(totalReceivablesKes / 1000000).toFixed(2)}M`,
+          context: `KES ${(overdueReceivablesKes / 1000).toFixed(0)}K overdue (>45d)`,
           delta: '1 Overdue Account',
-          tone: 'warning' as const,
+          status: 'warning' as const,
+          description: 'Alliance High School termly invoice pending',
+          actionLabel: 'Open Collections',
+          actionHref: '/finance?status=overdue',
         },
         {
-          label: 'Cooperative & Miller Payables',
-          value: `KES ${totalPayablesKes.toLocaleString()}`,
-          sublabel: 'Kinangop Growers & Mwea Rice Millers',
-          delta: 'Net 14 / Net 30',
-          tone: 'neutral' as const,
+          metric: 'Cooperative & Miller Payables',
+          value: `KES ${(totalPayablesKes / 1000000).toFixed(2)}M`,
+          context: 'KES 607K due this Friday',
+          delta: 'Net 14 / Net 30 Terms',
+          status: 'neutral' as const,
+          description: 'Kinangop Growers & Mwea Millers scheduled',
+          actionLabel: 'Review Payables',
+          actionHref: '/finance?tab=payables',
         },
         {
-          label: 'Active Order Pipeline Value',
-          value: `KES ${totalOrderValueKes.toLocaleString()}`,
-          sublabel: `${orders.length} active institutional & retail orders`,
-          delta: '+14.2% MoM',
-          tone: 'positive' as const,
-        },
-        {
-          label: 'Unreconciled M-Pesa / EFTs',
+          metric: 'Unreconciled M-Pesa / EFT',
           value: '1 Receipt',
-          sublabel: 'MPESA-B2B-994012A (KES 185,000)',
-          delta: 'Ready to Match',
-          tone: 'warning' as const,
+          context: 'MPESA-B2B-994012A (KES 185,000)',
+          delta: 'Awaiting Match',
+          status: 'warning' as const,
+          description: 'Verify school deposit against invoice #INV-2026-891',
+          actionLabel: 'Reconcile Receipt',
+          actionHref: '/finance?tab=payments',
+        },
+        {
+          metric: 'Net Working Capital Spread',
+          value: `+KES ${((totalReceivablesKes - totalPayablesKes) / 1000).toFixed(0)}K`,
+          context: 'Receivables exceed Payables by 39.8%',
+          delta: '+12.4% MoM',
+          status: 'healthy' as const,
+          description: 'Positive operational liquidity balance',
+          actionLabel: 'Treasury Ledger',
+          actionHref: '/finance',
         },
       ];
     }
@@ -263,32 +343,89 @@ export default function DashboardPage() {
     if (roleId === 'procurement_officer') {
       return [
         {
-          label: 'Active Farm & Miller Suppliers',
-          value: `${suppliers.length} Vendors`,
-          sublabel: '97.6% average QC acceptance score',
-          delta: '1 Price Alert (+6%)',
-          tone: 'warning' as const,
+          metric: 'Critical Reorder Deficits',
+          value: '3 SKUs Low',
+          context: 'Spinach, Onions & Potatoes below buffer',
+          delta: 'Action Required',
+          status: 'critical' as const,
+          description: 'Replenishment needed before 14:00 EAT',
+          actionLabel: 'Create PO',
+          actionHref: '/procurement?filter=reorder',
         },
         {
-          label: 'Pending PO Approvals',
+          metric: 'POs Awaiting Authorization',
           value: 'KES 910,000',
-          sublabel: 'PO-2026-515 (100 bags Mwea Pishori Rice)',
-          delta: 'Awaiting Sign-Off',
-          tone: 'warning' as const,
+          context: '1 PO awaiting executive sign-off',
+          delta: 'PO-2026-515',
+          status: 'warning' as const,
+          description: '100 bags Mwea Pishori Rice from Kirinyaga',
+          actionLabel: 'Track Approval',
+          actionHref: '/approvals?status=pending',
         },
         {
-          label: 'Incoming GRN Shipments',
+          metric: 'Incoming GRN Shipments Today',
           value: '3,800 Units',
-          sublabel: 'Tomatoes, Potatoes & Export Avocados',
-          delta: 'Arriving Today',
-          tone: 'positive' as const,
+          context: 'Tomatoes & Avocados arriving 11:30 EAT',
+          delta: 'Naivasha & Kinangop',
+          status: 'healthy' as const,
+          description: 'Cold dock receiving bay 1 reserved',
+          actionLabel: 'Inspect Shipments',
+          actionHref: '/procurement',
         },
         {
-          label: 'Current Stock Coverage',
-          value: `KES ${(inventoryValueKes / 1000000).toFixed(2)}M`,
-          sublabel: 'Zero stockouts on contracted school items',
-          delta: 'Nominal',
-          tone: 'positive' as const,
+          metric: 'Farmgate Price Variance',
+          value: '1 Alert',
+          context: 'Limuru Sukuma Wiki +6.2% variance',
+          delta: 'Above Benchmark',
+          status: 'warning' as const,
+          description: 'Compare with Naivasha cooperative pricing',
+          actionLabel: 'Compare Sourcing',
+          actionHref: '/suppliers',
+        },
+      ];
+    }
+
+    if (roleId === 'sales_rep' || roleId === 'sales_representative') {
+      return [
+        {
+          metric: 'Active Institutional Orders',
+          value: `${orders.length} Orders`,
+          context: `Pipeline value KES ${(totalOrderValueKes / 1000000).toFixed(2)}M`,
+          delta: '+14.2% MoM',
+          status: 'healthy' as const,
+          description: 'Schools, hospitals & corporate accounts',
+          actionLabel: 'View Orders',
+          actionHref: '/orders',
+        },
+        {
+          metric: 'Tender Contracts Expiring <= 14d',
+          value: '2 Tenders',
+          context: 'St. Mary’s School & Strathmore University',
+          delta: 'Renewal Due',
+          status: 'warning' as const,
+          description: 'Prepare termly vegetable supply proposals',
+          actionLabel: 'Review Tenders',
+          actionHref: '/crm?filter=contracts',
+        },
+        {
+          metric: 'Overdue Customer Accounts',
+          value: '1 Account',
+          context: 'Alliance High School (KES 295,000 overdue)',
+          delta: 'Delivery Hold Notice',
+          status: 'warning' as const,
+          description: 'Contact Bursar regarding installment payment',
+          actionLabel: 'Follow Up Account',
+          actionHref: '/crm?filter=overdue',
+        },
+        {
+          metric: 'New Customer Opportunities',
+          value: '3 Inquiries',
+          context: 'Kenyatta National Hosp special dietary order',
+          delta: 'High Priority',
+          status: 'healthy' as const,
+          description: 'Organic spinach & pumpkin puree supply',
+          actionLabel: 'Open CRM Leads',
+          actionHref: '/crm',
         },
       ];
     }
@@ -296,32 +433,44 @@ export default function DashboardPage() {
     if (roleId === 'delivery_driver') {
       return [
         {
-          label: 'Active / Scheduled Route Runs',
+          metric: 'Today’s Assigned Route Runs',
           value: `${deliveries.length} Runs`,
-          sublabel: 'Pangani, CBD/Westlands, Kikuyu Schools',
-          delta: '1 In Transit',
-          tone: 'positive' as const,
+          context: 'Refrigerated Van KDC-304L (Westlands / Parklands)',
+          delta: '8 Delivery Stops',
+          status: 'healthy' as const,
+          description: 'First departure scheduled 08:30 EAT',
+          actionLabel: 'View Route Map',
+          actionHref: '/deliveries',
         },
         {
-          label: 'Total Payload Dispatched',
-          value: '7,640 kg',
-          sublabel: 'Refrigerated 5T + Dry Bulk 10T Fleet',
-          delta: '96% Capacity',
-          tone: 'positive' as const,
+          metric: 'Pending Loading & Dispatch',
+          value: '1 Run',
+          context: 'Alliance High & St. Austin’s Academy order',
+          delta: 'Bay 2 Ready',
+          status: 'warning' as const,
+          description: 'Verify crate counts before sealing vehicle',
+          actionLabel: 'Confirm Dispatch',
+          actionHref: '/deliveries',
         },
         {
-          label: 'Pending Electronic PODs',
-          value: `${deliveries.filter((d) => !d.podCaptured).length} Runs`,
-          sublabel: 'Capture recipient signature on arrival',
-          delta: 'Action Required',
-          tone: 'warning' as const,
+          metric: 'Route Transit Status',
+          value: 'In Transit',
+          context: 'Stop 2 of 4 (Nairobi West Hospital)',
+          delta: '+15 min Delay',
+          status: 'warning' as const,
+          description: 'Slight congestion along Lang’ata Road',
+          actionLabel: 'Update ETA',
+          actionHref: '/deliveries?filter=exceptions',
         },
         {
-          label: 'On-Time Institutional SLA',
-          value: '98.2%',
-          sublabel: 'Before 06:30 EAT kitchen receiving cutoff',
-          delta: '+1.4% vs Aug',
-          tone: 'positive' as const,
+          metric: 'Electronic POD Sign-offs',
+          value: '2 Pending',
+          context: 'Receiving officer digital signature required',
+          delta: '2 / 4 Completed',
+          status: 'healthy' as const,
+          description: 'Upload signed delivery note on arrival',
+          actionLabel: 'Record POD',
+          actionHref: '/deliveries',
         },
       ];
     }
@@ -329,632 +478,669 @@ export default function DashboardPage() {
     if (roleId === 'administrator') {
       return [
         {
-          label: 'Internal Operator Accounts',
-          value: `${users.length} Members`,
-          sublabel: `${users.filter((u) => u.status === 'Active').length} Active · ${
-            users.filter((u) => u.status !== 'Active').length
-          } Restricted/Invited`,
-          delta: 'Strict Internal Auth',
-          tone: 'positive' as const,
+          metric: 'Governed Operator Accounts',
+          value: '9 Operators',
+          context: '8 Active · 1 Pending Invitation',
+          delta: 'Zero Lockouts',
+          status: 'healthy' as const,
+          description: 'All users authenticated via enterprise RBAC',
+          actionLabel: 'Manage Users',
+          actionHref: '/administration/users',
         },
         {
-          label: 'Governed RBAC Roles',
+          metric: 'Enterprise Role Coverage',
           value: '9 Roles',
-          sublabel: '37 granular module.action permissions',
-          delta: 'RLS Enforced',
-          tone: 'positive' as const,
+          context: '48 system permissions mapped',
+          delta: '100% Compliant',
+          status: 'healthy' as const,
+          description: 'Strict separation of operational duties',
+          actionLabel: 'Audit Roles',
+          actionHref: '/administration/roles',
         },
         {
-          label: 'Pending Governance Approvals',
-          value: `${pendingApprovals.length} Requests`,
-          sublabel: 'PO-2026-515 & Credit Release OVR-2026-042',
-          delta: 'Monitored',
-          tone: 'warning' as const,
+          metric: 'Security & Audit Events',
+          value: '128 Entries',
+          context: '3 price overrides & 1 role change today',
+          delta: 'Append-Only Ledger',
+          status: 'neutral' as const,
+          description: 'PostgreSQL governance audit trail',
+          actionLabel: 'Review Audit Trail',
+          actionHref: '/administration/audit-logs',
         },
         {
-          label: 'Open Operational Orders',
-          value: `${openOrdersCount} Orders`,
-          sublabel: `KES ${totalOrderValueKes.toLocaleString()} pipeline`,
-          delta: 'All Hubs Nominal',
-          tone: 'positive' as const,
+          metric: 'Data Integrity & SLA Posture',
+          value: '100% Operational',
+          context: 'All cross-dock sync services healthy',
+          delta: '0 System Alerts',
+          status: 'healthy' as const,
+          description: 'Automated backup & RLS policy active',
+          actionLabel: 'System Settings',
+          actionHref: '/settings',
         },
       ];
     }
 
-    // Default: Executive / Operations Manager / Sales Representative
+    if (roleId === 'operations_manager') {
+      return [
+        {
+          metric: 'Orders Requiring Action',
+          value: `${orders.filter((o) => o.status === 'Confirmed' || o.status === 'Picking' || o.status === 'On Hold').length} Orders`,
+          context: 'Picking, staging & on-hold exceptions',
+          delta: 'Fulfillment Backlog',
+          status: 'warning' as const,
+          description: 'Active pipeline orders requiring immediate warehouse action',
+          actionLabel: 'Fulfill Backlog',
+          actionHref: '/orders?filter=needs-action',
+        },
+        {
+          metric: "Today's Delivery Runs",
+          value: `${deliveries.length} Runs`,
+          context: '1 Dispatched · 1 Planned · 1 Exception',
+          delta: 'Waiyaki Way Delay (+35m)',
+          status: 'warning' as const,
+          description: 'Refrigerated route coverage & hospital arrival windows',
+          actionLabel: 'Dispatch Desk',
+          actionHref: '/deliveries?filter=exceptions',
+        },
+        {
+          metric: 'Perishable Stock at Risk',
+          value: `${expiringBatches.length} Batches`,
+          context: '600 kg produce expiring in <= 72h',
+          delta: 'FEFO Protocol',
+          status: 'critical' as const,
+          description: 'Cold Hub A Roma Tomatoes & Sukuma Wiki priority dispatch',
+          actionLabel: 'Review Inventory',
+          actionHref: '/inventory?filter=expiring',
+        },
+        {
+          metric: 'Governance Approvals Pending',
+          value: `${pendingApprovals.length} Actions`,
+          context: '1 Purchase Order · 1 Price Override',
+          delta: '≥ KES 250K Threshold',
+          status: 'warning' as const,
+          description: 'PO-2026-515 & school contract override await review',
+          actionLabel: 'Resolve Approvals',
+          actionHref: '/approvals?status=pending',
+        },
+      ];
+    }
+
+    // Default: Executive overview (Revenue, Gross Margin, Cash/Receivables, Stock Risk)
     return [
       {
-        label: 'Active Order Pipeline (KES)',
-        value: `KES ${totalOrderValueKes.toLocaleString()}`,
-        sublabel: `${openOrdersCount} open institutional & tender orders`,
-        delta: '+16.4% vs Wk 38',
-        tone: 'positive' as const,
+        metric: 'Institutional Order Revenue',
+        value: `KES ${(totalOrderValueKes / 1000000).toFixed(2)}M`,
+        context: `${openOrdersCount} active orders across schools & hospitals`,
+        delta: '+14.2% MoM',
+        status: 'healthy' as const,
+        description: 'Gross demand pacing 8.5% above weekly quota',
+        actionLabel: 'Review Orders',
+        actionHref: '/orders',
       },
       {
-        label: 'Warehouse Inventory Value',
-        value: `KES ${inventoryValueKes.toLocaleString()}`,
-        sublabel: `${expiringBatches.length} FEFO batches expiring within 7 days`,
-        delta: `${expiringBatches.length} FEFO Priority`,
-        tone: 'warning' as const,
+        metric: 'Gross Margin Spread',
+        value: '28.4%',
+        context: 'Contract revenue vs farmgate procurement cost',
+        delta: '+1.8% vs Target',
+        status: 'healthy' as const,
+        description: 'Direct cooperative sourcing savings realized',
+        actionLabel: 'Analyze Margins',
+        actionHref: '/finance',
       },
       {
-        label: 'Accounts Receivable (AR)',
-        value: `KES ${totalReceivablesKes.toLocaleString()}`,
-        sublabel: `KES ${overdueReceivablesKes.toLocaleString()} overdue (>45 days)`,
-        delta: '90.6% Current',
-        tone: 'positive' as const,
+        metric: 'Receivables at Risk',
+        value: `KES ${(totalReceivablesKes / 1000000).toFixed(2)}M`,
+        context: `KES ${(overdueReceivablesKes / 1000).toFixed(0)}K overdue (>45d)`,
+        delta: '1 Account Escalated',
+        status: 'warning' as const,
+        description: 'Alliance High School bursar follow-up needed',
+        actionLabel: 'Open Collections',
+        actionHref: '/finance?status=overdue',
       },
       {
-        label: 'Supplier Payables (AP)',
-        value: `KES ${totalPayablesKes.toLocaleString()}`,
-        sublabel: `${pendingApprovals.length} governance approvals awaiting sign-off`,
-        delta: 'Net 14 / 30',
-        tone: 'neutral' as const,
+        metric: 'Perishable Inventory Value',
+        value: `KES ${(inventoryValueKes / 1000000).toFixed(2)}M`,
+        context: `${expiringBatches.length} batches expire in <= 72h (600 kg)`,
+        delta: 'FEFO Priority Active',
+        status: 'critical' as const,
+        description: 'Tomatoes & greens require immediate dispatch',
+        actionLabel: 'Review Stock Risk',
+        actionHref: '/inventory?filter=expiring',
       },
     ];
   }, [
-    currentUser?.roleId,
-    inventoryValueKes,
-    expiringBatches.length,
+    currentUser,
     orders,
+    products,
+    stockBatches,
+    totalOrderValueKes,
+    openOrdersCount,
+    inventoryValueKes,
     totalReceivablesKes,
     overdueReceivablesKes,
     totalPayablesKes,
-    totalOrderValueKes,
-    suppliers.length,
+    expiringBatches,
     deliveries,
-    users,
-    pendingApprovals.length,
-    openOrdersCount,
+    pendingApprovals,
   ]);
 
-  const handleQuickApprove = async (id: string) => {
-    const res = await resolveApproval(
-      id,
-      'Approved',
-      'Approved from Executive Command Center'
-    );
-    setFeedback(res.message);
-  };
+  // Work Queue items for Governance Approvals (Section 12)
+  const approvalWorkQueueItems: WorkQueueItem[] = useMemo(() => {
+    return pendingApprovals.map((apr) => ({
+      id: apr.id,
+      title: `${apr.reference} · ${apr.category}`,
+      subtitle: `${apr.entityTitle} (${apr.reason})`,
+      tag: `KES ${apr.valueKes.toLocaleString()}`,
+      severity: apr.valueKes > 500000 ? ('critical' as const) : ('warning' as const),
+      actionLabel: can('approvals.approve') ? 'Approve' : 'Review',
+      actionHref: '/approvals?status=pending',
+      metadata: `Req: ${apr.requesterName}`,
+    }));
+  }, [pendingApprovals, can]);
+
+  // Work Queue items for Immediate Operational Actions
+  const operationalWorkQueueItems: WorkQueueItem[] = useMemo(() => {
+    const items: WorkQueueItem[] = [];
+
+    // Expiring produce batches
+    expiringBatches.forEach((b) => {
+      items.push({
+        id: `act-batch-${b.id}`,
+        title: `FEFO Expiring: ${b.productName} (${b.batchNumber})`,
+        subtitle: `${b.warehouseName} · ${b.availableQty} ${b.unit} available`,
+        tag: `${b.daysToExpiry}d left`,
+        severity: 'critical' as const,
+        actionLabel: 'Fulfill First',
+        actionHref: '/inventory?filter=expiring',
+        metadata: `Bin: ${b.binCode}`,
+      });
+    });
+
+    // Orders in Picking
+    orders
+      .filter((o) => o.status === 'Picking' || o.status === 'Confirmed')
+      .slice(0, 2)
+      .forEach((o) => {
+        items.push({
+          id: `act-ord-${o.id}`,
+          title: `Fulfill Order: ${o.orderNumber} (${o.customerName})`,
+          subtitle: `${o.customerSegment} · Delivery ${o.deliveryDate}`,
+          tag: o.status,
+          severity: 'warning' as const,
+          actionLabel: 'Advance Order',
+          actionHref: '/orders?filter=needs-action',
+          metadata: `KES ${o.totalKes.toLocaleString()}`,
+        });
+      });
+
+    return items;
+  }, [expiringBatches, orders]);
 
   return (
-    <div>
+    <div className="space-y-6">
+      {/* 1. PAGE HEADER (Section 31 & Master Order) */}
       <PageHeader
-        kicker={`OPERATIONAL COMMAND CENTER · ${currentUser?.roleName.toUpperCase()}`}
-        title="Agro-Deliveries Kenya Workspace"
-        description="Real-time visibility into institutional supply orders, cold-chain FEFO stock batches, cooperative procurement, delivery runs, and KES receivables."
+        kicker="AGRO-DELIVERIES KENYA · BOS COMMAND CENTER"
+        title="Operational Decision System"
+        description="Monitor business health, resolve operational bottlenecks, evaluate critical risks, and drive supply execution across Kenya's food network."
         actions={
-          <>
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] font-mono-tabular">
+              <Clock className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+              <span>As of 07:45 EAT · Updated 4m ago</span>
+            </span>
+
+            {can('orders.create') && (
+              <Link
+                href="/orders"
+                className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Order</span>
+              </Link>
+            )}
+
             <button
               type="button"
               onClick={() => setCustomizeOpen(true)}
-              className="h-10 px-4 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] inline-flex items-center gap-2 hover:border-[#4EB462] transition-colors cursor-pointer"
+              className="h-10 px-3.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-1.5 text-[var(--text-primary)] transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
-              <span>Customize Dashboard</span>
+              <span className="hidden sm:inline">Customize View</span>
             </button>
-            {can('orders.create') && (
-              <Link
-                href="/orders?action=new"
-                className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors"
-              >
-                <span>New Institutional Order</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            )}
-          </>
+          </div>
         }
       />
 
       <FeedbackBanner
         message={feedback}
+        type="success"
         onDismiss={() => setFeedback(null)}
       />
 
-      {/* Render Customizable Role-Aware Widgets in User's Order */}
-      <div className="space-y-6">
-        {enabledWidgets.map((widgetId) => {
-          const reg = WIDGET_REGISTRY.find((w) => w.id === widgetId);
-          if (!reg || !can(reg.permission)) return null;
+      {/* 2. OPERATIONAL PULSE / NEEDS ATTENTION (Section 4 & 5) */}
+      {enabledWidgets.includes('operational_pulse') && (
+        <OperationalPulse
+          items={operationalPulseItems}
+          title="Operational Pulse · Immediate Business Decisions Required"
+          freshness="Live Hub Telemetry · As of 07:45 EAT"
+        />
+      )}
 
-          if (widgetId === 'kpi_row') {
-            return (
-              <section
-                key="kpi_row"
-                aria-label="Key Performance Indicators"
-                className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
-              >
-                {roleKpis.map((kpi, idx) => (
-                  <KPI
-                    key={idx}
-                    label={kpi.label}
-                    value={kpi.value}
-                    sublabel={kpi.sublabel}
-                    delta={kpi.delta}
-                    tone={kpi.tone}
-                  />
+      {/* 3. ROLE-SPECIFIC ACTIONABLE DECISION KPIS (Section 6, 7, 10, 11, 13) */}
+      {enabledWidgets.includes('role_kpis') && (
+        <section aria-label="Role Decision Metrics">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <h2 className="font-heading text-sm font-semibold tracking-wide text-[var(--text-primary)] uppercase">
+                {currentUser?.roleName || 'Operator'} Decision Metrics
+              </h2>
+              <span className="text-[11px] text-[var(--text-secondary)]">
+                · Direct Actions Linked
+              </span>
+            </div>
+            <span className="text-xs font-mono-tabular text-[var(--text-secondary)]">
+              Target: 4 High-Leverage Units
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {roleDecisionKpis.map((kpi, idx) => (
+              <ActionableMetricCard
+                key={`${kpi.metric}-${idx}`}
+                metric={kpi.metric}
+                value={kpi.value}
+                context={kpi.context}
+                delta={kpi.delta}
+                status={kpi.status}
+                description={kpi.description}
+                actionLabel={kpi.actionLabel}
+                actionHref={kpi.actionHref}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 4. AI OPERATIONAL SHIFT BRIEF (Section 38: "What should I know right now?") */}
+      {enabledWidgets.includes('ai_brief') && aiBrief && (
+        <Card
+          padding="p-5"
+          variant="raised"
+          className="bg-gradient-to-r from-[#0C2212] via-[#0E2916] to-[#0A1C0E] border-[#4EB462]/35 text-[#F4F6F3]"
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-full bg-[#1F6A37] text-white">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </span>
+                <span className="text-xs font-semibold tracking-wider text-[#A9BEAE] uppercase">
+                  Shift Intelligence Brief · What Should I Know Right Now?
+                </span>
+              </div>
+              <h3 className="font-heading text-base sm:text-lg font-semibold text-white">
+                {aiBrief.headline}
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs text-[#E5EFE6]">
+                {aiBrief.priorities.slice(0, 3).map((p, idx) => (
+                  <div key={idx} className="flex items-start gap-2 bg-white/5 p-2 rounded-lg">
+                    <span className="text-[#4EB462] font-bold">0{idx + 1}.</span>
+                    <span>{p}</span>
+                  </div>
                 ))}
-              </section>
-            );
-          }
+              </div>
+            </div>
 
-          if (widgetId === 'operational_intelligence' && aiBrief) {
-            return (
-              <Card
-                key="operational_intelligence"
-                className="bg-gradient-to-r from-[#08190C] via-[#12512C] to-[#1F6A37] text-[#F4F6F3] border-none"
-              >
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                  <div className="space-y-2 max-w-3xl">
-                    <div className="inline-flex items-center gap-2 text-xs font-medium text-[#4EB462]">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>{aiBrief.headline}</span>
-                    </div>
-                    <ul className="space-y-1.5 text-xs sm:text-sm text-[#E5EFE6]">
-                      {aiBrief.priorities.map((item, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <span className="font-mono-tabular text-[#4EB462] font-semibold">
-                            0{i + 1}.
-                          </span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="lg:w-80 shrink-0 p-4 rounded-2xl bg-[#08190C]/55 border border-white/12">
-                    <div className="text-[11px] font-semibold text-[#4EB462] uppercase tracking-wider">
-                      Immediate Shift Directive
-                    </div>
-                    <p className="text-xs text-[#E5EFE6] mt-1 leading-relaxed">
-                      {aiBrief.riskAlert}
-                    </p>
-                  </div>
+            <div className="lg:w-80 shrink-0 p-3.5 rounded-xl bg-black/40 border border-amber-500/30 flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <AlertTriangle className="w-3 h-3 text-amber-400" />
+                  <span>Immediate Risk Alert</span>
                 </div>
-              </Card>
-            );
-          }
-
-          if (widgetId === 'revenue_fulfillment_chart') {
-            return (
-              <section
-                key="revenue_fulfillment_chart"
-                className="grid grid-cols-1 lg:grid-cols-12 gap-6"
-              >
-                <ChartCard
-                  title="Institutional Revenue vs. Cooperative Procurement Spend (KES)"
-                  subtitle="Weekly cash-flow velocity across schools, hospitals, and hospitality contracts"
-                  className="lg:col-span-7"
+                <p className="text-xs text-[#E5EFE6] mt-1 leading-relaxed">
+                  {aiBrief.riskAlert}
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-white/10 flex justify-end">
+                <Link
+                  href="/inventory?filter=expiring"
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-[#1F6A37] hover:bg-[#12512C] text-white transition-colors"
                 >
-                  <div className="h-72 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart
-                        data={REVENUE_TREND_DATA}
-                        margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
-                      >
-                        <defs>
-                          <linearGradient
-                            id="agroRevGrad"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#1F6A37"
-                              stopOpacity={0.35}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#1F6A37"
-                              stopOpacity={0.0}
-                            />
-                          </linearGradient>
-                          <linearGradient
-                            id="agroProcGrad"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#4EB462"
-                              stopOpacity={0.25}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#4EB462"
-                              stopOpacity={0.0}
-                            />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="rgba(61, 105, 74, 0.15)"
-                        />
-                        <XAxis
-                          dataKey="week"
-                          tick={{ fontSize: 12, fill: '#3D694A' }}
-                        />
-                        <YAxis
-                          tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
-                          tick={{ fontSize: 12, fill: '#3D694A' }}
-                        />
-                        <Tooltip
-                          formatter={(val: number) => [
-                            `KES ${val.toLocaleString()}`,
-                            '',
-                          ]}
-                          contentStyle={{
-                            borderRadius: '12px',
-                            border: '1px solid rgba(78,180,98,0.3)',
-                            backgroundColor: '#08190C',
-                            color: '#F4F6F3',
-                            fontSize: '12px',
-                          }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="revenueKes"
-                          name="Institutional Revenue"
-                          stroke="#1F6A37"
-                          strokeWidth={2.5}
-                          fillOpacity={1}
-                          fill="url(#agroRevGrad)"
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="procurementKes"
-                          name="Supplier Procurement"
-                          stroke="#4EB462"
-                          strokeWidth={2}
-                          fillOpacity={1}
-                          fill="url(#agroProcGrad)"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </ChartCard>
+                  <span>Resolve Risk</span>
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
-                <ChartCard
-                  title="Institutional Demand by Sector (KES)"
-                  subtitle="Current month volume distribution across customer segments"
-                  className="lg:col-span-5"
-                >
-                  <div className="h-72 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={SEGMENT_MIX_DATA}
-                        layout="vertical"
-                        margin={{ top: 5, right: 16, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="rgba(61, 105, 74, 0.15)"
-                        />
-                        <XAxis
-                          type="number"
-                          tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                          tick={{ fontSize: 11, fill: '#3D694A' }}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="segment"
-                          width={110}
-                          tick={{ fontSize: 11, fill: '#3D694A' }}
-                        />
-                        <Tooltip
-                          formatter={(val: number) => [
-                            `KES ${val.toLocaleString()}`,
-                            'Revenue',
-                          ]}
-                          contentStyle={{
-                            borderRadius: '12px',
-                            backgroundColor: '#08190C',
-                            color: '#F4F6F3',
-                            fontSize: '12px',
-                          }}
-                        />
-                        <Bar
-                          dataKey="revenueKes"
-                          fill="#1F6A37"
-                          radius={[0, 8, 8, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </ChartCard>
-              </section>
-            );
-          }
-
-          if (widgetId === 'fefo_expiry_radar') {
-            return (
-              <section
-                key="fefo_expiry_radar"
-                className="grid grid-cols-1 lg:grid-cols-12 gap-6"
+      {/* 5. PRIMARY TREND & OPERATIONAL VISUALIZATIONS (Sections 16, 17, 18) */}
+      {enabledWidgets.includes('primary_visualizations') && (
+        <section aria-label="Visual Analytics" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Revenue vs Sourcing Cash Trend */}
+          <ChartCard
+            title="Institutional Revenue vs. Procurement Sourcing (KES)"
+            subtitle="Answering: Is revenue expansion sustaining healthy gross margin over cooperative sourcing spend?"
+            className="lg:col-span-7"
+            action={
+              <Link
+                href="/finance"
+                className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
               >
-                <ChartCard
-                  title="FEFO Perishable Stock & Expiry Radar"
-                  subtitle="First-Expired, First-Out allocation priority across Nairobi Cold Hub A & Cross-Dock C"
-                  className="lg:col-span-7"
-                  action={
-                    <Link
-                      href="/inventory"
-                      className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
-                    >
-                      <span>Manage Batches</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  }
+                <span>Financial Ledger</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            }
+          >
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={REVENUE_TREND_DATA}
+                  margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
                 >
-                  <div className="space-y-2.5">
-                    {stockBatches.slice(0, 4).map((batch) => (
-                      <div
-                        key={batch.id}
-                        className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono-tabular text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462]">
-                              {batch.batchNumber}
-                            </span>
-                            <span aria-hidden="true">·</span>
-                            <span className="text-xs font-medium text-[var(--text-primary)]">
-                              {batch.productName}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                            {batch.warehouseName} ({batch.binCode}) · Available:{' '}
-                            <strong className="tabular-nums text-[var(--text-primary)]">
-                              {batch.availableQty.toLocaleString()} {batch.unit}
-                            </strong>{' '}
-                            · Expires {batch.expiryDate} ({batch.daysToExpiry}d left)
-                          </div>
-                        </div>
-                        <StatusBadge status={batch.status} />
-                      </div>
-                    ))}
-                  </div>
-                </ChartCard>
+                  <defs>
+                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#1F6A37" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#1F6A37" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="procGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4EB462" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#4EB462" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(61, 105, 74, 0.15)" />
+                  <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#3D694A' }} />
+                  <YAxis
+                    tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
+                    tick={{ fontSize: 11, fill: '#3D694A' }}
+                  />
+                  <Tooltip
+                    formatter={(val: number) => [`KES ${val.toLocaleString()}`, '']}
+                    contentStyle={{
+                      borderRadius: '12px',
+                      border: '1px solid rgba(78,180,98,0.3)',
+                      backgroundColor: '#08190C',
+                      color: '#F4F6F3',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenueKes"
+                    name="Institutional Revenue"
+                    stroke="#1F6A37"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#revGrad)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="procurementKes"
+                    name="Cooperative Sourcing"
+                    stroke="#4EB462"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#procGrad)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
 
-                {/* Pending Governance Approvals Widget */}
-                {can('approvals.view') && (
-                  <ChartCard
-                    title="Pending Governance Approvals"
-                    subtitle="Purchase orders, credit releases, and price overrides"
-                    className="lg:col-span-5"
-                    action={
-                      <Link
-                        href="/approvals"
-                        className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline"
-                      >
-                        Open Inbox ({pendingApprovals.length})
-                      </Link>
-                    }
-                  >
-                    {pendingApprovals.length === 0 ? (
-                      <div className="p-6 text-center text-xs text-[var(--text-secondary)]">
-                        All governance approvals are cleared.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {pendingApprovals.map((apr) => (
-                          <div
-                            key={apr.id}
-                            className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-mono-tabular text-xs font-semibold text-[var(--text-primary)]">
-                                {apr.reference} · {apr.category}
-                              </span>
-                              <span className="font-mono-tabular text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462]">
-                                KES {apr.valueKes.toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="text-xs font-medium text-[var(--text-primary)]">
-                              {apr.entityTitle}
-                            </div>
-                            <p className="text-[11px] text-[var(--text-secondary)]">
-                              Requested by {apr.requesterName} ({apr.requesterRole}) —{' '}
-                              {apr.reason}
-                            </p>
-                            {can('approvals.approve') && (
-                              <div className="pt-1 flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleQuickApprove(apr.id)}
-                                  className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>Approve Request</span>
-                                </button>
-                                <Link
-                                  href="/approvals"
-                                  className="px-3 py-1.5 rounded-full border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                                >
-                                  Inspect
-                                </Link>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </ChartCard>
-                )}
-              </section>
-            );
-          }
-
-          if (widgetId === 'recent_orders_table') {
-            return (
-              <ChartCard
-                key="recent_orders_table"
-                title="Active Institutional & Contract Order Pipeline"
-                subtitle="Live fulfillment state from order confirmation through picking, packing, and route dispatch"
-                action={
-                  <Link
-                    href="/orders"
-                    className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
-                  >
-                    <span>View All Orders</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                }
+          {/* Institutional Segment Demand */}
+          <ChartCard
+            title="Institutional Demand by Sector (KES)"
+            subtitle="Answering: Where is commercial volume concentrated this month?"
+            className="lg:col-span-5"
+            action={
+              <Link
+                href="/institutions"
+                className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
               >
-                {/* Desktop Table */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-secondary)]">
-                        <th className="py-2.5 px-3">Order Ref</th>
-                        <th className="py-2.5 px-3">Institution / Customer</th>
-                        <th className="py-2.5 px-3">Channel</th>
-                        <th className="py-2.5 px-3">Dispatch Hub</th>
-                        <th className="py-2.5 px-3">Status</th>
-                        <th className="py-2.5 px-3">Next Operational Step</th>
-                        <th className="py-2.5 px-3 text-right">Value (KES)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
-                      {orders.map((ord) => (
-                        <tr
-                          key={ord.id}
-                          className="hover:bg-[var(--bg-canvas)]/60 transition-colors"
-                        >
-                          <td className="py-3 px-3 font-mono-tabular font-semibold text-[var(--text-primary)]">
-                            {ord.orderNumber}
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="font-medium text-[var(--text-primary)]">
-                              {ord.customerName}
-                            </div>
-                            <div className="text-[11px] text-[var(--text-secondary)]">
-                              {ord.customerSegment} · Delivery {ord.deliveryDate}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-[var(--text-secondary)]">
-                            {ord.channel}
-                          </td>
-                          <td className="py-3 px-3 text-[var(--text-secondary)]">
-                            {ord.warehouseName}
-                          </td>
-                          <td className="py-3 px-3">
-                            <StatusBadge status={ord.status} />
-                          </td>
-                          <td className="py-3 px-3 text-[var(--text-secondary)]">
-                            {ord.nextStepLabel}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono-tabular font-semibold text-[var(--text-primary)]">
-                            {ord.totalKes.toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <span>Institutions</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            }
+          >
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={SEGMENT_MIX_DATA}
+                  layout="vertical"
+                  margin={{ top: 5, right: 16, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(61, 105, 74, 0.15)" />
+                  <XAxis
+                    type="number"
+                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                    tick={{ fontSize: 10, fill: '#3D694A' }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="segment"
+                    width={110}
+                    tick={{ fontSize: 10, fill: '#3D694A' }}
+                  />
+                  <Tooltip
+                    formatter={(val: number) => [`KES ${val.toLocaleString()}`, 'Revenue']}
+                    contentStyle={{
+                      borderRadius: '12px',
+                      backgroundColor: '#08190C',
+                      color: '#F4F6F3',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Bar dataKey="revenueKes" fill="#1F6A37" radius={[0, 8, 8, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+        </section>
+      )}
 
-                {/* Mobile Compact Record Cards */}
-                <div className="md:hidden space-y-2.5">
-                  {orders.map((ord) => (
-                    <div
-                      key={ord.id}
-                      className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono-tabular text-xs font-semibold">
-                          {ord.orderNumber}
-                        </span>
-                        <StatusBadge status={ord.status} />
-                      </div>
-                      <div className="text-xs font-semibold text-[var(--text-primary)]">
+      {/* 6. OPERATIONAL WORK QUEUES (Section 12: Reusable Work Queue Pattern) */}
+      {enabledWidgets.includes('work_queues') && (
+        <section aria-label="Operational Work Queues" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <WorkQueue
+            title="Pending Governance Approvals"
+            subtitle="Decisions requiring manager or executive sign-off"
+            badgeCount={approvalWorkQueueItems.length}
+            items={approvalWorkQueueItems}
+            emptyMessage="All approval requests have been cleared."
+            viewAllHref="/approvals"
+            viewAllLabel="Open Approvals Center"
+          />
+
+          <WorkQueue
+            title="Immediate Operational Fulfillment Queue"
+            subtitle="Perishable FEFO countdowns and active warehouse picking"
+            badgeCount={operationalWorkQueueItems.length}
+            items={operationalWorkQueueItems}
+            emptyMessage="All active orders and warehouse batches are current."
+            viewAllHref="/orders"
+            viewAllLabel="Open Orders Workbench"
+          />
+        </section>
+      )}
+
+      {/* 7. ACTIVE INSTITUTIONAL ORDER PIPELINE WORKBENCH (Section 22 & 34) */}
+      {enabledWidgets.includes('recent_orders_table') && (
+        <ChartCard
+          title="Active Institutional Order Workbench"
+          subtitle="Real-time order state from confirmation through picking, packing, route dispatch, and invoicing"
+          action={
+            <Link
+              href="/orders"
+              className="text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
+            >
+              <span>Full Order Workbench</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          }
+        >
+          {/* Desktop Workbench Table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <th className="py-2.5 px-3">Order Ref</th>
+                  <th className="py-2.5 px-3">Customer / Institution</th>
+                  <th className="py-2.5 px-3">Dispatch Hub</th>
+                  <th className="py-2.5 px-3">Delivery Date</th>
+                  <th className="py-2.5 px-3">Lifecycle Status</th>
+                  <th className="py-2.5 px-3 text-right">Value (KES)</th>
+                  <th className="py-2.5 px-3 text-right">Decision Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+                {orders.map((ord) => (
+                  <tr key={ord.id} className="hover:bg-[var(--bg-canvas)]/60 transition-colors">
+                    <td className="py-3 px-3 font-mono-tabular font-semibold text-[var(--text-primary)]">
+                      {ord.orderNumber}
+                    </td>
+                    <td className="py-3 px-3">
+                      <div className="font-semibold text-[var(--text-primary)]">
                         {ord.customerName}
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
-                        <span>{ord.warehouseName}</span>
-                        <span className="font-mono-tabular font-semibold text-[var(--text-primary)]">
-                          KES {ord.totalKes.toLocaleString()}
-                        </span>
+                      <div className="text-[11px] text-[var(--text-secondary)]">
+                        {ord.customerSegment} · {ord.channel}
                       </div>
-                    </div>
-                  ))}
+                    </td>
+                    <td className="py-3 px-3 text-[var(--text-secondary)]">
+                      {ord.warehouseName}
+                    </td>
+                    <td className="py-3 px-3 font-mono-tabular text-[var(--text-secondary)]">
+                      {ord.deliveryDate}
+                    </td>
+                    <td className="py-3 px-3">
+                      <StatusBadge status={ord.status} />
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono-tabular font-semibold text-[var(--text-primary)]">
+                      KES {ord.totalKes.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <Link
+                        href={`/orders?orderNumber=${ord.orderNumber}`}
+                        className="h-7 px-3 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <span>Inspect</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="md:hidden space-y-2.5">
+            {orders.map((ord) => (
+              <div
+                key={ord.id}
+                className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono-tabular text-xs font-semibold">
+                    {ord.orderNumber}
+                  </span>
+                  <StatusBadge status={ord.status} />
                 </div>
-              </ChartCard>
-            );
-          }
+                <div className="text-xs font-semibold text-[var(--text-primary)]">
+                  {ord.customerName}
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+                  <span>{ord.warehouseName}</span>
+                  <span className="font-mono-tabular font-semibold text-[var(--text-primary)]">
+                    KES {ord.totalKes.toLocaleString()}
+                  </span>
+                </div>
+                <div className="pt-2 border-t border-[var(--border-subtle)] flex justify-end">
+                  <Link
+                    href={`/orders?orderNumber=${ord.orderNumber}`}
+                    className="h-7 px-3 rounded-full bg-[#1F6A37] text-white text-xs font-semibold inline-flex items-center gap-1"
+                  >
+                    <span>Fulfill</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ChartCard>
+      )}
 
-          return null;
-        })}
-      </div>
-
-      {/* Dashboard Widget Customization Modal */}
+      {/* DASHBOARD WIDGET CUSTOMIZATION MODAL (Section 37) */}
       <Modal
         open={customizeOpen}
         onClose={() => setCustomizeOpen(false)}
-        title="Customize Command Center Widgets"
-        subtitle="Toggle visibility or reorder operational widgets permitted for your role."
+        title="Customize Command Center Decision View"
+        subtitle="Configure operational widget order and role-specific visibility."
       >
-        <div className="space-y-2.5">
-          {WIDGET_REGISTRY.filter((w) => can(w.permission)).map((widget) => {
-            const enabled = enabledWidgets.includes(widget.id);
-            return (
-              <div
-                key={widget.id}
-                className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between gap-3"
-              >
-                <label className="flex items-center gap-2.5 text-xs font-medium text-[var(--text-primary)] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={enabled}
-                    onChange={() => toggleDashboardWidget(widget.id)}
-                    className="rounded accent-[#1F6A37]"
-                  />
-                  <span>{widget.label}</span>
-                </label>
-                {enabled && (
-                  <div className="flex items-center gap-1">
+        <div className="space-y-3">
+          <p className="text-xs text-[var(--text-secondary)]">
+            AgroHub enforces role-optimized decision layouts. You may tailor which sections are displayed or restore default governance order.
+          </p>
+
+          <div className="space-y-2 pt-2">
+            {WIDGET_REGISTRY.map((w, index) => {
+              const active = enabledWidgets.includes(w.id);
+              return (
+                <div
+                  key={w.id}
+                  className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between gap-3 text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono-tabular text-[11px] text-[var(--text-secondary)]">
+                      {index + 1}.
+                    </span>
+                    <span className="font-medium text-[var(--text-primary)]">
+                      {w.label}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => moveDashboardWidget(widget.id, 'up')}
-                      className="p-1 rounded-full hover:bg-[var(--bg-card)] text-[var(--text-secondary)] cursor-pointer"
-                      title="Move widget up"
+                      onClick={() => toggleDashboardWidget(w.id)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                        active
+                          ? 'bg-[#1F6A37] text-white'
+                          : 'bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)]'
+                      }`}
                     >
-                      <ArrowUp className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveDashboardWidget(widget.id, 'down')}
-                      className="p-1 rounded-full hover:bg-[var(--bg-card)] text-[var(--text-secondary)] cursor-pointer"
-                      title="Move widget down"
-                    >
-                      <ArrowDown className="w-3.5 h-3.5" />
+                      {active ? 'Visible' : 'Hidden'}
                     </button>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
 
-        <div className="mt-6 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-between">
-          <button
-            type="button"
-            onClick={resetDashboardWidgets}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset to default layout</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setCustomizeOpen(false)}
-            className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
-          >
-            Done
-          </button>
+          <div className="pt-4 border-t border-[var(--border-subtle)] flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                resetDashboardWidgets();
+                setFeedback('Default role-optimized decision layout restored.');
+                setCustomizeOpen(false);
+              }}
+              className="px-3.5 py-1.5 rounded-full border border-[var(--border-subtle)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset to Role Defaults</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCustomizeOpen(false)}
+              className="px-4 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
         </div>
       </Modal>
     </div>
