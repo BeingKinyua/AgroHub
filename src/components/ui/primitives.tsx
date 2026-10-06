@@ -7,6 +7,7 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -137,6 +138,368 @@ export function KPI({
       </div>
       <div className="text-xs text-[var(--text-secondary)] mt-1.5 flex items-center gap-1.5">
         <span>{sublabel}</span>
+      </div>
+    </Card>
+  );
+}
+
+export interface ActionableMetric {
+  metric: string;
+  value: string;
+  context: string;
+  status?: 'critical' | 'warning' | 'healthy' | 'neutral';
+  description?: string;
+  actionLabel?: string;
+  actionHref?: string;
+  onAction?: () => void;
+  delta?: string;
+}
+
+export function ActionableMetricCard({
+  metric,
+  value,
+  context,
+  status = 'neutral',
+  description,
+  actionLabel,
+  actionHref,
+  onAction,
+  delta,
+}: ActionableMetric) {
+  const statusConfig = {
+    critical: {
+      border: 'border-red-500/35 hover:border-red-500/60',
+      badge: 'bg-red-500/10 text-red-600 dark:text-red-400',
+      icon: AlertTriangle,
+      label: 'Critical Risk',
+      btn: 'bg-red-600 hover:bg-red-700 text-white',
+    },
+    warning: {
+      border: 'border-amber-500/35 hover:border-amber-500/60',
+      badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+      icon: AlertCircle,
+      label: 'Attention Needed',
+      btn: 'bg-amber-600 hover:bg-amber-700 text-white',
+    },
+    healthy: {
+      border: 'border-[#4EB462]/35 hover:border-[#4EB462]/65',
+      badge: 'bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]',
+      icon: CheckCircle2,
+      label: 'Optimal',
+      btn: 'bg-[#1F6A37] hover:bg-[#12512C] text-white',
+    },
+    neutral: {
+      border: 'border-[var(--border-subtle)] hover:border-[#4EB462]/40',
+      badge: 'bg-[var(--bg-canvas)] text-[var(--text-secondary)]',
+      icon: Clock,
+      label: 'Monitored',
+      btn: 'bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)]',
+    },
+  };
+
+  const current = statusConfig[status];
+  const StatusIcon = current.icon;
+
+  return (
+    <Card
+      padding="p-5"
+      variant="raised"
+      className={`flex flex-col justify-between transition-all duration-200 ${current.border}`}
+    >
+      <div>
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <span className="text-xs font-semibold text-[var(--text-secondary)] tracking-wide uppercase">
+            {metric}
+          </span>
+          <span
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${current.badge}`}
+          >
+            <StatusIcon className="w-3 h-3" />
+            <span>{current.label}</span>
+          </span>
+        </div>
+
+        <div className="font-heading text-2xl sm:text-[28px] font-semibold tracking-tight text-[var(--text-primary)] tabular-nums">
+          {value}
+        </div>
+
+        <div className="text-xs text-[var(--text-secondary)] mt-1.5 flex items-center justify-between gap-2">
+          <span className="font-medium text-[var(--text-primary)]">{context}</span>
+          {delta && (
+            <span className="font-mono-tabular text-[11px] text-[var(--text-secondary)] shrink-0">
+              {delta}
+            </span>
+          )}
+        </div>
+
+        {description && (
+          <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 line-clamp-1">
+            {description}
+          </p>
+        )}
+      </div>
+
+      {(actionLabel && (actionHref || onAction)) && (
+        <div className="mt-4 pt-3 border-t border-[var(--border-subtle)]/70 flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">
+            Decision Action
+          </span>
+          {actionHref ? (
+            <Link
+              href={actionHref}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${current.btn}`}
+            >
+              <span>{actionLabel}</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={onAction}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${current.btn}`}
+            >
+              <span>{actionLabel}</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+export interface OperationalPulseItem {
+  id: string;
+  severity: 'critical' | 'warning' | 'healthy';
+  title: string;
+  detail: string;
+  value?: string;
+  timestamp: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
+export function OperationalPulse({
+  items,
+  title = 'Operational Pulse · Critical Decisions Required',
+  freshness = 'As of 07:45 EAT · Updated 4m ago',
+}: {
+  items: OperationalPulseItem[];
+  title?: string;
+  freshness?: string;
+}) {
+  if (!items || items.length === 0) return null;
+
+  return (
+    <div className="mb-6 rounded-[20px] bg-[var(--bg-card)] border-2 border-amber-500/35 dark:border-amber-500/30 p-4 sm:p-5 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-3 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+          </span>
+          <h2 className="font-heading text-sm font-semibold tracking-wide text-[var(--text-primary)]">
+            {title}
+          </h2>
+          <span className="text-[11px] font-mono-tabular px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-bold">
+            {items.length} Action{items.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        <span className="text-[11px] font-mono-tabular text-[var(--text-secondary)]">
+          {freshness}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {items.map((item) => {
+          const isCritical = item.severity === 'critical';
+          return (
+            <div
+              key={item.id}
+              className={`p-3.5 rounded-xl border flex flex-col justify-between transition-all ${
+                isCritical
+                  ? 'bg-red-500/[0.04] border-red-500/25 dark:border-red-500/30'
+                  : 'bg-amber-500/[0.04] border-amber-500/25 dark:border-amber-500/30'
+              }`}
+            >
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--text-primary)]">
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full shrink-0 ${
+                        isCritical ? 'bg-red-500' : 'bg-amber-500'
+                      }`}
+                    />
+                    <span className="truncate">{item.title}</span>
+                  </div>
+                  {item.value && (
+                    <span className="font-mono-tabular text-xs font-bold text-[var(--text-primary)] shrink-0">
+                      {item.value}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 leading-relaxed">
+                  {item.detail}
+                </p>
+              </div>
+
+              <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px]">
+                <span className="text-[10px] text-[var(--text-secondary)] font-mono-tabular">
+                  {item.timestamp}
+                </span>
+                <Link
+                  href={item.actionHref}
+                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+                    isCritical
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-amber-600 hover:bg-amber-700 text-white'
+                  }`}
+                >
+                  <span>{item.actionLabel}</span>
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export interface WorkQueueItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  tag?: string;
+  severity?: 'critical' | 'warning' | 'healthy' | 'neutral';
+  actionLabel: string;
+  actionHref?: string;
+  onAction?: () => void;
+  metadata?: string;
+}
+
+export function WorkQueue({
+  title,
+  subtitle,
+  badgeCount,
+  items,
+  emptyMessage = 'No items pending in this queue. Everything is up to date.',
+  viewAllHref,
+  viewAllLabel = 'View Complete Queue',
+}: {
+  title: string;
+  subtitle?: string;
+  badgeCount?: number;
+  items: WorkQueueItem[];
+  emptyMessage?: string;
+  viewAllHref?: string;
+  viewAllLabel?: string;
+}) {
+  return (
+    <Card padding="p-5" variant="raised" className="flex flex-col justify-between">
+      <div>
+        <div className="flex items-center justify-between gap-3 pb-3 mb-3 border-b border-[var(--border-subtle)]">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
+                {title}
+              </h3>
+              {typeof badgeCount === 'number' && (
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-mono-tabular font-bold bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]">
+                  {badgeCount}
+                </span>
+              )}
+            </div>
+            {subtitle && (
+              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                {subtitle}
+              </p>
+            )}
+          </div>
+          {viewAllHref && (
+            <Link
+              href={viewAllHref}
+              className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1 shrink-0"
+            >
+              <span>{viewAllLabel}</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
+        </div>
+
+        {items.length === 0 ? (
+          <div className="py-6 text-center text-xs text-[var(--text-secondary)]">
+            <CheckCircle2 className="w-5 h-5 mx-auto text-[#1F6A37] dark:text-[#4EB462] mb-1.5 opacity-80" />
+            <span>{emptyMessage}</span>
+          </div>
+        ) : (
+          <div className="divide-y divide-[var(--border-subtle)]">
+            {items.map((item) => {
+              const dotColor =
+                item.severity === 'critical'
+                  ? 'bg-red-500'
+                  : item.severity === 'warning'
+                  ? 'bg-amber-500'
+                  : item.severity === 'healthy'
+                  ? 'bg-[#4EB462]'
+                  : 'bg-slate-400';
+
+              return (
+                <div
+                  key={item.id}
+                  className="py-2.5 flex items-center justify-between gap-3 hover:bg-[var(--bg-canvas)]/50 px-1 rounded-lg transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
+                      <span className="font-semibold text-xs text-[var(--text-primary)] truncate">
+                        {item.title}
+                      </span>
+                      {item.tag && (
+                        <span className="text-[10px] font-mono-tabular px-1.5 py-0.2 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                          {item.tag}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-[var(--text-secondary)] flex items-center gap-2 mt-0.5">
+                      <span className="truncate">{item.subtitle}</span>
+                      {item.metadata && (
+                        <>
+                          <span>·</span>
+                          <span className="font-mono-tabular shrink-0 text-[10px]">
+                            {item.metadata}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0">
+                    {item.actionHref ? (
+                      <Link
+                        href={item.actionHref}
+                        className="h-7 px-3 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <span>{item.actionLabel}</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={item.onAction}
+                        className="h-7 px-3 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <span>{item.actionLabel}</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </Card>
   );
