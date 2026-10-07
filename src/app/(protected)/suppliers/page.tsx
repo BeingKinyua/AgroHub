@@ -70,8 +70,18 @@ export default function SuppliersPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [feedback, setFeedback] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  // Active Selected Supplier for Sub-modals
-  const [activeSupplier, setActiveSupplier] = useState<SupplierRecord | null>(null);
+  // Active Selected Supplier ID for Sub-modals
+  const [activeSupplierId, setActiveSupplierId] = useState<string | null>(null);
+
+  // Derive live active supplier directly from context state
+  const activeSupplier = useMemo(
+    () => (activeSupplierId ? suppliers.find((s) => s.id === activeSupplierId) || null : null),
+    [activeSupplierId, suppliers]
+  );
+
+  const setActiveSupplier = (sup: SupplierRecord | null) => {
+    setActiveSupplierId(sup?.id || null);
+  };
 
   // Modals visibility
   const [createOpen, setCreateOpen] = useState(false);
