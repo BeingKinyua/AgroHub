@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { History, Plus, Search, Tag } from 'lucide-react';
+import { Edit2, History, Package, Plus, Search } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
 import {
   Card,
@@ -26,11 +26,11 @@ const CATEGORIES = [
 ] as const;
 
 export default function ProductsPage() {
-  const { products, can, createProduct, updateProductPrice } = useBos();
+  const { products, can, createProduct, updateProduct } = useBos();
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(
+  const [editDetailsProduct, setEditDetailsProduct] = useState<ProductRecord | null>(
     null
   );
   const [historyProduct, setHistoryProduct] = useState<ProductRecord | null>(
@@ -41,10 +41,23 @@ export default function ProductsPage() {
     type: 'success' | 'error';
   } | null>(null);
 
-  // Edit price state
-  const [instPrice, setInstPrice] = useState(0);
-  const [whlPrice, setWhlPrice] = useState(0);
-  const [retPrice, setRetPrice] = useState(0);
+  // Full Edit Product Form State
+  const [editName, setEditName] = useState('');
+  const [editSku, setEditSku] = useState('');
+  const [editCategory, setEditCategory] =
+    useState<ProductRecord['category']>('Fresh Vegetables');
+  const [editUnit, setEditUnit] = useState<UnitOfMeasure>('kilograms');
+  const [editDescription, setEditDescription] = useState('');
+  const [editStatus, setEditStatus] =
+    useState<ProductRecord['status']>('Active');
+  const [editReorderPoint, setEditReorderPoint] = useState(100);
+  const [editBatchTracked, setEditBatchTracked] = useState(true);
+  const [editExpiryTracked, setEditExpiryTracked] = useState(true);
+  const [editInstKes, setEditInstKes] = useState(95);
+  const [editWhlKes, setEditWhlKes] = useState(105);
+  const [editRetKes, setEditRetKes] = useState(125);
+  const [editOnlineKes, setEditOnlineKes] = useState(120);
+  const [editCostKes, setEditCostKes] = useState(70);
 
   // New Product state
   const [name, setName] = useState('');
@@ -71,24 +84,47 @@ export default function ProductsPage() {
     });
   }, [products, categoryFilter, search]);
 
-  const openPriceEditor = (prod: ProductRecord) => {
-    setEditingProduct(prod);
-    setInstPrice(prod.pricing.institutionalKes);
-    setWhlPrice(prod.pricing.wholesaleKes);
-    setRetPrice(prod.pricing.retailKes);
+  const openEditProduct = (prod: ProductRecord) => {
+    setEditDetailsProduct(prod);
+    setEditName(prod.name);
+    setEditSku(prod.sku);
+    setEditCategory(prod.category);
+    setEditUnit(prod.unit);
+    setEditDescription(prod.description);
+    setEditStatus(prod.status);
+    setEditReorderPoint(prod.reorderPoint);
+    setEditBatchTracked(prod.batchTracked);
+    setEditExpiryTracked(prod.expiryTracked);
+    setEditInstKes(prod.pricing.institutionalKes);
+    setEditWhlKes(prod.pricing.wholesaleKes);
+    setEditRetKes(prod.pricing.retailKes);
+    setEditOnlineKes(prod.pricing.onlineKes);
+    setEditCostKes(prod.pricing.supplierCostKes);
   };
 
-  const handleSavePrice = async (e: React.FormEvent) => {
+  const handleSaveEditProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingProduct) return;
-    const res = await updateProductPrice(
-      editingProduct.id,
-      Number(instPrice),
-      Number(whlPrice),
-      Number(retPrice)
-    );
+    if (!editDetailsProduct) return;
+    const res = await updateProduct(editDetailsProduct.id, {
+      name: editName.trim(),
+      sku: editSku.trim(),
+      category: editCategory,
+      unit: editUnit,
+      description: editDescription.trim(),
+      status: editStatus,
+      reorderPoint: Number(editReorderPoint),
+      batchTracked: editBatchTracked,
+      expiryTracked: editExpiryTracked,
+      pricing: {
+        institutionalKes: Number(editInstKes),
+        wholesaleKes: Number(editWhlKes),
+        retailKes: Number(editRetKes),
+        onlineKes: Number(editOnlineKes),
+        supplierCostKes: Number(editCostKes),
+      },
+    });
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) setEditingProduct(null);
+    if (res.ok) setEditDetailsProduct(null);
   };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
@@ -313,16 +349,19 @@ export default function ProductsPage() {
                 <History className="w-3.5 h-3.5" />
                 <span>Price History ({prod.priceHistory.length})</span>
               </button>
-              {can('products.edit') && (
-                <button
-                  type="button"
-                  onClick={() => openPriceEditor(prod)}
-                  className="px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium hover:border-[#4EB462] inline-flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Tag className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
-                  <span>Edit Tiers</span>
-                </button>
-              )}
+              <div className="flex items-center gap-1.5">
+                {can('products.edit') && (
+                  <button
+                    type="button"
+                    onClick={() => openEditProduct(prod)}
+                    className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                    title="Edit product details, SKU, specifications, and pricing"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Edit Product</span>
+                  </button>
+                )}
+              </div>
             </div>
           </Card>
         ))}
@@ -357,67 +396,6 @@ export default function ProductsPage() {
             ))}
           </div>
         )}
-      </Modal>
-
-      {/* Edit Multi-Tier Price Modal */}
-      <Modal
-        open={Boolean(editingProduct)}
-        onClose={() => setEditingProduct(null)}
-        title={`Edit Price Tiers · ${editingProduct?.name}`}
-        subtitle="Previous prices are automatically preserved in the product historical pricing ledger."
-      >
-        <form onSubmit={handleSavePrice} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Institutional (KES)
-              </label>
-              <input
-                type="number"
-                value={instPrice}
-                onChange={(e) => setInstPrice(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Wholesale (KES)
-              </label>
-              <input
-                type="number"
-                value={whlPrice}
-                onChange={(e) => setWhlPrice(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Retail (KES)
-              </label>
-              <input
-                type="number"
-                value={retPrice}
-                onChange={(e) => setRetPrice(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setEditingProduct(null)}
-              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
-            >
-              Save & Log Price Revision
-            </button>
-          </div>
-        </form>
       </Modal>
 
       {/* Create New Product Modal */}
@@ -550,6 +528,239 @@ export default function ProductsPage() {
               className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
             >
               Create Product SKU
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Product Modal */}
+      <Modal
+        open={Boolean(editDetailsProduct)}
+        onClose={() => setEditDetailsProduct(null)}
+        title={`Edit Product · ${editDetailsProduct?.name}`}
+        subtitle={`Update SKU details, unit of measure, active status, buffer target, and pricing tiers for ${editDetailsProduct?.sku}.`}
+      >
+        <form onSubmit={handleSaveEditProduct} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium mb-1">
+                Product Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="e.g., Kinangop Roma Tomatoes"
+                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">SKU Code *</label>
+              <input
+                type="text"
+                required
+                value={editSku}
+                onChange={(e) => setEditSku(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1">Category *</label>
+              <select
+                value={editCategory}
+                onChange={(e) =>
+                  setEditCategory(e.target.value as ProductRecord['category'])
+                }
+                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              >
+                {CATEGORIES.filter((c) => c !== 'All').map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">
+                Unit of Measure *
+              </label>
+              <select
+                value={editUnit}
+                onChange={(e) => setEditUnit(e.target.value as UnitOfMeasure)}
+                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              >
+                <option value="kilograms">kilograms</option>
+                <option value="pieces">pieces</option>
+                <option value="bunches">bunches</option>
+                <option value="dozens">dozens</option>
+                <option value="packs">packs</option>
+                <option value="bags">bags</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">
+                Lifecycle Status *
+              </label>
+              <select
+                value={editStatus}
+                onChange={(e) =>
+                  setEditStatus(e.target.value as ProductRecord['status'])
+                }
+                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium"
+              >
+                <option value="Active">Active</option>
+                <option value="Seasonal Hold">Seasonal Hold</option>
+                <option value="Discontinued">Discontinued</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1">
+              Description / Specifications
+            </label>
+            <textarea
+              rows={2}
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Grading specifications, packaging standard, origin county..."
+              className="w-full p-2.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+            />
+          </div>
+
+          {/* Reorder and Inventory Configuration */}
+          <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
+            <div className="text-xs font-semibold text-[var(--text-primary)]">
+              Warehouse & Stock Thresholds
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  Buffer Target / Reorder Point ({editUnit})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={editReorderPoint}
+                  onChange={(e) => setEditReorderPoint(Number(e.target.value))}
+                  className="w-full h-9 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-5">
+                <input
+                  type="checkbox"
+                  id="editBatchTracked"
+                  checked={editBatchTracked}
+                  onChange={(e) => setEditBatchTracked(e.target.checked)}
+                  className="rounded text-[#1F6A37] focus:ring-[#1F6A37]"
+                />
+                <label htmlFor="editBatchTracked" className="text-xs text-[var(--text-secondary)] cursor-pointer">
+                  FEFO Batch Tracked
+                </label>
+              </div>
+              <div className="flex items-center gap-2 pt-5">
+                <input
+                  type="checkbox"
+                  id="editExpiryTracked"
+                  checked={editExpiryTracked}
+                  onChange={(e) => setEditExpiryTracked(e.target.checked)}
+                  className="rounded text-[#1F6A37] focus:ring-[#1F6A37]"
+                />
+                <label htmlFor="editExpiryTracked" className="text-xs text-[var(--text-secondary)] cursor-pointer">
+                  Expiry Date Tracked
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing Tiers Section */}
+          <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
+            <div className="text-xs font-semibold text-[var(--text-primary)]">
+              Multi-Channel Price Schedule (KES / {editUnit})
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              <div>
+                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  Supplier Cost
+                </label>
+                <input
+                  type="number"
+                  required
+                  value={editCostKes}
+                  onChange={(e) => setEditCostKes(Number(e.target.value))}
+                  className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  Institutional
+                </label>
+                <input
+                  type="number"
+                  required
+                  value={editInstKes}
+                  onChange={(e) => setEditInstKes(Number(e.target.value))}
+                  className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  Wholesale
+                </label>
+                <input
+                  type="number"
+                  required
+                  value={editWhlKes}
+                  onChange={(e) => setEditWhlKes(Number(e.target.value))}
+                  className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular font-semibold"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  Retail (POS)
+                </label>
+                <input
+                  type="number"
+                  required
+                  value={editRetKes}
+                  onChange={(e) => setEditRetKes(Number(e.target.value))}
+                  className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  Online
+                </label>
+                <input
+                  type="number"
+                  required
+                  value={editOnlineKes}
+                  onChange={(e) => setEditOnlineKes(Number(e.target.value))}
+                  className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setEditDetailsProduct(null)}
+              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-sm inline-flex items-center gap-1.5"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              <span>Save Changes</span>
             </button>
           </div>
         </form>

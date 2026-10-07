@@ -145,6 +145,10 @@ interface BosContextValue {
       'id' | 'status' | 'availableQty' | 'reservedQty' | 'incomingQty' | 'priceHistory'
     >
   ) => Promise<{ ok: boolean; message: string }>;
+  updateProduct: (
+    productId: string,
+    updates: Partial<Omit<ProductRecord, 'id' | 'priceHistory'>>
+  ) => Promise<{ ok: boolean; message: string }>;
   updateProductPrice: (
     productId: string,
     institutionalKes: number,
@@ -905,6 +909,66 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
 
     const msg = `Product ${newProd.name} (${newProd.sku}) added to catalog.`;
     pushToast({ title: 'Product SKU Added', description: msg, tone: 'success' });
+    return { ok: true, message: msg };
+  };
+
+  const updateProduct: BosContextValue['updateProduct'] = async (
+    productId,
+    updates
+  ) => {
+    const auth = await verifyServerAction('products.edit', 'Update Product Details');
+    if (!auth.ok) return { ok: false, message: auth.error! };
+
+    const target = products.find((p) => p.id === productId);
+    if (!target) return { ok: false, message: 'Product not found.' };
+
+    const updatedPricing = updates.pricing
+      ? { ...target.pricing, ...updates.pricing }
+      : target.pricing;
+
+    // Check if institutional or wholesale pricing changed to record price history
+    const priceChanged =
+      updates.pricing &&
+      (updates.pricing.institutionalKes !== undefined &&
+        updates.pricing.institutionalKes !== target.pricing.institutionalKes ||
+        updates.pricing.wholesaleKes !== undefined &&
+        updates.pricing.wholesaleKes !== target.pricing.wholesaleKes ||
+        updates.pricing.retailKes !== undefined &&
+        updates.pricing.retailKes !== target.pricing.retailKes);
+
+    const newHistory = priceChanged && updates.pricing?.institutionalKes
+      ? [
+          {
+            date: new Date().toISOString().split('T')[0],
+            tier: 'Institutional' as const,
+            priceKes: updates.pricing.institutionalKes,
+            changedBy: currentUser?.fullName || 'Operator',
+          },
+          ...target.priceHistory,
+        ]
+      : target.priceHistory;
+
+    const updated: ProductRecord = {
+      ...target,
+      ...updates,
+      pricing: updatedPricing,
+      priceHistory: newHistory,
+    };
+
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? updated : p))
+    );
+
+    appendAudit(
+      'Products',
+      `${updated.sku} (${updated.name})`,
+      'Updated Product Details',
+      `${target.name} · ${target.category} · ${target.unit}`,
+      `${updated.name} · ${updated.category} · ${updated.unit}`
+    );
+
+    const msg = `Product ${updated.name} (${updated.sku}) updated successfully.`;
+    pushToast({ title: 'Product Updated', description: msg, tone: 'success' });
     return { ok: true, message: msg };
   };
 
@@ -2151,6 +2215,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         createOrder,
         advanceOrderStatus,
         createProduct,
+        updateProduct,
         updateProductPrice,
         recordStockMovement,
         createPurchaseOrder,
