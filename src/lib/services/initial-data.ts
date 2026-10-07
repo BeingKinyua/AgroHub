@@ -225,9 +225,12 @@ export const INITIAL_PRODUCTS: ProductRecord[] = [
       supplierCostKes: 78,
     },
     priceHistory: [
-      { date: '2026-09-25', tier: 'Institutional', priceKes: 105, changedBy: 'Daniel Kiprop' },
-      { date: '2026-09-20', tier: 'Supplier Cost', priceKes: 78, changedBy: 'Peter Ndung’u' },
+      { date: '2026-05-15', tier: 'Supplier Cost', priceKes: 65, changedBy: 'Peter Ndung’u' },
+      { date: '2026-06-20', tier: 'Supplier Cost', priceKes: 68, changedBy: 'Peter Ndung’u' },
+      { date: '2026-07-22', tier: 'Supplier Cost', priceKes: 70, changedBy: 'Peter Ndung’u' },
       { date: '2026-08-15', tier: 'Supplier Cost', priceKes: 72, changedBy: 'Peter Ndung’u' },
+      { date: '2026-09-20', tier: 'Supplier Cost', priceKes: 78, changedBy: 'Peter Ndung’u' },
+      { date: '2026-09-25', tier: 'Institutional', priceKes: 105, changedBy: 'Daniel Kiprop' },
     ],
   },
   {
@@ -253,8 +256,12 @@ export const INITIAL_PRODUCTS: ProductRecord[] = [
       supplierCostKes: 21,
     },
     priceHistory: [
-      { date: '2026-09-22', tier: 'Institutional', priceKes: 30, changedBy: 'Grace Achieng' },
+      { date: '2026-05-18', tier: 'Supplier Cost', priceKes: 18, changedBy: 'Peter Ndung’u' },
+      { date: '2026-06-25', tier: 'Supplier Cost', priceKes: 19, changedBy: 'Peter Ndung’u' },
+      { date: '2026-07-20', tier: 'Supplier Cost', priceKes: 20, changedBy: 'Peter Ndung’u' },
+      { date: '2026-08-15', tier: 'Supplier Cost', priceKes: 20, changedBy: 'Peter Ndung’u' },
       { date: '2026-09-10', tier: 'Supplier Cost', priceKes: 21, changedBy: 'Peter Ndung’u' },
+      { date: '2026-09-22', tier: 'Institutional', priceKes: 30, changedBy: 'Grace Achieng' },
     ],
   },
   {
@@ -280,6 +287,10 @@ export const INITIAL_PRODUCTS: ProductRecord[] = [
       supplierCostKes: 22,
     },
     priceHistory: [
+      { date: '2026-05-10', tier: 'Supplier Cost', priceKes: 26, changedBy: 'Peter Ndung’u' },
+      { date: '2026-06-15', tier: 'Supplier Cost', priceKes: 24, changedBy: 'Peter Ndung’u' },
+      { date: '2026-07-22', tier: 'Supplier Cost', priceKes: 23, changedBy: 'Peter Ndung’u' },
+      { date: '2026-08-18', tier: 'Supplier Cost', priceKes: 21, changedBy: 'Peter Ndung’u' },
       { date: '2026-09-28', tier: 'Supplier Cost', priceKes: 22, changedBy: 'Peter Ndung’u' },
     ],
   },
@@ -306,8 +317,12 @@ export const INITIAL_PRODUCTS: ProductRecord[] = [
       supplierCostKes: 9100,
     },
     priceHistory: [
-      { date: '2026-09-18', tier: 'Institutional', priceKes: 10450, changedBy: 'Mercy Kamau' },
+      { date: '2026-04-15', tier: 'Supplier Cost', priceKes: 8600, changedBy: 'Peter Ndung’u' },
+      { date: '2026-05-25', tier: 'Supplier Cost', priceKes: 8750, changedBy: 'Peter Ndung’u' },
+      { date: '2026-07-10', tier: 'Supplier Cost', priceKes: 8900, changedBy: 'Peter Ndung’u' },
+      { date: '2026-08-18', tier: 'Supplier Cost', priceKes: 9000, changedBy: 'Peter Ndung’u' },
       { date: '2026-09-01', tier: 'Supplier Cost', priceKes: 9100, changedBy: 'Peter Ndung’u' },
+      { date: '2026-09-18', tier: 'Institutional', priceKes: 10450, changedBy: 'Mercy Kamau' },
     ],
   },
   {
@@ -333,6 +348,11 @@ export const INITIAL_PRODUCTS: ProductRecord[] = [
       supplierCostKes: 3290,
     },
     priceHistory: [
+      { date: '2026-04-20', tier: 'Supplier Cost', priceKes: 3450, changedBy: 'Peter Ndung’u' },
+      { date: '2026-06-15', tier: 'Supplier Cost', priceKes: 3380, changedBy: 'Peter Ndung’u' },
+      { date: '2026-07-22', tier: 'Supplier Cost', priceKes: 3320, changedBy: 'Peter Ndung’u' },
+      { date: '2026-08-25', tier: 'Supplier Cost', priceKes: 3300, changedBy: 'Peter Ndung’u' },
+      { date: '2026-09-18', tier: 'Supplier Cost', priceKes: 3290, changedBy: 'Peter Ndung’u' },
       { date: '2026-09-14', tier: 'Institutional', priceKes: 3720, changedBy: 'Daniel Kiprop' },
     ],
   },
@@ -359,6 +379,10 @@ export const INITIAL_PRODUCTS: ProductRecord[] = [
       supplierCostKes: 395,
     },
     priceHistory: [
+      { date: '2026-05-12', tier: 'Supplier Cost', priceKes: 370, changedBy: 'Peter Ndung’u' },
+      { date: '2026-06-20', tier: 'Supplier Cost', priceKes: 380, changedBy: 'Peter Ndung’u' },
+      { date: '2026-07-28', tier: 'Supplier Cost', priceKes: 385, changedBy: 'Peter Ndung’u' },
+      { date: '2026-08-30', tier: 'Supplier Cost', priceKes: 390, changedBy: 'Peter Ndung’u' },
       { date: '2026-09-26', tier: 'Supplier Cost', priceKes: 395, changedBy: 'Peter Ndung’u' },
     ],
   },
@@ -385,6 +409,11 @@ export const INITIAL_PRODUCTS: ProductRecord[] = [
       supplierCostKes: 46,
     },
     priceHistory: [
+      { date: '2026-05-15', tier: 'Supplier Cost', priceKes: 52, changedBy: 'Peter Ndung’u' },
+      { date: '2026-06-22', tier: 'Supplier Cost', priceKes: 49, changedBy: 'Peter Ndung’u' },
+      { date: '2026-07-30', tier: 'Supplier Cost', priceKes: 48, changedBy: 'Peter Ndung’u' },
+      { date: '2026-08-28', tier: 'Supplier Cost', priceKes: 45, changedBy: 'Peter Ndung’u' },
+      { date: '2026-09-24', tier: 'Supplier Cost', priceKes: 46, changedBy: 'Peter Ndung’u' },
       { date: '2026-09-21', tier: 'Institutional', priceKes: 62, changedBy: 'Grace Achieng' },
     ],
   },

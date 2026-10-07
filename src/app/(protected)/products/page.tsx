@@ -1,7 +1,26 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Edit2, History, Package, Plus, Search } from 'lucide-react';
+import {
+  Edit2,
+  History,
+  LineChart,
+  Minus,
+  Package,
+  Plus,
+  Search,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
 import { useBos } from '@/lib/services/bos-context';
 import {
   Card,
@@ -83,6 +102,78 @@ export default function ProductsPage() {
       return matchCat && matchSearch;
     });
   }, [products, categoryFilter, search]);
+
+  // Derived Supplier Cost trend metrics and timeline chart data
+  const supplierTrend = useMemo(() => {
+    if (!historyProduct) return null;
+
+    // Filter strictly for 'Supplier Cost' tier only
+    const supplierEntries = historyProduct.priceHistory.filter(
+      (h) => h.tier === 'Supplier Cost'
+    );
+
+    // Sort chronologically (oldest date first)
+    const sorted = [...supplierEntries].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    const currentPrice = historyProduct.pricing.supplierCostKes;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const allPoints = [...sorted];
+    if (
+      allPoints.length === 0 ||
+      (allPoints[allPoints.length - 1].priceKes !== currentPrice &&
+        allPoints[allPoints.length - 1].date !== todayStr)
+    ) {
+      allPoints.push({
+        date: todayStr,
+        tier: 'Supplier Cost' as const,
+        priceKes: currentPrice,
+        changedBy: 'Current Active Procurement Cost',
+      });
+    }
+
+    const prices = allPoints.map((p) => p.priceKes);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const initialPrice = allPoints[0].priceKes;
+    const latestPrice = allPoints[allPoints.length - 1].priceKes;
+    const diffKes = latestPrice - initialPrice;
+    const diffPct = initialPrice > 0 ? (diffKes / initialPrice) * 100 : 0;
+
+    const chartData = allPoints.map((p, index) => {
+      const prevPrice = index > 0 ? allPoints[index - 1].priceKes : p.priceKes;
+      const stepDiff = p.priceKes - prevPrice;
+      const dateObj = new Date(p.date);
+      const formattedDate = !isNaN(dateObj.getTime())
+        ? dateObj.toLocaleDateString('en-KE', { month: 'short', day: 'numeric' })
+        : p.date;
+
+      return {
+        date: p.date,
+        formattedDate,
+        fullDate: p.date,
+        priceKes: p.priceKes,
+        changedBy: p.changedBy,
+        stepDiff,
+      };
+    });
+
+    return {
+      chartData,
+      allPoints,
+      minPrice,
+      maxPrice,
+      initialPrice,
+      latestPrice,
+      diffKes,
+      diffPct,
+      unit: historyProduct.unit,
+      sku: historyProduct.sku,
+      name: historyProduct.name,
+    };
+  }, [historyProduct]);
 
   const openEditProduct = (prod: ProductRecord) => {
     setEditDetailsProduct(prod);
@@ -344,10 +435,11 @@ export default function ProductsPage() {
               <button
                 type="button"
                 onClick={() => setHistoryProduct(prod)}
-                className="px-2.5 py-1 rounded-full text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] inline-flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-full text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="View supplier purchase price timeline graph and cost trend"
               >
-                <History className="w-3.5 h-3.5" />
-                <span>Price History ({prod.priceHistory.length})</span>
+                <LineChart className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                <span>Price History</span>
               </button>
               <div className="flex items-center gap-1.5">
                 {can('products.edit') && (
@@ -367,33 +459,258 @@ export default function ProductsPage() {
         ))}
       </div>
 
-      {/* Price History Modal */}
+      {/* Supplier Purchase Price History Timeline Modal */}
       <Modal
         open={Boolean(historyProduct)}
         onClose={() => setHistoryProduct(null)}
-        title={`Historical Pricing Ledger · ${historyProduct?.name}`}
-        subtitle="Audit trail of institutional, wholesale, and supplier cost adjustments."
+        title={`Supplier Purchase Price Trend · ${historyProduct?.name}`}
+        subtitle={`Procurement timeline graph tracking supplier acquisition cost adjustments for ${historyProduct?.sku} (${historyProduct?.unit}).`}
       >
-        {historyProduct && (
-          <div className="space-y-2.5">
-            {historyProduct.priceHistory.map((h, i) => (
-              <div
-                key={i}
-                className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between text-xs"
-              >
-                <div>
-                  <div className="font-semibold text-[var(--text-primary)]">
-                    {h.tier} Tier
-                  </div>
-                  <div className="text-[11px] text-[var(--text-secondary)]">
-                    Updated on {h.date} by {h.changedBy}
-                  </div>
+        {supplierTrend && (
+          <div className="space-y-4">
+            {/* Summary KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                  Current Purchase Price
                 </div>
-                <div className="font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]">
-                  KES {h.priceKes.toLocaleString()} / {historyProduct.unit}
+                <div className="text-base font-bold font-mono text-[#1F6A37] dark:text-[#4EB462] mt-0.5">
+                  KES {supplierTrend.latestPrice.toLocaleString()}
+                </div>
+                <div className="text-[10px] text-[var(--text-secondary)]">
+                  per {supplierTrend.unit}
                 </div>
               </div>
-            ))}
+              <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                  Baseline Recorded Price
+                </div>
+                <div className="text-base font-semibold font-mono text-[var(--text-primary)] mt-0.5">
+                  KES {supplierTrend.initialPrice.toLocaleString()}
+                </div>
+                <div className="text-[10px] text-[var(--text-secondary)]">
+                  First tracked milestone
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                  Overall Net Variance
+                </div>
+                <div className="flex items-center gap-1 mt-0.5">
+                  {supplierTrend.diffKes > 0 ? (
+                    <TrendingUp className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  ) : supplierTrend.diffKes < 0 ? (
+                    <TrendingDown className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  ) : (
+                    <Minus className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                  )}
+                  <span
+                    className={`text-sm font-bold font-mono ${
+                      supplierTrend.diffKes > 0
+                        ? 'text-amber-700 dark:text-amber-400'
+                        : supplierTrend.diffKes < 0
+                        ? 'text-[#1F6A37] dark:text-[#4EB462]'
+                        : 'text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {supplierTrend.diffKes > 0 ? '+' : ''}
+                    {supplierTrend.diffKes.toLocaleString()} KES ({supplierTrend.diffPct > 0 ? '+' : ''}
+                    {supplierTrend.diffPct.toFixed(1)}%)
+                  </span>
+                </div>
+                <div className="text-[10px] text-[var(--text-secondary)]">
+                  Cost shift over time
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                  Procurement Band
+                </div>
+                <div className="text-xs font-mono font-semibold text-[var(--text-primary)] mt-1">
+                  Low: KES {supplierTrend.minPrice.toLocaleString()}
+                </div>
+                <div className="text-xs font-mono font-semibold text-[var(--text-secondary)]">
+                  High: KES {supplierTrend.maxPrice.toLocaleString()}
+                </div>
+              </div>
+            </div>
+
+            {/* Timeline Area Graph */}
+            <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <LineChart className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">
+                    Supplier Purchase Price Timeline (KES / {supplierTrend.unit})
+                  </span>
+                </div>
+                <span className="text-[11px] text-[var(--text-secondary)] font-mono">
+                  {supplierTrend.chartData.length} timeline milestones
+                </span>
+              </div>
+
+              <div className="h-56 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={supplierTrend.chartData}
+                    margin={{ top: 10, right: 15, left: 5, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="supplierCostGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#1F6A37" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#1F6A37" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(61, 105, 74, 0.15)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="formattedDate"
+                      stroke="var(--text-secondary)"
+                      tick={{ fontSize: 11, fill: '#3D694A' }}
+                      tickLine={false}
+                      axisLine={{ stroke: 'rgba(61, 105, 74, 0.2)' }}
+                    />
+                    <YAxis
+                      domain={[
+                        (dataMin: number) => Math.max(0, Math.floor(dataMin * 0.9)),
+                        (dataMax: number) => Math.ceil(dataMax * 1.1),
+                      ]}
+                      stroke="var(--text-secondary)"
+                      tick={{ fontSize: 11, fill: '#3D694A' }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(val: number) =>
+                        `KES ${val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}`
+                      }
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload as {
+                            fullDate: string;
+                            priceKes: number;
+                            changedBy: string;
+                            stepDiff: number;
+                          };
+                          return (
+                            <div className="rounded-xl bg-[#08190C] border border-[#1F6A37]/40 p-3 shadow-xl text-xs text-[#F4F6F3]">
+                              <div className="flex items-center justify-between gap-3 text-[11px] text-[#A3B899] mb-1">
+                                <span>{data.fullDate}</span>
+                                <span className="font-mono text-[10px] bg-[#1F6A37]/30 px-1.5 py-0.5 rounded text-[#4EB462]">
+                                  Supplier Purchase Price
+                                </span>
+                              </div>
+                              <div className="text-sm font-semibold font-mono text-[#4EB462]">
+                                KES {data.priceKes.toLocaleString()}{' '}
+                                <span className="text-xs font-normal text-[#A3B899]">
+                                  / {supplierTrend.unit}
+                                </span>
+                              </div>
+                              {data.stepDiff !== 0 && (
+                                <div className="text-[11px] mt-1 flex items-center gap-1 font-mono">
+                                  <span className="text-[#A3B899]">Vs Prior:</span>
+                                  <span
+                                    className={
+                                      data.stepDiff > 0
+                                        ? 'text-amber-400'
+                                        : 'text-emerald-400'
+                                    }
+                                  >
+                                    {data.stepDiff > 0
+                                      ? `+KES ${data.stepDiff.toLocaleString()}`
+                                      : `-KES ${Math.abs(data.stepDiff).toLocaleString()}`}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="text-[11px] text-[#A3B899] mt-1.5 border-t border-[#1F6A37]/30 pt-1">
+                                Logged By:{' '}
+                                <span className="text-[#F4F6F3]">{data.changedBy}</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="priceKes"
+                      stroke="#1F6A37"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#supplierCostGradient)"
+                      dot={{ r: 4, fill: '#1F6A37', stroke: '#fff', strokeWidth: 1.5 }}
+                      activeDot={{ r: 6, fill: '#1F6A37', stroke: '#fff', strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Historical Milestones Ledger (Only Supplier Cost) */}
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-[var(--text-primary)] flex items-center justify-between">
+                <span>Supplier Purchase Price Adjustment Log</span>
+                <span className="text-[11px] font-normal text-[var(--text-secondary)]">
+                  Exclusively supplier acquisition cost tier
+                </span>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                {[...supplierTrend.chartData].reverse().map((entry, idx) => (
+                  <div
+                    key={`${entry.date}-${idx}`}
+                    className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between text-xs hover:border-[#1F6A37]/30 transition-colors"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-[var(--text-primary)] font-mono">
+                          {entry.fullDate}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#1F6A37]/10 text-[#1F6A37] dark:text-[#4EB462]">
+                          Supplier Purchase Price
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-[var(--text-secondary)]">
+                        Procurement Officer:{' '}
+                        <strong className="font-medium text-[var(--text-primary)]">
+                          {entry.changedBy}
+                        </strong>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono-tabular font-bold text-sm text-[#1F6A37] dark:text-[#4EB462]">
+                        KES {entry.priceKes.toLocaleString()}
+                        <span className="text-[10px] font-normal text-[var(--text-secondary)]">
+                          {' '}
+                          / {supplierTrend.unit}
+                        </span>
+                      </div>
+                      {entry.stepDiff !== 0 ? (
+                        <div
+                          className={`text-[10px] font-mono font-medium ${
+                            entry.stepDiff > 0
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-emerald-600 dark:text-emerald-400'
+                          }`}
+                        >
+                          {entry.stepDiff > 0
+                            ? `+KES ${entry.stepDiff.toLocaleString()}`
+                            : `-KES ${Math.abs(entry.stepDiff).toLocaleString()}`}{' '}
+                          vs prior
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-[var(--text-secondary)]">
+                          Baseline rate
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </Modal>

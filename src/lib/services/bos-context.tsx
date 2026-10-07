@@ -16,6 +16,7 @@ import {
   OrderRecord,
   PaymentRecord,
   PermissionKey,
+  PriceHistoryEntry,
   ProcurementOrderRecord,
   ProductRecord,
   RoleDefinition,
@@ -926,26 +927,37 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       ? { ...target.pricing, ...updates.pricing }
       : target.pricing;
 
-    // Check if institutional or wholesale pricing changed to record price history
-    const priceChanged =
-      updates.pricing &&
-      (updates.pricing.institutionalKes !== undefined &&
-        updates.pricing.institutionalKes !== target.pricing.institutionalKes ||
-        updates.pricing.wholesaleKes !== undefined &&
-        updates.pricing.wholesaleKes !== target.pricing.wholesaleKes ||
-        updates.pricing.retailKes !== undefined &&
-        updates.pricing.retailKes !== target.pricing.retailKes);
+    // Check if supplier cost or institutional pricing changed to record price history
+    const historyEntriesToAdd: PriceHistoryEntry[] = [];
+    const today = new Date().toISOString().split('T')[0];
+    const changedByName = currentUser?.fullName || 'Procurement Specialist';
 
-    const newHistory = priceChanged && updates.pricing?.institutionalKes
-      ? [
-          {
-            date: new Date().toISOString().split('T')[0],
-            tier: 'Institutional' as const,
-            priceKes: updates.pricing.institutionalKes,
-            changedBy: currentUser?.fullName || 'Operator',
-          },
-          ...target.priceHistory,
-        ]
+    if (
+      updates.pricing?.supplierCostKes !== undefined &&
+      updates.pricing.supplierCostKes !== target.pricing.supplierCostKes
+    ) {
+      historyEntriesToAdd.push({
+        date: today,
+        tier: 'Supplier Cost',
+        priceKes: updates.pricing.supplierCostKes,
+        changedBy: changedByName,
+      });
+    }
+
+    if (
+      updates.pricing?.institutionalKes !== undefined &&
+      updates.pricing.institutionalKes !== target.pricing.institutionalKes
+    ) {
+      historyEntriesToAdd.push({
+        date: today,
+        tier: 'Institutional',
+        priceKes: updates.pricing.institutionalKes,
+        changedBy: changedByName,
+      });
+    }
+
+    const newHistory = historyEntriesToAdd.length > 0
+      ? [...historyEntriesToAdd, ...target.priceHistory]
       : target.priceHistory;
 
     const updated: ProductRecord = {
