@@ -36,6 +36,8 @@ export type PermissionKey =
   | 'suppliers.view'
   | 'suppliers.create'
   | 'suppliers.edit'
+  | 'suppliers.approve'
+  | 'suppliers.suspend'
   | 'deliveries.view'
   | 'deliveries.assign'
   | 'deliveries.dispatch'
@@ -243,6 +245,50 @@ export interface CustomerInstitutionRecord {
   status: 'Active' | 'Credit Watch' | 'Tender Renewal';
 }
 
+export interface SupplierContract {
+  id: string;
+  contractRef: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  status: 'Active' | 'Expiring Soon' | 'Expired' | 'Pending Review';
+  valueKes: number;
+  paymentTerms: string;
+  deliveryCadence: string;
+  notes?: string;
+  signedDate?: string;
+}
+
+export interface SupplierDocumentItem {
+  id: string;
+  docNumber: string;
+  title: string;
+  category:
+    | 'KEBS Certificate'
+    | 'County Trade License'
+    | 'Tax Compliance (KRA PIN)'
+    | 'Supply Agreement'
+    | 'Phytosanitary Inspection'
+    | 'Bank Details & Cheque Leaf';
+  issueDate: string;
+  expiryDate?: string;
+  status: 'Verified' | 'Pending Verification' | 'Expired';
+  fileSize?: string;
+}
+
+export interface SupplierEvaluationRecord {
+  id: string;
+  evaluationDate: string;
+  evaluator: string;
+  overallScorePct: number;
+  qualityScorePct: number;
+  timelinessScorePct: number;
+  pricingCompliancePct: number;
+  packagingGrade: 'Grade A' | 'Grade B' | 'Grade C';
+  notes: string;
+  recommendation: 'Preferred Cooperative' | 'Standard Approved' | 'Performance Watch' | 'Suspended';
+}
+
 export interface SupplierRecord {
   id: string;
   code: string;
@@ -256,7 +302,7 @@ export interface SupplierRecord {
   paymentTerms: string;
   payableBalanceKes: number;
   qualityScorePct: number;
-  recentPriceTrend: 'Stable' | 'Increased +6%' | 'Decreased -4%';
+  recentPriceTrend: 'Stable' | 'Increased +6%' | 'Decreased -4%' | 'Price Review Needed';
   suppliedProducts: {
     productId: string;
     productName: string;
@@ -265,7 +311,11 @@ export interface SupplierRecord {
     previousCostKes: number;
     lastUpdated: string;
   }[];
-  status: 'Active' | 'Under Review';
+  status: 'Active' | 'Under Review' | 'Suspended';
+  suspendedReason?: string;
+  contracts?: SupplierContract[];
+  documents?: SupplierDocumentItem[];
+  evaluations?: SupplierEvaluationRecord[];
 }
 
 export interface ProcurementOrderRecord {

@@ -21,7 +21,11 @@ import {
   RoleDefinition,
   StockBatchRecord,
   StockMovementRecord,
+  SupplierContract,
+  SupplierDocumentItem,
+  SupplierEvaluationRecord,
   SupplierRecord,
+  UnitOfMeasure,
   WarehouseRecord,
 } from '@/types/domain/bos';
 import {
@@ -229,6 +233,73 @@ interface BosContextValue {
   deleteDocumentRecord: (docId: string) => Promise<{ ok: boolean; message: string }>;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
+
+  // Supplier Management Mutations
+  createSupplier: (input: {
+    name: string;
+    category: string;
+    region: string;
+    contactPerson: string;
+    phone: string;
+    email: string;
+    leadTimeDays: number;
+    paymentTerms: string;
+  }) => Promise<{ ok: boolean; message: string; supplier?: SupplierRecord }>;
+  updateSupplier: (
+    id: string,
+    updates: Partial<SupplierRecord>
+  ) => Promise<{ ok: boolean; message: string }>;
+  approveSupplier: (
+    id: string,
+    comment?: string
+  ) => Promise<{ ok: boolean; message: string }>;
+  suspendSupplier: (
+    id: string,
+    reason: string
+  ) => Promise<{ ok: boolean; message: string }>;
+  reactivateSupplier: (
+    id: string
+  ) => Promise<{ ok: boolean; message: string }>;
+  addSupplierContract: (
+    supplierId: string,
+    contract: Omit<SupplierContract, 'id'>
+  ) => Promise<{ ok: boolean; message: string }>;
+  updateSupplierContractStatus: (
+    supplierId: string,
+    contractId: string,
+    status: SupplierContract['status']
+  ) => Promise<{ ok: boolean; message: string }>;
+  updateSupplierPriceList: (
+    supplierId: string,
+    productId: string,
+    newCostKes: number,
+    reason?: string
+  ) => Promise<{ ok: boolean; message: string }>;
+  addSupplierPriceItem: (
+    supplierId: string,
+    item: {
+      productId: string;
+      productName: string;
+      unit: UnitOfMeasure;
+      currentCostKes: number;
+    }
+  ) => Promise<{ ok: boolean; message: string }>;
+  removeSupplierPriceItem: (
+    supplierId: string,
+    productId: string
+  ) => Promise<{ ok: boolean; message: string }>;
+  addSupplierDocument: (
+    supplierId: string,
+    doc: Omit<SupplierDocumentItem, 'id'>
+  ) => Promise<{ ok: boolean; message: string }>;
+  verifySupplierDocument: (
+    supplierId: string,
+    docId: string
+  ) => Promise<{ ok: boolean; message: string }>;
+  evaluateSupplierPerformance: (
+    supplierId: string,
+    evaluation: Omit<SupplierEvaluationRecord, 'id' | 'evaluationDate' | 'evaluator'>
+  ) => Promise<{ ok: boolean; message: string }>;
 }
 
 const DEFAULT_WIDGETS = [
@@ -268,7 +339,8 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] =
     useState<CustomerInstitutionRecord[]>(INITIAL_CUSTOMERS);
   const [orders, setOrders] = useState<OrderRecord[]>(INITIAL_ORDERS);
-  const [suppliers] = useState<SupplierRecord[]>(INITIAL_SUPPLIERS);
+  const [suppliers, setSuppliers] =
+    useState<SupplierRecord[]>(INITIAL_SUPPLIERS);
   const [procurementOrders, setProcurementOrders] = useState<
     ProcurementOrderRecord[]
   >(INITIAL_PROCUREMENT_ORDERS);
@@ -1598,6 +1670,443 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
+  // Supplier Operations (Create, Edit, Approve, Suspend, Contracts, Price List, Documents, Evaluations)
+  const createSupplier: BosContextValue['createSupplier'] = async (input) => {
+    if (!can('suppliers.create')) {
+      const msg = 'Access Denied: Your role lacks permission (suppliers.create) to register suppliers.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const nextNum = suppliers.length + 1;
+    const code = `VND-${input.name.slice(0, 3).toUpperCase()}-${String(nextNum).padStart(3, '0')}`;
+    const newSupplier: SupplierRecord = {
+      id: `SUP-${String(nextNum).padStart(2, '0')}`,
+      code,
+      name: input.name,
+      category: input.category,
+      region: input.region,
+      contactPerson: input.contactPerson,
+      phone: input.phone,
+      email: input.email,
+      leadTimeDays: input.leadTimeDays,
+      paymentTerms: input.paymentTerms,
+      payableBalanceKes: 0,
+      qualityScorePct: 95.0,
+      recentPriceTrend: 'Stable',
+      status: 'Under Review',
+      suppliedProducts: [],
+      contracts: [],
+      documents: [],
+      evaluations: [],
+    };
+    setSuppliers((prev) => [newSupplier, ...prev]);
+    appendAudit(
+      'Suppliers',
+      code,
+      'Registered New Vendor (Under Review)',
+      'None',
+      `${newSupplier.name} (${newSupplier.region}) · Contact: ${newSupplier.contactPerson}`
+    );
+    pushToast({
+      title: 'Supplier Registered',
+      description: `${newSupplier.name} registered and routed for governance onboarding review.`,
+      tone: 'success',
+    });
+    return { ok: true, message: `Supplier ${newSupplier.name} registered successfully.`, supplier: newSupplier };
+  };
+
+  const updateSupplier: BosContextValue['updateSupplier'] = async (id, updates) => {
+    if (!can('suppliers.edit')) {
+      const msg = 'Access Denied: Your role lacks permission (suppliers.edit) to edit supplier details.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === id);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const updated: SupplierRecord = { ...target, ...updates };
+    setSuppliers((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Updated Supplier Profile',
+      `${target.name} · Terms: ${target.paymentTerms} · Lead: ${target.leadTimeDays}d`,
+      `${updated.name} · Terms: ${updated.paymentTerms} · Lead: ${updated.leadTimeDays}d`
+    );
+    pushToast({
+      title: 'Supplier Details Updated',
+      description: `${updated.name} records updated successfully.`,
+      tone: 'success',
+    });
+    return { ok: true, message: `Supplier ${updated.name} updated.` };
+  };
+
+  const approveSupplier: BosContextValue['approveSupplier'] = async (id, comment) => {
+    if (!can('suppliers.approve') && !can('procurement.approve') && !can('approvals.approve') && !can('suppliers.edit')) {
+      const msg = 'Access Denied: Your role lacks permission to approve supplier onboardings.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === id);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const updated: SupplierRecord = { ...target, status: 'Active', suspendedReason: undefined };
+    setSuppliers((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Approved Supplier Onboarding',
+      target.status,
+      `Active · Approved by ${currentUser?.fullName || 'Operator'} (${comment || 'Governance sign-off'})`
+    );
+    pushToast({
+      title: 'Supplier Approved',
+      description: `${target.name} is now authorized for purchase requisitions and purchase orders.`,
+      tone: 'success',
+    });
+    return { ok: true, message: `${target.name} approved and activated.` };
+  };
+
+  const suspendSupplier: BosContextValue['suspendSupplier'] = async (id, reason) => {
+    if (!can('suppliers.suspend') && !can('suppliers.edit') && !can('procurement.approve') && !can('approvals.approve')) {
+      const msg = 'Access Denied: Your role lacks permission to suspend supplier accounts.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === id);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const updated: SupplierRecord = { ...target, status: 'Suspended', suspendedReason: reason };
+    setSuppliers((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Suspended Vendor Account',
+      target.status,
+      `Suspended · Reason: ${reason} (by ${currentUser?.fullName || 'Operator'})`
+    );
+    pushToast({
+      title: 'Supplier Suspended',
+      description: `${target.name} placed on operational suspension. Purchase orders halted.`,
+      tone: 'warning',
+    });
+    return { ok: true, message: `${target.name} has been suspended.` };
+  };
+
+  const reactivateSupplier: BosContextValue['reactivateSupplier'] = async (id) => {
+    if (!can('suppliers.suspend') && !can('suppliers.edit') && !can('procurement.approve') && !can('approvals.approve')) {
+      const msg = 'Access Denied: Your role lacks permission to reinstate supplier accounts.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === id);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const updated: SupplierRecord = { ...target, status: 'Active', suspendedReason: undefined };
+    setSuppliers((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Reinstated Vendor Account',
+      'Suspended',
+      `Active (Reinstated by ${currentUser?.fullName || 'Operator'})`
+    );
+    pushToast({
+      title: 'Supplier Reinstated',
+      description: `${target.name} is now restored to Active supply status.`,
+      tone: 'success',
+    });
+    return { ok: true, message: `${target.name} reinstated.` };
+  };
+
+  const addSupplierContract: BosContextValue['addSupplierContract'] = async (supplierId, contractInput) => {
+    if (!can('suppliers.edit') && !can('procurement.create')) {
+      const msg = 'Access Denied: Your role lacks permission to manage contracts.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const newContract: SupplierContract = {
+      ...contractInput,
+      id: `CTR-${target.code.slice(4, 7)}-${Date.now().toString().slice(-4)}`,
+    };
+    const updatedContracts = [newContract, ...(target.contracts || [])];
+    const updated: SupplierRecord = { ...target, contracts: updatedContracts };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Added Supply Contract',
+      'None',
+      `${newContract.contractRef} · ${newContract.title} (KES ${newContract.valueKes.toLocaleString()})`
+    );
+    pushToast({
+      title: 'Supply Contract Added',
+      description: `Contract ${newContract.contractRef} registered for ${target.name}.`,
+      tone: 'success',
+    });
+    return { ok: true, message: 'Contract registered successfully.' };
+  };
+
+  const updateSupplierContractStatus: BosContextValue['updateSupplierContractStatus'] = async (
+    supplierId,
+    contractId,
+    status
+  ) => {
+    if (!can('suppliers.edit') && !can('procurement.create') && !can('procurement.approve')) {
+      const msg = 'Access Denied: Your role lacks permission to update contract status.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const updatedContracts = (target.contracts || []).map((c) =>
+      c.id === contractId ? { ...c, status } : c
+    );
+    const updated: SupplierRecord = { ...target, contracts: updatedContracts };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Updated Supply Contract Status',
+      'Previous Status',
+      `Contract ${contractId} marked as ${status}`
+    );
+    pushToast({
+      title: 'Contract Status Updated',
+      description: `Contract updated to ${status}.`,
+      tone: 'success',
+    });
+    return { ok: true, message: 'Contract status updated.' };
+  };
+
+  const updateSupplierPriceList: BosContextValue['updateSupplierPriceList'] = async (
+    supplierId,
+    productId,
+    newCostKes,
+    reason
+  ) => {
+    if (!can('suppliers.edit')) {
+      const msg = 'Access Denied: Your role lacks permission (suppliers.edit) to revise supplier price lists.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const prevItem = target.suppliedProducts.find((p) => p.productId === productId);
+    if (!prevItem) return { ok: false, message: 'Product not found in supplier price list.' };
+
+    const pctChange = ((newCostKes - prevItem.currentCostKes) / prevItem.currentCostKes) * 100;
+    const trendText =
+      pctChange > 0 ? `Increased +${pctChange.toFixed(0)}%` : pctChange < 0 ? `Decreased ${pctChange.toFixed(0)}%` : 'Stable';
+
+    const updatedProducts = target.suppliedProducts.map((p) =>
+      p.productId === productId
+        ? {
+            ...p,
+            previousCostKes: p.currentCostKes,
+            currentCostKes: newCostKes,
+            lastUpdated: todayStr,
+          }
+        : p
+    );
+    const updated: SupplierRecord = {
+      ...target,
+      suppliedProducts: updatedProducts,
+      recentPriceTrend: trendText as SupplierRecord['recentPriceTrend'],
+    };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      `Adjusted Farmgate Cost (${prevItem.productName})`,
+      `KES ${prevItem.currentCostKes}/${prevItem.unit}`,
+      `KES ${newCostKes}/${prevItem.unit} (${reason || 'Market price adjustment'})`
+    );
+    pushToast({
+      title: 'Supplier Price Updated',
+      description: `${prevItem.productName} updated from KES ${prevItem.currentCostKes} to KES ${newCostKes}/${prevItem.unit}.`,
+      tone: 'info',
+    });
+    return { ok: true, message: 'Price revised successfully.' };
+  };
+
+  const addSupplierPriceItem: BosContextValue['addSupplierPriceItem'] = async (supplierId, item) => {
+    if (!can('suppliers.edit')) {
+      const msg = 'Access Denied: Your role lacks permission to modify price list.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newItem = {
+      productId: item.productId,
+      productName: item.productName,
+      unit: item.unit,
+      currentCostKes: item.currentCostKes,
+      previousCostKes: item.currentCostKes,
+      lastUpdated: todayStr,
+    };
+    const updated: SupplierRecord = {
+      ...target,
+      suppliedProducts: [...target.suppliedProducts, newItem],
+    };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Added SKU to Supplier Price List',
+      'None',
+      `${newItem.productName} at KES ${newItem.currentCostKes}/${newItem.unit}`
+    );
+    pushToast({
+      title: 'Product Added to Price List',
+      description: `${newItem.productName} added to ${target.name}.`,
+      tone: 'success',
+    });
+    return { ok: true, message: 'SKU added to price list.' };
+  };
+
+  const removeSupplierPriceItem: BosContextValue['removeSupplierPriceItem'] = async (supplierId, productId) => {
+    if (!can('suppliers.edit')) {
+      const msg = 'Access Denied: Your role lacks permission to modify price list.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const item = target.suppliedProducts.find((p) => p.productId === productId);
+    const updated: SupplierRecord = {
+      ...target,
+      suppliedProducts: target.suppliedProducts.filter((p) => p.productId !== productId),
+    };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Removed SKU from Price List',
+      item?.productName || productId,
+      'Discontinued from vendor catalog'
+    );
+    pushToast({
+      title: 'Item Removed',
+      description: `${item?.productName || 'SKU'} removed from price list.`,
+      tone: 'info',
+    });
+    return { ok: true, message: 'Item removed from price list.' };
+  };
+
+  const addSupplierDocument: BosContextValue['addSupplierDocument'] = async (supplierId, docInput) => {
+    if (!can('suppliers.edit') && !can('documents.manage')) {
+      const msg = 'Access Denied: Your role lacks permission to upload supplier documents.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const newDoc: SupplierDocumentItem = {
+      ...docInput,
+      id: `DOC-${target.code.slice(4, 7)}-${Date.now().toString().slice(-4)}`,
+    };
+    const updated: SupplierRecord = {
+      ...target,
+      documents: [newDoc, ...(target.documents || [])],
+    };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Uploaded Compliance Document',
+      'None',
+      `${newDoc.title} (${newDoc.category} · ${newDoc.docNumber})`
+    );
+    pushToast({
+      title: 'Document Uploaded',
+      description: `${newDoc.title} attached to ${target.name}.`,
+      tone: 'success',
+    });
+    return { ok: true, message: 'Document uploaded successfully.' };
+  };
+
+  const verifySupplierDocument: BosContextValue['verifySupplierDocument'] = async (supplierId, docId) => {
+    if (!can('suppliers.edit') && !can('documents.manage') && !can('procurement.approve')) {
+      const msg = 'Access Denied: Your role lacks permission to verify compliance documents.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const updatedDocs = (target.documents || []).map((d) =>
+      d.id === docId ? { ...d, status: 'Verified' as const } : d
+    );
+    const updated: SupplierRecord = { ...target, documents: updatedDocs };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Verified Vendor Compliance Document',
+      'Pending Verification',
+      `Document ${docId} verified by ${currentUser?.fullName || 'Operator'}`
+    );
+    pushToast({
+      title: 'Document Verified',
+      description: 'Compliance certificate validated and posted to vendor vault.',
+      tone: 'success',
+    });
+    return { ok: true, message: 'Document verified.' };
+  };
+
+  const evaluateSupplierPerformance: BosContextValue['evaluateSupplierPerformance'] = async (
+    supplierId,
+    evaluationInput
+  ) => {
+    if (!can('suppliers.edit') && !can('procurement.approve')) {
+      const msg = 'Access Denied: Your role lacks permission to record supplier evaluations.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newEvaluation: SupplierEvaluationRecord = {
+      ...evaluationInput,
+      id: `EVL-${target.code.slice(4, 7)}-${Date.now().toString().slice(-4)}`,
+      evaluationDate: todayStr,
+      evaluator: `${currentUser?.fullName || 'Operator'} (${currentUser?.roleName || 'Reviewer'})`,
+    };
+    const updatedEvaluations = [newEvaluation, ...(target.evaluations || [])];
+    const updated: SupplierRecord = {
+      ...target,
+      qualityScorePct: Number(evaluationInput.overallScorePct.toFixed(1)),
+      evaluations: updatedEvaluations,
+    };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Concluded Supplier Performance Audit',
+      `${target.qualityScorePct}%`,
+      `${evaluationInput.overallScorePct}% (${evaluationInput.recommendation}) · Evaluator: ${newEvaluation.evaluator}`
+    );
+    pushToast({
+      title: 'Performance Evaluation Saved',
+      description: `${target.name} score updated to ${evaluationInput.overallScorePct}%. Recommendation: ${evaluationInput.recommendation}.`,
+      tone: 'success',
+    });
+    return { ok: true, message: 'Performance evaluation completed.' };
+  };
+
   return (
     <BosContext.Provider
       value={{
@@ -1661,6 +2170,19 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         deleteDocumentRecord,
         markNotificationRead,
         markAllNotificationsRead,
+        createSupplier,
+        updateSupplier,
+        approveSupplier,
+        suspendSupplier,
+        reactivateSupplier,
+        addSupplierContract,
+        updateSupplierContractStatus,
+        updateSupplierPriceList,
+        addSupplierPriceItem,
+        removeSupplierPriceItem,
+        addSupplierDocument,
+        verifySupplierDocument,
+        evaluateSupplierPerformance,
       }}
     >
       {children}
