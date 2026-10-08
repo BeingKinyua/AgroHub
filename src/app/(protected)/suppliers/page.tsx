@@ -353,7 +353,19 @@ export default function SuppliersPage() {
       editPriceReason
     );
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) setEditingPriceProductId(null);
+    if (res.ok) {
+      setEditingPriceProductId(null);
+      const sup = suppliers.find((s) => s.id === activeSupplier.id);
+      if (sup) {
+        // Also reflect the latest changes into activeSupplier
+        const updatedSupplied = sup.suppliedProducts.map((p) =>
+          p.productId === productId
+            ? { ...p, previousCostKes: p.currentCostKes, currentCostKes: Number(editPriceCost), lastUpdated: new Date().toISOString().split('T')[0] }
+            : p
+        );
+        setActiveSupplier({ ...sup, suppliedProducts: updatedSupplied });
+      }
+    }
   };
 
   const handleAddDocument = async (e: React.FormEvent) => {
@@ -1462,6 +1474,17 @@ export default function SuppliersPage() {
                         <td className="py-2.5 px-3">
                           <div className="font-semibold text-[var(--text-primary)]">{sp.productName}</div>
                           <div className="text-[10px] text-[var(--text-secondary)]">Unit: {sp.unit}</div>
+                          {isEditing && (
+                            <div className="mt-1">
+                              <input
+                                type="text"
+                                placeholder="Revision reason / notes..."
+                                value={editPriceReason}
+                                onChange={(e) => setEditPriceReason(e.target.value)}
+                                className="w-full h-6 px-1.5 rounded border border-[var(--border-subtle)] text-[10px] bg-[var(--bg-card)]"
+                              />
+                            </div>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono-tabular font-bold text-[var(--text-primary)]">
                           {isEditing ? (

@@ -1997,6 +1997,30 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       recentPriceTrend: trendText as SupplierRecord['recentPriceTrend'],
     };
     setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+
+    // Synchronize product supplierCostKes and record in priceHistory for Supplier Cost timeline graph
+    setProducts((prev) =>
+      prev.map((prod) => {
+        if (prod.id === productId) {
+          const newEntry: PriceHistoryEntry = {
+            date: todayStr,
+            tier: 'Supplier Cost',
+            priceKes: newCostKes,
+            changedBy: `${target.name} (${reason || 'Contract Price Revision'})`,
+          };
+          return {
+            ...prod,
+            pricing: {
+              ...prod.pricing,
+              supplierCostKes: newCostKes,
+            },
+            priceHistory: [newEntry, ...prod.priceHistory],
+          };
+        }
+        return prod;
+      })
+    );
+
     appendAudit(
       'Suppliers',
       target.code,
