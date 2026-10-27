@@ -585,65 +585,46 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     documents,
   ]);
 
-  // Context-aware Quick Actions filtered by RBAC
-  const quickActions = useMemo(() => {
-    const actions: {
-      label: string;
-      href: string;
-      permission: PermissionKey;
-      description: string;
-    }[] = [
-      {
-        label: 'New Institutional Order',
-        href: '/orders?action=new',
-        permission: 'orders.create',
-        description: 'Create contract or walk-in order',
-      },
-      {
-        label: 'New Customer / Institution',
-        href: '/customers?action=new',
-        permission: 'customers.create',
-        description: 'Onboard school, hospital, or hotel',
-      },
-      {
-        label: 'New Catalog Product',
-        href: '/products?action=new',
-        permission: 'products.create',
-        description: 'Register SKU & multi-tier pricing',
-      },
-      {
-        label: 'Raise Purchase Order',
-        href: '/procurement?action=new',
-        permission: 'procurement.create',
-        description: 'Source produce or grains from supplier',
-      },
-      {
-        label: 'Record Stock / Wastage',
-        href: '/inventory?action=adjust',
-        permission: 'inventory.adjust',
-        description: 'FEFO batch adjustment or spoilage log',
-      },
-      {
-        label: 'Record M-Pesa / Bank Payment',
-        href: '/payments?action=new',
-        permission: 'finance.record_payment',
-        description: 'Log AR receipt or supplier AP payout',
-      },
-      {
-        label: 'Upload Operational Document',
-        href: '/documents?action=upload',
-        permission: 'documents.manage',
-        description: 'File GRN, POD, KEBS certificate, or invoice',
-      },
-      {
-        label: 'Invite Internal Member',
-        href: '/administration/users?action=invite',
-        permission: 'administration.users.create',
-        description: 'Administrator-controlled onboarding',
-      },
+  // Route-level permission & active breadcrumbs
+  const requiredRoutePerm = ROUTE_REQUIRED_PERMISSION[pathname];
+  const isRouteAuthorized = requiredRoutePerm ? can(requiredRoutePerm) : true;
+
+  const currentPageLabel =
+    navGroups
+      .flatMap((g) => g.items)
+      .find((i) => pathname === i.href || pathname.startsWith(i.href + '/'))
+      ?.label ||
+    (pathname === '/profile'
+      ? 'My Profile'
+      : pathname.includes('audit-logs')
+      ? 'Audit Logs'
+      : 'Workspace');
+
+  const mainBreadcrumbs = useMemo(() => {
+    if (pathname === '/dashboard') {
+      return [
+        { label: 'AgroHub BOS', href: '/dashboard' },
+        { label: 'Command Center' },
+      ];
+    }
+    if (pathname.startsWith('/administration/')) {
+      const sub =
+        pathname === '/administration/users'
+          ? 'Internal Operators'
+          : pathname === '/administration/roles'
+          ? 'RBAC Roles Matrix'
+          : 'System Audit Trail';
+      return [
+        { label: 'AgroHub BOS', href: '/dashboard' },
+        { label: 'Administration', href: '/administration/users' },
+        { label: sub },
+      ];
+    }
+    return [
+      { label: 'AgroHub BOS', href: '/dashboard' },
+      { label: currentPageLabel },
     ];
-    return actions.filter((a) => can(a.permission));
-  }, [can]);
+  }, [pathname, currentPageLabel]);
 
   if (!isInitialized) {
     return (
@@ -695,46 +676,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
-  // Check route-level permission
-  const requiredRoutePerm = ROUTE_REQUIRED_PERMISSION[pathname];
-  const isRouteAuthorized = requiredRoutePerm
-    ? can(requiredRoutePerm)
-    : true;
-
-  const currentPageLabel =
-    navGroups
-      .flatMap((g) => g.items)
-      .find((i) => pathname === i.href || pathname.startsWith(i.href + '/'))
-      ?.label ||
-    (pathname === '/profile'
-      ? 'My Profile'
-      : pathname.includes('audit-logs')
-      ? 'Audit Logs'
-      : 'Workspace');
-
-  const mainBreadcrumbs = useMemo(() => {
-    if (pathname === '/dashboard') {
-      return [{ label: 'AgroHub BOS', href: '/dashboard' }, { label: 'Command Center' }];
-    }
-    if (pathname.startsWith('/administration/')) {
-      const sub =
-        pathname === '/administration/users'
-          ? 'Internal Operators'
-          : pathname === '/administration/roles'
-          ? 'RBAC Roles Matrix'
-          : 'System Audit Trail';
-      return [
-        { label: 'AgroHub BOS', href: '/dashboard' },
-        { label: 'Administration', href: '/administration/users' },
-        { label: sub },
-      ];
-    }
-    return [
-      { label: 'AgroHub BOS', href: '/dashboard' },
-      { label: currentPageLabel },
-    ];
-  }, [pathname, currentPageLabel]);
 
   return (
     <div className="min-h-dvh bg-[var(--bg-canvas)] text-[var(--text-primary)] flex">
