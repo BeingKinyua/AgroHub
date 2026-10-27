@@ -1,5 +1,5 @@
-import { LoginExperience } from '@/features/auth/LoginExperience';
+import { redirect } from 'next/navigation';
 
 export default function RootLandingPage() {
-  return <LoginExperience />;
+  redirect('/dashboard');
 }

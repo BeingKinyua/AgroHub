@@ -44,7 +44,10 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${inter.variable} ${manrope.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="min-h-screen antialiased selection:bg-[#4EB462]/20 selection:text-[#1F6A37]">
+      <body
+        suppressHydrationWarning
+        className="min-h-screen antialiased selection:bg-[#4EB462]/20 selection:text-[#1F6A37]"
+      >
         <BosProvider>{children}</BosProvider>
       </body>
     </html>

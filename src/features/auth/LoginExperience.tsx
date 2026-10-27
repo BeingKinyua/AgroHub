@@ -30,7 +30,6 @@ export function LoginExperience() {
     users,
     theme,
     setTheme,
-    resolvedDark,
   } = useBos();
 
   const [email, setEmail] = useState('w.mwangi@agrodeliveries.co.ke');
@@ -262,7 +261,7 @@ export function LoginExperience() {
               )}
             </div>
             <footer className="w-full max-w-[1360px] mx-auto py-2 flex flex-col sm:flex-row items-center justify-center text-xs text-[var(--text-secondary)] gap-2">
-              <span>© {new Date().getFullYear()} Agro-Deliveries Kenya Internal Business Operating System.</span>
+              <span>© 2026 Agro-Deliveries Kenya Internal Business Operating System.</span>
             </footer>
           </div>
 

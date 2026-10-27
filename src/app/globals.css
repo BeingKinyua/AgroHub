@@ -31,7 +31,10 @@
 
   /* Radius & Spacing Tokens */
   --radius-card: 18px;
+  --radius-modal: 20px;
   --radius-control: 10px;
+  --radius-small: 8px;
+  --radius-pill: 9999px;
   --page-padding-desktop: 2rem;
   --page-padding-mobile: 1rem;
 

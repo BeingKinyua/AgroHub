@@ -423,13 +423,13 @@ export default function SuppliersPage() {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+                className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
               >
                 <Plus className="w-4 h-4" />
                 <span>Register Supplier</span>
               </button>
             ) : (
-              <span className="h-10 px-3.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-xs inline-flex items-center gap-1.5 opacity-80">
+              <span className="h-10 px-3.5 rounded-[10px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-xs inline-flex items-center gap-1.5 opacity-80">
                 <Lock className="w-3.5 h-3.5" />
                 <span>Create Restricted</span>
               </span>

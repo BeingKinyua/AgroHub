@@ -148,7 +148,7 @@ function ProcurementContent() {
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
+              className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>New Requisition</span>

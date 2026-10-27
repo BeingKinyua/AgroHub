@@ -122,7 +122,7 @@ export default function UsersAdministrationPage() {
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
-              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+              className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
               <span>Invite Internal Member</span>

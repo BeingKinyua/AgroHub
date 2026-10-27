@@ -145,10 +145,17 @@ export default function ProductsPage() {
     const chartData = allPoints.map((p, index) => {
       const prevPrice = index > 0 ? allPoints[index - 1].priceKes : p.priceKes;
       const stepDiff = p.priceKes - prevPrice;
-      const dateObj = new Date(p.date);
-      const formattedDate = !isNaN(dateObj.getTime())
-        ? dateObj.toLocaleDateString('en-KE', { month: 'short', day: 'numeric' })
-        : p.date;
+      const parts = p.date.split('-');
+      const monthNames = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      ];
+      let formattedDate = p.date;
+      if (parts.length >= 3) {
+        const mIdx = parseInt(parts[1], 10) - 1;
+        const mName = monthNames[mIdx] || parts[1];
+        formattedDate = `${parseInt(parts[2], 10)} ${mName}`;
+      }
 
       return {
         date: p.date,
@@ -259,7 +266,7 @@ export default function ProductsPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>New Product SKU</span>

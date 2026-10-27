@@ -68,7 +68,7 @@ export default function SettingsPage() {
         actions={
           <Link
             href="/profile"
-            className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+            className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
           >
             <User className="w-4 h-4" />
             <span>My Operator Profile</span>
@@ -110,16 +110,15 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Appearance, Prototype & Operational Policy */}
+        {/* Left: Appearance & Operational Policy */}
         <div className="lg:col-span-7 space-y-6">
           <Card variant="raised" className="space-y-4">
             <div>
               <h2 className="font-heading text-base font-semibold text-[var(--text-primary)]">
-                Interface Theme & Prototype Controls
+                Interface Theme & Appearance
               </h2>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                Customize workspace visual contrast, dashboard widget layout,
-                and RBAC role evaluation tools
+                Customize workspace visual contrast and system theme synchronization
               </p>
             </div>
 
@@ -129,16 +128,20 @@ export default function SettingsPage() {
                   Color Theme Mode
                 </div>
                 <div className="text-[11px] text-[var(--text-secondary)]">
-                  Agro-Deliveries soft-mint light mode or deep forest dark mode
+                  Agro-Deliveries soft-mint light mode, deep forest dark mode, or OS system theme
                 </div>
               </div>
-              <div className="flex items-center p-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+              <div
+                role="group"
+                aria-label="Theme Mode"
+                className="flex items-center p-1 rounded-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+              >
                 <button
                   type="button"
                   onClick={() => setTheme('light')}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
                     theme === 'light'
-                      ? 'bg-[#1F6A37] text-white'
+                      ? 'bg-[#1F6A37] text-white shadow-xs'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
@@ -148,9 +151,9 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setTheme('dark')}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
                     theme === 'dark'
-                      ? 'bg-[#1F6A37] text-white'
+                      ? 'bg-[#1F6A37] text-white shadow-xs'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
@@ -160,9 +163,9 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setTheme('system')}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
                     theme === 'system'
-                      ? 'bg-[#1F6A37] text-white'
+                      ? 'bg-[#1F6A37] text-white shadow-xs'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
@@ -170,54 +173,6 @@ export default function SettingsPage() {
                   <span>System</span>
                 </button>
               </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
-                  <span>Top Header RBAC Role Switcher Pill</span>
-                </div>
-                <div className="text-[11px] text-[var(--text-secondary)]">
-                  Keep the 9-role persona switcher accessible in the top utility
-                  bar alongside the Profile menu
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDemoModeEnabled(!demoModeEnabled)}
-                className={`px-3.5 py-2 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                  demoModeEnabled
-                    ? 'bg-[#1F6A37] text-white'
-                    : 'bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)]'
-                }`}
-              >
-                {demoModeEnabled ? 'Visible in Header' : 'Hidden in Header'}
-              </button>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold text-[var(--text-primary)]">
-                  Command Center Widget Layout
-                </div>
-                <div className="text-[11px] text-[var(--text-secondary)]">
-                  Restore default dashboard widget order and visibility
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  resetDashboardWidgets();
-                  setFeedback(
-                    'Dashboard widgets restored to default role-aware configuration.'
-                  );
-                }}
-                className="px-3.5 py-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset Widgets</span>
-              </button>
             </div>
           </Card>
 
@@ -278,7 +233,7 @@ export default function SettingsPage() {
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+                  className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Save Governance Thresholds</span>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -54,7 +54,6 @@ export function Card({
 
   return (
     <div
-      data-gsap-reveal
       className={`rounded-[18px] bg-[var(--bg-card)] ${elevationStyles[variant]} ${padding} transition-all duration-150 ${
         interactive
           ? 'hover:border-[#4EB462]/45 hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 cursor-pointer'
@@ -79,6 +78,12 @@ export function ChartCard({
   children: React.ReactNode;
   className?: string;
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <Card variant="raised" className={className}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
@@ -94,7 +99,16 @@ export function ChartCard({
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
-      {children}
+      {mounted ? (
+        children
+      ) : (
+        <div className="h-64 w-full rounded-xl bg-[var(--bg-canvas)]/40 flex items-center justify-center text-xs text-[var(--text-secondary)]">
+          <div className="flex items-center gap-2">
+            <div className="w-3.5 h-3.5 rounded-full border-2 border-[#1F6A37] border-t-transparent animate-spin" />
+            <span>Loading visualization...</span>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
@@ -247,7 +261,7 @@ export function ActionableMetricCard({
           {actionHref ? (
             <Link
               href={actionHref}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${current.btn}`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-medium transition-colors cursor-pointer ${current.btn}`}
             >
               <span>{actionLabel}</span>
               <ArrowRight className="w-3 h-3" />
@@ -256,7 +270,7 @@ export function ActionableMetricCard({
             <button
               type="button"
               onClick={onAction}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${current.btn}`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-medium transition-colors cursor-pointer ${current.btn}`}
             >
               <span>{actionLabel}</span>
               <ArrowRight className="w-3 h-3" />
@@ -291,18 +305,15 @@ export function OperationalPulse({
   if (!items || items.length === 0) return null;
 
   return (
-    <div className="mb-6 rounded-[20px] bg-[var(--bg-card)] border-2 border-amber-500/35 dark:border-amber-500/30 p-4 sm:p-5 shadow-sm">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-3 border-b border-[var(--border-subtle)]">
+    <div className="mb-6 rounded-[18px] bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-sm)] p-4 sm:p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-3.5 border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-2.5">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-          </span>
+          <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
           <h2 className="font-heading text-sm font-semibold tracking-wide text-[var(--text-primary)]">
             {title}
           </h2>
-          <span className="text-[11px] font-mono-tabular px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-bold">
-            {items.length} Action{items.length !== 1 ? 's' : ''}
+          <span className="text-[11px] font-mono-tabular px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium">
+            {items.length} required
           </span>
         </div>
         <span className="text-[11px] font-mono-tabular text-[var(--text-secondary)]">
@@ -316,7 +327,7 @@ export function OperationalPulse({
           return (
             <div
               key={item.id}
-              className={`p-3.5 rounded-xl border flex flex-col justify-between transition-all ${
+              className={`p-3.5 rounded-[14px] border flex flex-col justify-between transition-all ${
                 isCritical
                   ? 'bg-red-500/[0.04] border-red-500/25 dark:border-red-500/30'
                   : 'bg-amber-500/[0.04] border-amber-500/25 dark:border-amber-500/30'
@@ -349,7 +360,7 @@ export function OperationalPulse({
                 </span>
                 <Link
                   href={item.actionHref}
-                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-[10px] text-xs font-medium cursor-pointer transition-colors ${
                     isCritical
                       ? 'bg-red-600 hover:bg-red-700 text-white'
                       : 'bg-amber-600 hover:bg-amber-700 text-white'
@@ -406,7 +417,7 @@ export function WorkQueue({
                 {title}
               </h3>
               {typeof badgeCount === 'number' && (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-mono-tabular font-bold bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]">
+                <span className="px-2 py-0.5 rounded-md text-[11px] font-mono-tabular font-semibold bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]">
                   {badgeCount}
                 </span>
               )}
@@ -448,16 +459,16 @@ export function WorkQueue({
               return (
                 <div
                   key={item.id}
-                  className="py-2.5 flex items-center justify-between gap-3 hover:bg-[var(--bg-canvas)]/50 px-1 rounded-lg transition-colors"
+                  className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 hover:bg-[var(--bg-canvas)]/50 px-2 rounded-[10px] transition-colors"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
                       <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
                       <span className="font-semibold text-xs text-[var(--text-primary)] truncate">
                         {item.title}
                       </span>
                       {item.tag && (
-                        <span className="text-[10px] font-mono-tabular px-1.5 py-0.2 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                        <span className="text-[10px] font-mono-tabular px-1.5 py-0.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
                           {item.tag}
                         </span>
                       )}
@@ -475,11 +486,11 @@ export function WorkQueue({
                     </div>
                   </div>
 
-                  <div className="shrink-0">
+                  <div className="shrink-0 self-end sm:self-auto">
                     {item.actionHref ? (
                       <Link
                         href={item.actionHref}
-                        className="h-7 px-3 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        className="h-8 px-3.5 rounded-[10px] bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <span>{item.actionLabel}</span>
                         <ArrowRight className="w-3 h-3" />
@@ -488,7 +499,7 @@ export function WorkQueue({
                       <button
                         type="button"
                         onClick={item.onAction}
-                        className="h-7 px-3 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        className="h-8 px-3.5 rounded-[10px] bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <span>{item.actionLabel}</span>
                         <ArrowRight className="w-3 h-3" />
@@ -529,7 +540,7 @@ export function Avatar({
     sm: 'w-8 h-8 text-xs rounded-lg',
     md: 'w-9 h-9 text-xs rounded-xl',
     lg: 'w-11 h-11 text-sm rounded-xl',
-    xl: 'w-16 h-16 text-lg rounded-2xl',
+    xl: 'w-14 h-14 text-base rounded-2xl',
   };
 
   if (avatarUrl && !imgFailed) {
@@ -568,7 +579,7 @@ export function Tooltip({
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 transition-opacity duration-150 z-[var(--z-dropdown)] whitespace-nowrap px-2.5 py-1 rounded-full bg-[#08190C] text-[#F4F6F3] border border-white/12 text-[11px] font-medium shadow-md ${
+        className={`pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 transition-opacity duration-150 z-[var(--z-dropdown)] whitespace-nowrap px-2.5 py-1 rounded-lg bg-[#08190C] text-[#F4F6F3] border border-white/12 text-[11px] font-medium shadow-md ${
           side === 'right'
             ? 'absolute left-full top-1/2 -translate-y-1/2 ml-2.5'
             : 'absolute top-full left-1/2 -translate-x-1/2 mt-2'
@@ -817,6 +828,14 @@ export function FilterBar({
   );
 }
 
+export function RoleLabel({ roleName }: { roleName: string }) {
+  return (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)] whitespace-nowrap">
+      {roleName}
+    </span>
+  );
+}
+
 export function EmptyState({
   title,
   description,
@@ -843,7 +862,7 @@ export function EmptyState({
         <button
           type="button"
           onClick={onAction}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium bg-[#1F6A37] text-white hover:bg-[#12512C] transition-colors cursor-pointer"
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-[10px] text-xs font-medium bg-[#1F6A37] text-white hover:bg-[#12512C] transition-colors cursor-pointer"
         >
           {actionLabel}
         </button>
@@ -876,7 +895,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onRetry}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium bg-[#1F6A37] text-white hover:bg-[#12512C] transition-colors cursor-pointer"
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-[10px] text-xs font-medium bg-[#1F6A37] text-white hover:bg-[#12512C] transition-colors cursor-pointer"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Try again</span>
@@ -911,7 +930,7 @@ export function AccessDenied({
           across all operational records.
         </p>
         {requiredPermission && (
-          <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+          <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
             <span>Required authority:</span>
             <code className="font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]">
               {requiredPermission}
@@ -921,7 +940,7 @@ export function AccessDenied({
         <div className="mt-6 flex items-center justify-center gap-3">
           <Link
             href="/dashboard"
-            className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors"
+            className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Return to Dashboard</span>
@@ -1057,7 +1076,7 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+            className="h-10 px-4 rounded-[10px] border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
           >
             Cancel
           </button>
@@ -1067,7 +1086,7 @@ export function ConfirmDialog({
               onConfirm();
               onClose();
             }}
-            className={`h-10 px-4 rounded-full text-white text-xs font-medium cursor-pointer transition-colors ${
+            className={`h-10 px-4 rounded-[10px] text-white text-xs font-medium cursor-pointer transition-colors ${
               destructive
                 ? 'bg-red-600 hover:bg-red-700'
                 : 'bg-[#1F6A37] hover:bg-[#12512C]'

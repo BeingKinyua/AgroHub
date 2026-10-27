@@ -1,17 +1,11 @@
 'use client';
 
-import React, { useRef } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { useGSAP } from '@gsap/react';
-
-if (typeof window !== 'undefined') {
-  gsap.registerPlugin(ScrollTrigger, useGSAP);
-}
+import React from 'react';
+import { motion } from 'motion/react';
 
 /**
- * Centralized GSAP Page Entrance & Scroll Reveal Wrapper.
- * Respects prefers-reduced-motion automatically.
+ * Centralized Page Entrance & Transition Wrapper.
+ * Uses motion/react for smooth, SSR-safe animations.
  */
 export function AnimatedPage({
   children,
@@ -20,52 +14,15 @@ export function AnimatedPage({
   children: React.ReactNode;
   className?: string;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useGSAP(
-    () => {
-      if (typeof window === 'undefined') return;
-      const prefersReducedMotion = window.matchMedia(
-        '(prefers-reduced-motion: reduce)'
-      ).matches;
-
-      if (prefersReducedMotion || !containerRef.current) return;
-
-      const items = containerRef.current.querySelectorAll('[data-gsap-reveal]');
-      if (items.length > 0) {
-        gsap.fromTo(
-          items,
-          { opacity: 0, y: 10 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.32,
-            stagger: 0.045,
-            ease: 'power2.out',
-            clearProps: 'transform,opacity',
-          }
-        );
-      } else {
-        gsap.fromTo(
-          containerRef.current,
-          { opacity: 0, y: 8 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.26,
-            ease: 'power2.out',
-            clearProps: 'transform,opacity',
-          }
-        );
-      }
-    },
-    { scope: containerRef }
-  );
-
   return (
-    <div ref={containerRef} className={className}>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -76,40 +33,15 @@ export function AnimatedSection({
   children: React.ReactNode;
   className?: string;
 }) {
-  const sectionRef = useRef<HTMLDivElement>(null);
-
-  useGSAP(
-    () => {
-      if (typeof window === 'undefined') return;
-      const prefersReducedMotion = window.matchMedia(
-        '(prefers-reduced-motion: reduce)'
-      ).matches;
-
-      if (prefersReducedMotion || !sectionRef.current) return;
-
-      gsap.fromTo(
-        sectionRef.current,
-        { opacity: 0, y: 12 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.35,
-          ease: 'power2.out',
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: 'top 92%',
-            once: true,
-          },
-          clearProps: 'transform,opacity',
-        }
-      );
-    },
-    { scope: sectionRef }
-  );
-
   return (
-    <div ref={sectionRef} data-gsap-reveal className={className}>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-20px' }}
+      transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
       {children}
-    </div>
+    </motion.div>
   );
 }
