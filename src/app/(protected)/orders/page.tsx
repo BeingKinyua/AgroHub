@@ -76,6 +76,10 @@ function OrdersWorkbenchContent() {
       setStatusFilter(statusParam);
     }
 
+    if (searchParams.get('action') === 'new') {
+      setCreateOpen(true);
+    }
+
     if (orderNumParam) {
       setSearch(orderNumParam);
       const match = orders.find((o) => o.orderNumber.toLowerCase() === orderNumParam.toLowerCase());
@@ -268,7 +272,7 @@ function OrdersWorkbenchContent() {
               <button
                 type="button"
                 onClick={handleExportCsv}
-                className="h-10 px-4 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-2 hover:border-[#4EB462] cursor-pointer"
+                className="h-10 px-4 rounded-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-2 hover:border-[#4EB462] cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
                 <span className="hidden sm:inline">Export Manifest</span>
@@ -278,7 +282,7 @@ function OrdersWorkbenchContent() {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
+                className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Order</span>

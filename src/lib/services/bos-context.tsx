@@ -324,11 +324,13 @@ const STORAGE_KEY_WIDGETS = 'agro_bos_widgets_v1';
 const STORAGE_KEY_DEMO = 'agro_bos_demo_mode_v1';
 
 export function BosProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<InternalUser | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [currentUser, setCurrentUser] = useState<InternalUser | null>(
+    INITIAL_USERS[0]
+  );
+  const [isInitialized, setIsInitialized] = useState(true);
   const [demoModeEnabled, setDemoModeState] = useState(false);
 
-  const [theme, setThemeState] = useState<ThemeMode>('light');
+  const [theme, setThemeState] = useState<ThemeMode>('system');
   const [resolvedDark, setResolvedDark] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -1997,30 +1999,6 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       recentPriceTrend: trendText as SupplierRecord['recentPriceTrend'],
     };
     setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
-
-    // Synchronize product supplierCostKes and record in priceHistory for Supplier Cost timeline graph
-    setProducts((prev) =>
-      prev.map((prod) => {
-        if (prod.id === productId) {
-          const newEntry: PriceHistoryEntry = {
-            date: todayStr,
-            tier: 'Supplier Cost',
-            priceKes: newCostKes,
-            changedBy: `${target.name} (${reason || 'Contract Price Revision'})`,
-          };
-          return {
-            ...prod,
-            pricing: {
-              ...prod.pricing,
-              supplierCostKes: newCostKes,
-            },
-            priceHistory: [newEntry, ...prod.priceHistory],
-          };
-        }
-        return prod;
-      })
-    );
-
     appendAudit(
       'Suppliers',
       target.code,

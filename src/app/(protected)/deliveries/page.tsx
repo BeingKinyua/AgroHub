@@ -173,11 +173,11 @@ function DeliveriesContent() {
       )}
 
       {/* Interactive Filter Pills */}
-      <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit">
+      <div className="flex items-center gap-1 p-1 rounded-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit">
         <button
           type="button"
           onClick={() => setFilterMode('all')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
             filterMode === 'all'
               ? 'bg-[#1F6A37] text-white shadow-sm'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -188,7 +188,7 @@ function DeliveriesContent() {
         <button
           type="button"
           onClick={() => setFilterMode('pending')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
             filterMode === 'pending'
               ? 'bg-[#1F6A37] text-white shadow-sm'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -199,7 +199,7 @@ function DeliveriesContent() {
         <button
           type="button"
           onClick={() => setFilterMode('in-transit')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
             filterMode === 'in-transit'
               ? 'bg-[#1F6A37] text-white shadow-sm'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -210,7 +210,7 @@ function DeliveriesContent() {
         <button
           type="button"
           onClick={() => setFilterMode('delivered')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
             filterMode === 'delivered'
               ? 'bg-[#1F6A37] text-white shadow-sm'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'

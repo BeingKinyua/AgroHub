@@ -22,8 +22,6 @@ import {
   Download,
   Filter,
   Plus,
-  RotateCcw,
-  SlidersHorizontal,
   Sparkles,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
@@ -32,7 +30,6 @@ import {
   Card,
   ChartCard,
   FeedbackBanner,
-  Modal,
   OperationalPulse,
   OperationalPulseItem,
   PageHeader,
@@ -65,19 +62,6 @@ const FEFO_RISK_DATA = [
   { category: 'Culinary Herbs', atRiskKg: 65, batches: 1 },
 ];
 
-const WIDGET_REGISTRY: {
-  id: string;
-  label: string;
-  permission: PermissionKey;
-}[] = [
-  { id: 'operational_pulse', label: 'Operational Pulse & Immediate Attention', permission: 'dashboard.view' },
-  { id: 'role_kpis', label: 'Role-Specific Decision KPIs', permission: 'dashboard.view' },
-  { id: 'ai_brief', label: 'Shift Operational AI Intelligence', permission: 'dashboard.view' },
-  { id: 'primary_visualizations', label: 'Primary Trend & Cash/FEFO Visualizations', permission: 'dashboard.view' },
-  { id: 'work_queues', label: 'Operational Work Queues (Approvals & Fulfillment)', permission: 'dashboard.view' },
-  { id: 'recent_orders_table', label: 'Active Order Pipeline Workbench', permission: 'orders.view' },
-];
-
 export default function DashboardPage() {
   const {
     currentUser,
@@ -89,13 +73,9 @@ export default function DashboardPage() {
     suppliers,
     deliveries,
     approvals,
-    enabledWidgets,
-    toggleDashboardWidget,
-    resetDashboardWidgets,
     resolveApproval,
   } = useBos();
 
-  const [customizeOpen, setCustomizeOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [aiBrief, setAiBrief] = useState<{
     headline: string;
@@ -678,36 +658,27 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* 1. PAGE HEADER (Section 31 & Master Order) */}
+      {/* 1. PAGE HEADER */}
       <PageHeader
         kicker="AGRO-DELIVERIES KENYA · BOS COMMAND CENTER"
         title="Operational Decision System"
         description="Monitor business health, resolve operational bottlenecks, evaluate critical risks, and drive supply execution across Kenya's food network."
         actions={
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] font-mono-tabular">
+          <div className="flex items-center gap-2.5">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-[10px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] font-mono-tabular">
               <Clock className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
               <span>As of 07:45 EAT · Updated 4m ago</span>
             </span>
 
             {can('orders.create') && (
               <Link
-                href="/orders"
-                className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                href="/orders?action=new"
+                className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Order</span>
               </Link>
             )}
-
-            <button
-              type="button"
-              onClick={() => setCustomizeOpen(true)}
-              className="h-10 px-3.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-1.5 text-[var(--text-primary)] transition-colors cursor-pointer"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
-              <span className="hidden sm:inline">Customize View</span>
-            </button>
           </div>
         }
       />
@@ -718,52 +689,48 @@ export default function DashboardPage() {
         onDismiss={() => setFeedback(null)}
       />
 
-      {/* 2. OPERATIONAL PULSE / NEEDS ATTENTION (Section 4 & 5) */}
-      {enabledWidgets.includes('operational_pulse') && (
-        <OperationalPulse
-          items={operationalPulseItems}
-          title="Operational Pulse · Immediate Business Decisions Required"
-          freshness="Live Hub Telemetry · As of 07:45 EAT"
-        />
-      )}
+      {/* 2. OPERATIONAL PULSE / IMMEDIATE BUSINESS DECISIONS */}
+      <OperationalPulse
+        items={operationalPulseItems}
+        title="Operational Pulse · Immediate Business Decisions Required"
+        freshness="Live Hub Telemetry · As of 07:45 EAT"
+      />
 
-      {/* 3. ROLE-SPECIFIC ACTIONABLE DECISION KPIS (Section 6, 7, 10, 11, 13) */}
-      {enabledWidgets.includes('role_kpis') && (
-        <section aria-label="Role Decision Metrics">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <h2 className="font-heading text-sm font-semibold tracking-wide text-[var(--text-primary)] uppercase">
-                {currentUser?.roleName || 'Operator'} Decision Metrics
-              </h2>
-              <span className="text-[11px] text-[var(--text-secondary)]">
-                · Direct Actions Linked
-              </span>
-            </div>
-            <span className="text-xs font-mono-tabular text-[var(--text-secondary)]">
-              Target: 4 High-Leverage Units
+      {/* 3. ROLE-SPECIFIC ACTIONABLE DECISION KPIS */}
+      <section aria-label="Role Decision Metrics">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-sm font-semibold tracking-wide text-[var(--text-primary)] uppercase">
+              {currentUser?.roleName || 'Operator'} Decision Metrics
+            </h2>
+            <span className="text-[11px] text-[var(--text-secondary)]">
+              · Direct Actions Linked
             </span>
           </div>
+          <span className="text-xs font-mono-tabular text-[var(--text-secondary)]">
+            Target: 4 High-Leverage Units
+          </span>
+        </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {roleDecisionKpis.map((kpi, idx) => (
-              <ActionableMetricCard
-                key={`${kpi.metric}-${idx}`}
-                metric={kpi.metric}
-                value={kpi.value}
-                context={kpi.context}
-                delta={kpi.delta}
-                status={kpi.status}
-                description={kpi.description}
-                actionLabel={kpi.actionLabel}
-                actionHref={kpi.actionHref}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {roleDecisionKpis.map((kpi, idx) => (
+            <ActionableMetricCard
+              key={`${kpi.metric}-${idx}`}
+              metric={kpi.metric}
+              value={kpi.value}
+              context={kpi.context}
+              delta={kpi.delta}
+              status={kpi.status}
+              description={kpi.description}
+              actionLabel={kpi.actionLabel}
+              actionHref={kpi.actionHref}
+            />
+          ))}
+        </div>
+      </section>
 
-      {/* 4. AI OPERATIONAL SHIFT BRIEF (Section 38: "What should I know right now?") */}
-      {enabledWidgets.includes('ai_brief') && aiBrief && (
+      {/* 4. AI OPERATIONAL SHIFT BRIEF */}
+      {aiBrief && (
         <Card
           padding="p-5"
           variant="raised"
@@ -805,7 +772,7 @@ export default function DashboardPage() {
               <div className="mt-3 pt-2 border-t border-white/10 flex justify-end">
                 <Link
                   href="/inventory?filter=expiring"
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-[#1F6A37] hover:bg-[#12512C] text-white transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-[10px] text-xs font-medium bg-[#1F6A37] hover:bg-[#12512C] text-white transition-colors cursor-pointer"
                 >
                   <span>Resolve Risk</span>
                   <ArrowRight className="w-3 h-3" />
@@ -816,157 +783,153 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* 5. PRIMARY TREND & OPERATIONAL VISUALIZATIONS (Sections 16, 17, 18) */}
-      {enabledWidgets.includes('primary_visualizations') && (
-        <section aria-label="Visual Analytics" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Revenue vs Sourcing Cash Trend */}
-          <ChartCard
-            title="Institutional Revenue vs. Procurement Sourcing (KES)"
-            subtitle="Answering: Is revenue expansion sustaining healthy gross margin over cooperative sourcing spend?"
-            className="lg:col-span-7"
-            action={
-              <Link
-                href="/finance"
-                className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
+      {/* 5. PRIMARY TREND & OPERATIONAL VISUALIZATIONS */}
+      <section aria-label="Visual Analytics" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Revenue vs Sourcing Cash Trend */}
+        <ChartCard
+          title="Institutional Revenue vs. Procurement Sourcing (KES)"
+          subtitle="Answering: Is revenue expansion sustaining healthy gross margin over cooperative sourcing spend?"
+          className="lg:col-span-7"
+          action={
+            <Link
+              href="/finance"
+              className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
+            >
+              <span>Financial Ledger</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          }
+        >
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={REVENUE_TREND_DATA}
+                margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
               >
-                <span>Financial Ledger</span>
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            }
-          >
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={REVENUE_TREND_DATA}
-                  margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#1F6A37" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#1F6A37" stopOpacity={0.0} />
-                    </linearGradient>
-                    <linearGradient id="procGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4EB462" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#4EB462" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(61, 105, 74, 0.15)" />
-                  <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#3D694A' }} />
-                  <YAxis
-                    tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
-                    tick={{ fontSize: 11, fill: '#3D694A' }}
-                  />
-                  <Tooltip
-                    formatter={(val: number) => [`KES ${val.toLocaleString()}`, '']}
-                    contentStyle={{
-                      borderRadius: '12px',
-                      border: '1px solid rgba(78,180,98,0.3)',
-                      backgroundColor: '#08190C',
-                      color: '#F4F6F3',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="revenueKes"
-                    name="Institutional Revenue"
-                    stroke="#1F6A37"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#revGrad)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="procurementKes"
-                    name="Cooperative Sourcing"
-                    stroke="#4EB462"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#procGrad)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </ChartCard>
+                <defs>
+                  <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#1F6A37" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#1F6A37" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="procGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4EB462" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#4EB462" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(61, 105, 74, 0.15)" />
+                <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#3D694A' }} />
+                <YAxis
+                  tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
+                  tick={{ fontSize: 11, fill: '#3D694A' }}
+                />
+                <Tooltip
+                  formatter={(val: number) => [`KES ${val.toLocaleString()}`, '']}
+                  contentStyle={{
+                    borderRadius: '12px',
+                    border: '1px solid rgba(78,180,98,0.3)',
+                    backgroundColor: '#08190C',
+                    color: '#F4F6F3',
+                    fontSize: '12px',
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="revenueKes"
+                  name="Institutional Revenue"
+                  stroke="#1F6A37"
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#revGrad)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="procurementKes"
+                  name="Cooperative Sourcing"
+                  stroke="#4EB462"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#procGrad)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
 
-          {/* Institutional Segment Demand */}
-          <ChartCard
-            title="Institutional Demand by Sector (KES)"
-            subtitle="Answering: Where is commercial volume concentrated this month?"
-            className="lg:col-span-5"
-            action={
-              <Link
-                href="/institutions"
-                className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
+        {/* Institutional Segment Demand */}
+        <ChartCard
+          title="Institutional Demand by Sector (KES)"
+          subtitle="Answering: Where is commercial volume concentrated this month?"
+          className="lg:col-span-5"
+          action={
+            <Link
+              href="/institutions"
+              className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
+            >
+              <span>Institutions</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          }
+        >
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={SEGMENT_MIX_DATA}
+                layout="vertical"
+                margin={{ top: 5, right: 16, left: 10, bottom: 5 }}
               >
-                <span>Institutions</span>
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            }
-          >
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={SEGMENT_MIX_DATA}
-                  layout="vertical"
-                  margin={{ top: 5, right: 16, left: 10, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(61, 105, 74, 0.15)" />
-                  <XAxis
-                    type="number"
-                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                    tick={{ fontSize: 10, fill: '#3D694A' }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="segment"
-                    width={110}
-                    tick={{ fontSize: 10, fill: '#3D694A' }}
-                  />
-                  <Tooltip
-                    formatter={(val: number) => [`KES ${val.toLocaleString()}`, 'Revenue']}
-                    contentStyle={{
-                      borderRadius: '12px',
-                      backgroundColor: '#08190C',
-                      color: '#F4F6F3',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Bar dataKey="revenueKes" fill="#1F6A37" radius={[0, 8, 8, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </ChartCard>
-        </section>
-      )}
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(61, 105, 74, 0.15)" />
+                <XAxis
+                  type="number"
+                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                  tick={{ fontSize: 10, fill: '#3D694A' }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="segment"
+                  width={110}
+                  tick={{ fontSize: 10, fill: '#3D694A' }}
+                />
+                <Tooltip
+                  formatter={(val: number) => [`KES ${val.toLocaleString()}`, 'Revenue']}
+                  contentStyle={{
+                    borderRadius: '12px',
+                    backgroundColor: '#08190C',
+                    color: '#F4F6F3',
+                    fontSize: '12px',
+                  }}
+                />
+                <Bar dataKey="revenueKes" fill="#1F6A37" radius={[0, 8, 8, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      </section>
 
-      {/* 6. OPERATIONAL WORK QUEUES (Section 12: Reusable Work Queue Pattern) */}
-      {enabledWidgets.includes('work_queues') && (
-        <section aria-label="Operational Work Queues" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <WorkQueue
-            title="Pending Governance Approvals"
-            subtitle="Decisions requiring manager or executive sign-off"
-            badgeCount={approvalWorkQueueItems.length}
-            items={approvalWorkQueueItems}
-            emptyMessage="All approval requests have been cleared."
-            viewAllHref="/approvals"
-            viewAllLabel="Open Approvals Center"
-          />
+      {/* 6. OPERATIONAL WORK QUEUES */}
+      <section aria-label="Operational Work Queues" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <WorkQueue
+          title="Pending Governance Approvals"
+          subtitle="Decisions requiring manager or executive sign-off"
+          badgeCount={approvalWorkQueueItems.length}
+          items={approvalWorkQueueItems}
+          emptyMessage="All approval requests have been cleared."
+          viewAllHref="/approvals"
+          viewAllLabel="Open Approvals Center"
+        />
 
-          <WorkQueue
-            title="Immediate Operational Fulfillment Queue"
-            subtitle="Perishable FEFO countdowns and active warehouse picking"
-            badgeCount={operationalWorkQueueItems.length}
-            items={operationalWorkQueueItems}
-            emptyMessage="All active orders and warehouse batches are current."
-            viewAllHref="/orders"
-            viewAllLabel="Open Orders Workbench"
-          />
-        </section>
-      )}
+        <WorkQueue
+          title="Immediate Operational Fulfillment Queue"
+          subtitle="Perishable FEFO countdowns and active warehouse picking"
+          badgeCount={operationalWorkQueueItems.length}
+          items={operationalWorkQueueItems}
+          emptyMessage="All active orders and warehouse batches are current."
+          viewAllHref="/orders"
+          viewAllLabel="Open Orders Workbench"
+        />
+      </section>
 
-      {/* 7. ACTIVE INSTITUTIONAL ORDER PIPELINE WORKBENCH (Section 22 & 34) */}
-      {enabledWidgets.includes('recent_orders_table') && (
+      {/* 7. ACTIVE INSTITUTIONAL ORDER PIPELINE WORKBENCH */}
+      {can('orders.view') && (
         <ChartCard
           title="Active Institutional Order Workbench"
           subtitle="Real-time order state from confirmation through picking, packing, route dispatch, and invoicing"
@@ -1023,7 +986,7 @@ export default function DashboardPage() {
                     <td className="py-3 px-3 text-right">
                       <Link
                         href={`/orders?orderNumber=${ord.orderNumber}`}
-                        className="h-7 px-3 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        className="h-8 px-3.5 rounded-[10px] bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <span>Inspect</span>
                         <ArrowRight className="w-3 h-3" />
@@ -1060,7 +1023,7 @@ export default function DashboardPage() {
                 <div className="pt-2 border-t border-[var(--border-subtle)] flex justify-end">
                   <Link
                     href={`/orders?orderNumber=${ord.orderNumber}`}
-                    className="h-7 px-3 rounded-full bg-[#1F6A37] text-white text-xs font-semibold inline-flex items-center gap-1"
+                    className="h-8 px-3.5 rounded-[10px] bg-[#1F6A37] text-white text-xs font-semibold inline-flex items-center gap-1"
                   >
                     <span>Fulfill</span>
                     <ArrowRight className="w-3 h-3" />
@@ -1071,78 +1034,6 @@ export default function DashboardPage() {
           </div>
         </ChartCard>
       )}
-
-      {/* DASHBOARD WIDGET CUSTOMIZATION MODAL (Section 37) */}
-      <Modal
-        open={customizeOpen}
-        onClose={() => setCustomizeOpen(false)}
-        title="Customize Command Center Decision View"
-        subtitle="Configure operational widget order and role-specific visibility."
-      >
-        <div className="space-y-3">
-          <p className="text-xs text-[var(--text-secondary)]">
-            AgroHub enforces role-optimized decision layouts. You may tailor which sections are displayed or restore default governance order.
-          </p>
-
-          <div className="space-y-2 pt-2">
-            {WIDGET_REGISTRY.map((w, index) => {
-              const active = enabledWidgets.includes(w.id);
-              return (
-                <div
-                  key={w.id}
-                  className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between gap-3 text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono-tabular text-[11px] text-[var(--text-secondary)]">
-                      {index + 1}.
-                    </span>
-                    <span className="font-medium text-[var(--text-primary)]">
-                      {w.label}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleDashboardWidget(w.id)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
-                        active
-                          ? 'bg-[#1F6A37] text-white'
-                          : 'bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)]'
-                      }`}
-                    >
-                      {active ? 'Visible' : 'Hidden'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="pt-4 border-t border-[var(--border-subtle)] flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => {
-                resetDashboardWidgets();
-                setFeedback('Default role-optimized decision layout restored.');
-                setCustomizeOpen(false);
-              }}
-              className="px-3.5 py-1.5 rounded-full border border-[var(--border-subtle)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset to Role Defaults</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setCustomizeOpen(false)}
-              className="px-4 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

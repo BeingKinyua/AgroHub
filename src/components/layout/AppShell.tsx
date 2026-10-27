@@ -52,6 +52,7 @@ import {
   Breadcrumbs,
   DROPDOWN_MOTION,
   PermissionGateBanner,
+  RoleLabel,
   StatusBadge,
   Tooltip,
 } from '@/components/ui/primitives';
@@ -108,9 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationTab, setNotificationTab] = useState<'all' | 'unread'>('all');
-  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [demoSwitcherOpen, setDemoSwitcherOpen] = useState(false);
 
   const navScrollRef = useRef<HTMLElement | null>(null);
   const headerActionsRef = useRef<HTMLDivElement | null>(null);
@@ -119,7 +118,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SIDEBAR);
-      if (saved === 'true') setSidebarCollapsed(true);
+      if (saved === 'true') {
+        setSidebarCollapsed(true);
+      } else if (saved === 'false') {
+        setSidebarCollapsed(false);
+      } else if (typeof window !== 'undefined' && window.innerWidth < 1024 && window.innerWidth >= 768) {
+        setSidebarCollapsed(true);
+      }
     } catch {
       // ignore storage errors
     }
@@ -174,9 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       if (e.key === 'Escape') {
         setSearchOpen(false);
         setNotificationsOpen(false);
-        setQuickActionsOpen(false);
         setProfileMenuOpen(false);
-        setDemoSwitcherOpen(false);
         setMobileDrawerOpen(false);
       }
     };
@@ -187,9 +190,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         !headerActionsRef.current.contains(e.target as Node)
       ) {
         setNotificationsOpen(false);
-        setQuickActionsOpen(false);
         setProfileMenuOpen(false);
-        setDemoSwitcherOpen(false);
       }
     };
 
@@ -678,21 +679,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             accounts are prohibited from accessing Agro-Deliveries operational
             data.
           </p>
-          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => switchTestPersona('USR-001')}
-              className="px-4 py-2.5 rounded-full bg-[#1F6A37] text-white text-xs font-medium hover:bg-[#12512C] cursor-pointer"
-            >
-              Switch to Active Executive Account
-            </button>
+          <div className="mt-6 flex items-center justify-center">
             <button
               type="button"
               onClick={() => {
                 logout();
                 router.push('/login');
               }}
-              className="px-4 py-2.5 rounded-full border border-[var(--border-subtle)] text-xs font-medium hover:bg-[#E5EFE6] dark:hover:bg-[#122719] cursor-pointer"
+              className="px-5 py-2.5 rounded-[10px] bg-[#1F6A37] text-white text-xs font-medium hover:bg-[#12512C] transition-colors cursor-pointer"
             >
               Return to Login
             </button>
@@ -744,15 +738,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-[var(--bg-canvas)] text-[var(--text-primary)] flex">
-      {/* DESKTOP INDEPENDENT SCROLLING SIDEBAR */}
+      {/* DESKTOP & TABLET INDEPENDENT SCROLLING SIDEBAR */}
       <aside
         aria-label="Workspace Sidebar"
         style={{
-          width: sidebarCollapsed
-            ? 'var(--sidebar-mini-width)'
-            : 'var(--sidebar-width)',
+          width: sidebarCollapsed ? '84px' : '272px',
+          minWidth: sidebarCollapsed ? '84px' : '272px',
         }}
-        className="hidden lg:flex flex-col shrink-0 h-dvh sticky top-0 z-[var(--z-sidebar)] bg-[#08190C] text-[#F4F6F3] border-r border-white/10 transition-[width] duration-200 ease-out select-none"
+        className={`hidden md:flex flex-col shrink-0 h-dvh sticky top-0 z-40 bg-[#08190C] text-[#F4F6F3] border-r border-white/10 transition-[width] duration-200 ease-out select-none ${
+          sidebarCollapsed ? 'w-[84px] min-w-[84px]' : 'w-[272px] min-w-[272px]'
+        }`}
       >
         {/* Fixed Top Brand Header */}
         <div
@@ -976,7 +971,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <AnimatePresence>
         {mobileDrawerOpen && (
           <div
-            className="fixed inset-0 z-[var(--z-drawer)] lg:hidden flex"
+            className="fixed inset-0 z-[var(--z-drawer)] md:hidden flex"
             role="dialog"
             aria-modal="true"
             aria-label="Mobile Navigation Drawer"
@@ -1098,237 +1093,58 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       {/* MAIN INDEPENDENT SCROLL WORKSPACE COLUMN */}
-      <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
+      <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
         {/* STICKY TOP UTILITY HEADER */}
         <header className="sticky top-0 z-[var(--z-header)] h-16 bg-[var(--bg-card)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
-          {/* Left: Mobile Menu + Current Page Context Title (Breadcrumb moved to main area) */}
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              type="button"
-              onClick={() => setMobileDrawerOpen(true)}
-              className="lg:hidden p-2 rounded-full border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] cursor-pointer"
-              aria-label="Open navigation menu"
-            >
-              <Menu className="w-4 h-4" />
-            </button>
-            <span className="font-heading font-semibold text-sm sm:text-base text-[var(--text-primary)] truncate">
-              {currentPageLabel}
-            </span>
-          </div>
+          {/* Mobile Menu Trigger (hidden on desktop) */}
+          <button
+            type="button"
+            onClick={() => setMobileDrawerOpen(true)}
+            className="md:hidden p-2 rounded-[10px] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] cursor-pointer shrink-0"
+            aria-label="Open navigation menu"
+          >
+            <Menu className="w-4 h-4" />
+          </button>
 
-          {/* Center: Command Global Search Trigger */}
-          <div className="flex-1 max-w-md mx-2">
+          {/* 1. Global Search Trigger */}
+          <div className="flex-1 max-w-xl mx-1 sm:mx-3">
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="w-full h-10 px-3.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] flex items-center justify-between gap-2 hover:border-[#4EB462]/60 transition-colors cursor-pointer"
+              className="w-full h-10 px-3.5 rounded-[10px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] flex items-center justify-between gap-2 hover:border-[#4EB462]/60 transition-colors cursor-pointer"
             >
               <span className="flex items-center gap-2 truncate">
                 <Search className="w-3.5 h-3.5 shrink-0 text-[#1F6A37] dark:text-[#4EB462]" />
                 <span className="truncate">
-                  Search orders, FEFO batches, institutions, SKUs...
+                  Search across AgroHub (orders, inventory, partners)...
                 </span>
               </span>
-              <kbd className="hidden sm:inline-block font-mono-tabular text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+              <kbd className="hidden sm:inline-block font-mono-tabular text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-subtle)]">
                 ⌘K
               </kbd>
             </button>
           </div>
 
-          {/* Right: Quick Actions + Demo Role Switcher + Theme + Notifications + Account Profile */}
+          {/* Right: Notifications + Profile Menu */}
           <div
             ref={headerActionsRef}
-            className="flex items-center gap-2 shrink-0"
+            className="flex items-center gap-2.5 shrink-0"
           >
-            {/* Context-Aware Quick Actions */}
-            {quickActions.length > 0 && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuickActionsOpen((v) => !v);
-                    setNotificationsOpen(false);
-                    setProfileMenuOpen(false);
-                    setDemoSwitcherOpen(false);
-                  }}
-                  aria-expanded={quickActionsOpen}
-                  className="h-10 px-3.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Quick Action</span>
-                </button>
-
-                <AnimatePresence>
-                  {quickActionsOpen && (
-                    <motion.div
-                      {...DROPDOWN_MOTION}
-                      className="absolute right-0 mt-2 w-72 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-lg)] p-2 z-[var(--z-dropdown)]"
-                    >
-                      <div className="px-3 py-2 text-[11px] font-semibold text-[var(--text-secondary)] border-b border-[var(--border-subtle)] mb-1">
-                        Authorized Actions ({currentUser.roleName})
-                      </div>
-                      <div className="max-h-80 overflow-y-auto space-y-0.5">
-                        {quickActions.map((act) => (
-                          <Link
-                            key={act.label}
-                            href={act.href}
-                            onClick={() => setQuickActionsOpen(false)}
-                            className="block px-3 py-2 rounded-xl hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
-                          >
-                            <div className="text-xs font-medium text-[var(--text-primary)]">
-                              {act.label}
-                            </div>
-                            <div className="text-[11px] text-[var(--text-secondary)]">
-                              {act.description}
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-
-            {/* Separated Demo Role Switcher Pill (Visible when Prototype Demo Mode is enabled) */}
-            {demoModeEnabled && (
-              <div className="relative hidden md:block">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDemoSwitcherOpen((v) => !v);
-                    setQuickActionsOpen(false);
-                    setNotificationsOpen(false);
-                    setProfileMenuOpen(false);
-                  }}
-                  aria-expanded={demoSwitcherOpen}
-                  title="Switch RBAC Evaluation Role"
-                  className="h-10 px-3.5 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] border border-[#4EB462]/35 text-[#12512C] dark:text-[#4EB462] text-xs font-medium inline-flex items-center gap-1.5 hover:border-[#4EB462] transition-colors cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                  <span className="max-w-[130px] truncate">
-                    Role: {currentUser.roleName}
-                  </span>
-                </button>
-
-                <AnimatePresence>
-                  {demoSwitcherOpen && (
-                    <motion.div
-                      {...DROPDOWN_MOTION}
-                      className="absolute right-0 mt-2 w-72 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-lg)] p-3 z-[var(--z-dropdown)]"
-                    >
-                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--border-subtle)]">
-                        <div>
-                          <div className="text-xs font-semibold text-[var(--text-primary)]">
-                            RBAC Role Simulator
-                          </div>
-                          <div className="text-[11px] text-[var(--text-secondary)]">
-                            Instant prototype persona switch
-                          </div>
-                        </div>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]">
-                          9 Roles
-                        </span>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto space-y-1">
-                        {users
-                          .filter((u) => u.status === 'Active')
-                          .map((u) => (
-                            <button
-                              key={u.id}
-                              type="button"
-                              onClick={() => {
-                                switchTestPersona(u.id);
-                                setDemoSwitcherOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-2 rounded-full text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                                u.id === currentUser.id
-                                  ? 'bg-[#E5EFE6] text-[#12512C] dark:bg-[#142B1B] dark:text-[#4EB462] font-semibold'
-                                  : 'hover:bg-[var(--bg-canvas)] text-[var(--text-primary)]'
-                              }`}
-                            >
-                              <div className="min-w-0">
-                                <div className="truncate">{u.roleName}</div>
-                                <div className="text-[10px] opacity-75 truncate">
-                                  {u.fullName} (@{u.nickname})
-                                </div>
-                              </div>
-                              {u.id === currentUser.id && (
-                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 ml-2" />
-                              )}
-                            </button>
-                          ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-
-            {/* Theme Mode Selector (Light / Dark / System) */}
-            <div
-              role="group"
-              aria-label="Theme Mode"
-              className="hidden sm:flex items-center p-1 rounded-full bg-[var(--bg-canvas)]/50 border border-[var(--border-subtle)]"
-            >
-              <button
-                type="button"
-                onClick={() => setTheme('light')}
-                title="Light mode"
-                aria-label="Light mode"
-                className={`p-1.5 rounded-full text-xs transition-colors cursor-pointer ${
-                  theme === 'light'
-                    ? 'bg-[var(--bg-card)] text-[#1F6A37] shadow-xs'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Sun className="w-3.5 h-3.5" fill='yellow'/>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTheme('dark')}
-                title="Dark mode"
-                aria-label="Dark mode"
-                className={`p-1.5 rounded-full text-xs transition-colors cursor-pointer ${
-                  theme === 'dark'
-                    ? 'bg-[var(--bg-card)] text-[#4EB462] shadow-xs'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Moon className="w-3.5 h-3.5" fill='gray' />
-              </button>
-              <button
-                type="button"
-                onClick={() => setTheme('system')}
-                title="System theme"
-                aria-label="System theme"
-                className={`p-1.5 rounded-full text-xs transition-colors cursor-pointer ${
-                  theme === 'system'
-                    ? 'bg-[var(--bg-card)] text-[#1F6A37] dark:text-[#4EB462] shadow-xs'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Monitor className="w-3.5 h-3.5" fill='#1F6A37' />
-              </button>
-            </div>
-
-            {/* Notification Center */}
+            {/* 2. Notification Center */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => {
                   setNotificationsOpen((v) => !v);
-                  setQuickActionsOpen(false);
                   setProfileMenuOpen(false);
-                  setDemoSwitcherOpen(false);
                 }}
                 aria-label="Notifications"
                 aria-expanded={notificationsOpen}
-                className="relative h-10 w-10 rounded-full hover:bg-[var(--bg-canvas)] flex items-center justify-center text-[var(--text-primary)] transition-colors cursor-pointer"
+                className="relative h-10 w-10 rounded-[10px] hover:bg-[var(--bg-canvas)] border border-transparent hover:border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] transition-colors cursor-pointer"
               >
-                <Bell className="w-4 h-4" fill='#1F6A37'/>
+                <Bell className="w-4 h-4 text-[var(--text-primary)]" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#CC310E] text-white font-mono-tabular text-[10px] flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#CC310E] text-white font-mono-tabular text-[10px] font-bold flex items-center justify-center">
                     {unreadCount}
                   </span>
                 )}
@@ -1338,7 +1154,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {notificationsOpen && (
                   <motion.div
                     {...DROPDOWN_MOTION}
-                    className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-lg)] p-3.5 z-[var(--z-dropdown)]"
+                    className="absolute right-0 mt-2 w-80 sm:w-96 rounded-[18px] bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-lg)] p-3.5 z-[var(--z-dropdown)]"
                   >
                     <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-[var(--border-subtle)]">
                       <div>
@@ -1352,7 +1168,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <button
                         type="button"
                         onClick={markAllNotificationsRead}
-                        className="px-2.5 py-1 rounded-full bg-[var(--bg-canvas)] text-[11px] font-medium text-[#1F6A37] dark:text-[#4EB462] inline-flex items-center gap-1 hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors cursor-pointer"
+                        className="px-2.5 py-1 rounded-md bg-[var(--bg-canvas)] text-[11px] font-medium text-[#1F6A37] dark:text-[#4EB462] inline-flex items-center gap-1 hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors cursor-pointer"
                       >
                         <CheckCheck className="w-3.5 h-3.5" />
                         <span>Mark all read</span>
@@ -1363,7 +1179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <button
                         type="button"
                         onClick={() => setNotificationTab('all')}
-                        className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                        className={`px-3 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
                           notificationTab === 'all'
                             ? 'bg-[#1F6A37] text-white'
                             : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)]'
@@ -1374,7 +1190,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <button
                         type="button"
                         onClick={() => setNotificationTab('unread')}
-                        className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                        className={`px-3 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
                           notificationTab === 'unread'
                             ? 'bg-[#1F6A37] text-white'
                             : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)]'
@@ -1399,7 +1215,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                               markNotificationRead(n.id);
                               setNotificationsOpen(false);
                             }}
-                            className={`block p-3 rounded-xl border transition-colors ${
+                            className={`block p-3 rounded-[12px] border transition-colors ${
                               n.read
                                 ? 'bg-[var(--bg-canvas)]/50 border-transparent opacity-75'
                                 : 'bg-[var(--bg-canvas)] border-[var(--border-subtle)] hover:border-[#4EB462]/45'
@@ -1407,7 +1223,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           >
                             <div className="flex items-center justify-between gap-2 mb-1">
                               <StatusBadge status={n.severity} />
-                              <span className="text-[11px] text-[var(--text-secondary)]">
+                              <span className="text-[11px] text-[var(--text-secondary)] font-mono-tabular">
                                 {n.timestamp}
                               </span>
                             </div>
@@ -1426,19 +1242,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </AnimatePresence>
             </div>
 
-            {/* User Account & Profile Dropdown */}
+            {/* 3. User Account & Profile Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => {
                   setProfileMenuOpen((v) => !v);
                   setNotificationsOpen(false);
-                  setQuickActionsOpen(false);
-                  setDemoSwitcherOpen(false);
                 }}
                 aria-expanded={profileMenuOpen}
                 aria-label="Account and Profile Menu"
-                className="h-10 pl-1.5 pr-2.5 rounded-full flex items-center gap-2 text-left hover:border-[#4EB462]/60 transition-colors cursor-pointer"
+                className="h-10 w-10 rounded-full flex items-center justify-center hover:ring-2 hover:ring-[#4EB462]/40 transition-all cursor-pointer"
               >
                 <Avatar
                   fullName={currentUser.fullName}
@@ -1451,34 +1265,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {profileMenuOpen && (
                   <motion.div
                     {...DROPDOWN_MOTION}
-                    className="absolute right-0 mt-2 w-80 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-lg)] p-3.5 z-[var(--z-dropdown)]"
+                    className="absolute right-0 mt-2 w-80 rounded-[18px] bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-lg)] p-4 z-[var(--z-dropdown)]"
                   >
                     {/* Identity Header */}
-                    <div className="flex flex-col items-center gap-3 pb-3 mb-2.5 border-b border-[var(--border-subtle)]">
+                    <div className="flex items-start gap-3 pb-3.5 mb-3 border-b border-[var(--border-subtle)]">
                       <Avatar
                         fullName={currentUser.fullName}
                         avatarUrl={currentUser.avatarUrl}
-                        size="xl"
+                        size="lg"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm txt-center font-semibold text-[var(--text-primary)] truncate">
+                        <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
                           {currentUser.fullName}
                         </div>
-                        <div className="text-xs text-center text-[var(--text-secondary)] truncate">
+                        <div className="text-xs text-[var(--text-secondary)] truncate">
                           @{currentUser.nickname} · {currentUser.email}
                         </div>
-                        <div className="mt-1 flex items-center gap-1.5">
-                          <StatusBadge status={currentUser.roleName} />
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <RoleLabel roleName={currentUser.roleName} />
                         </div>
                       </div>
                     </div>
 
                     {/* Primary Account Navigation */}
-                    <div className="space-y-1 pb-2.5 mb-2.5 border-b border-[var(--border-subtle)]">
+                    <div className="space-y-1 pb-3 mb-3 border-b border-[var(--border-subtle)]">
                       <Link
                         href="/profile"
                         onClick={() => setProfileMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-xs font-medium text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
                       >
                         <User className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
                         <div>
@@ -1491,7 +1305,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <Link
                         href="/settings"
                         onClick={() => setProfileMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-xs font-medium text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
                       >
                         <Settings className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
                         <div>
@@ -1505,7 +1319,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <Link
                           href="/administration/audit-logs"
                           onClick={() => setProfileMenuOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-xs font-medium text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
                         >
                           <FileSpreadsheet className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
                           <div>
@@ -1518,43 +1332,52 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       )}
                     </div>
 
-                    {/* Clearly Separated Prototype / Demo Role Switcher */}
-                    <div className="pb-2.5 mb-2.5 border-b border-[var(--border-subtle)]">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                          Prototype Role Switcher
-                        </span>
+                    {/* Appearance Section in Profile Menu */}
+                    <div className="pb-3 mb-3 border-b border-[var(--border-subtle)]">
+                      <div className="text-[11px] font-semibold text-[var(--text-secondary)] mb-2 px-1">
+                        Appearance
+                      </div>
+                      <div
+                        role="group"
+                        aria-label="Theme Mode"
+                        className="grid grid-cols-3 gap-1 p-1 rounded-[10px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)]"
+                      >
                         <button
                           type="button"
-                          onClick={() => setDemoModeEnabled(!demoModeEnabled)}
-                          className="px-2.5 py-0.5 rounded-full bg-[var(--bg-canvas)] text-[11px] font-medium text-[#1F6A37] dark:text-[#4EB462] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors cursor-pointer"
+                          onClick={() => setTheme('light')}
+                          className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                            theme === 'light'
+                              ? 'bg-[var(--bg-card)] text-[#1F6A37] shadow-xs'
+                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                          }`}
                         >
-                          {demoModeEnabled ? 'Hide Header Pill' : 'Show Header Pill'}
+                          <Sun className="w-3.5 h-3.5" />
+                          <span>Light</span>
                         </button>
-                      </div>
-                      <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-                        {users
-                          .filter((u) => u.status === 'Active')
-                          .map((u) => (
-                            <button
-                              key={u.id}
-                              type="button"
-                              onClick={() => {
-                                switchTestPersona(u.id);
-                                setProfileMenuOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-1.5 rounded-full text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                                u.id === currentUser.id
-                                  ? 'bg-[#E5EFE6] text-[#12512C] dark:bg-[#142B1B] dark:text-[#4EB462] font-semibold'
-                                  : 'hover:bg-[var(--bg-canvas)] text-[var(--text-primary)]'
-                              }`}
-                            >
-                              <span className="truncate">{u.roleName}</span>
-                              <span className="text-[10px] opacity-75 shrink-0 ml-2">
-                                @{u.nickname}
-                              </span>
-                            </button>
-                          ))}
+                        <button
+                          type="button"
+                          onClick={() => setTheme('dark')}
+                          className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                            theme === 'dark'
+                              ? 'bg-[var(--bg-card)] text-[#4EB462] shadow-xs'
+                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                          }`}
+                        >
+                          <Moon className="w-3.5 h-3.5" />
+                          <span>Dark</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTheme('system')}
+                          className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                            theme === 'system'
+                              ? 'bg-[var(--bg-card)] text-[#1F6A37] dark:text-[#4EB462] shadow-xs'
+                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                          }`}
+                        >
+                          <Monitor className="w-3.5 h-3.5" />
+                          <span>System</span>
+                        </button>
                       </div>
                     </div>
 
@@ -1565,7 +1388,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         logout();
                         router.push('/login');
                       }}
-                      className="w-full px-4 py-2 rounded-full text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 flex items-center justify-between transition-colors cursor-pointer"
+                      className="w-full px-3 py-2 rounded-[10px] text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 flex items-center justify-between transition-colors cursor-pointer"
                     >
                       <span>Sign out of AgroHub BOS</span>
                       <LogOut className="w-3.5 h-3.5" />
@@ -1578,7 +1401,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* WORKSPACE CONTENT CANVAS */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 xl:p-8 max-w-[1600px] w-full mx-auto">
           {/* Breadcrumb relocated from top nav bar into main content area */}
           <div className="mb-4">
             <Breadcrumbs items={mainBreadcrumbs} />
@@ -1597,7 +1420,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* CONTEXTUAL MOBILE BOTTOM NAVIGATION (<= 15% viewport height) */}
       <nav
         aria-label="Mobile Quick Navigation"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-[var(--z-header)] h-14 bg-[#08190C] text-[#A9BEAE] border-t border-white/10 grid grid-cols-5 items-center px-2"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-[var(--z-header)] h-14 bg-[#08190C] text-[#A9BEAE] border-t border-white/10 grid grid-cols-5 items-center px-2"
       >
         <Link
           href="/dashboard"
@@ -1769,7 +1592,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* GLOBAL TOAST FEEDBACK STACK */}
       <div
         aria-live="polite"
-        className="fixed bottom-16 lg:bottom-6 right-4 sm:right-6 z-[var(--z-toast)] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"
+        className="fixed bottom-16 md:bottom-6 right-4 sm:right-6 z-[var(--z-toast)] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"
       >
         <AnimatePresence>
           {toasts.map((t) => (
