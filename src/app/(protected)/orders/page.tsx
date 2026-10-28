@@ -5,16 +5,20 @@ import { useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
   ArrowRight,
+  Building2,
   CheckCircle2,
   Clock,
   Download,
   Eye,
   FileText,
+  Layers,
   PauseCircle,
   PlayCircle,
   Plus,
   Search,
   ShoppingBag,
+  Sparkles,
+  Trash2,
   Truck,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
@@ -87,15 +91,164 @@ function OrdersWorkbenchContent() {
     }
   }, [searchParams, orders]);
 
-  // Form state for New Order
+  // Multi-Item Order Composer State (Phase A: 3.1 - 3.7)
+  const tomorrowStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  }, []);
+
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [channel, setChannel] = useState<OrderRecord['channel']>('Institutional Contract');
-  const [deliveryDate, setDeliveryDate] = useState('2026-10-01');
+  const [deliveryDate, setDeliveryDate] = useState(tomorrowStr);
   const [warehouseName, setWarehouseName] = useState(warehouses[0]?.name || 'Nairobi Cold Hub A');
-  const [productId, setProductId] = useState(products[0]?.id || '');
-  const [quantity, setQuantity] = useState(100);
-  const [overridePrice, setOverridePrice] = useState('');
+  const [orderReference, setOrderReference] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [notes, setNotes] = useState('');
+  const [composerStep, setComposerStep] = useState<'compose' | 'review'>('compose');
+
+  interface FormLineItem {
+    id: string;
+    productId: string;
+    quantity: number;
+    overridePriceKes?: number;
+  }
+
+  const [formItems, setFormItems] = useState<FormLineItem[]>([
+    { id: 'line-1', productId: products[0]?.id || '', quantity: 50 },
+  ]);
+
+  // Synchronize customer details (segment, delivery zone, default PO ref)
+  useEffect(() => {
+    const cust = customers.find((c) => c.id === customerId);
+    if (cust) {
+      if (cust.isInstitutional) {
+        setChannel('Institutional Contract');
+      }
+      setDeliveryAddress(`${cust.deliveryZone}, ${cust.county} (Attn: ${cust.procurementContact})`);
+      setOrderReference(`PO-${cust.code}-${new Date().getFullYear()}-01`);
+    }
+  }, [customerId, customers]);
+
+  const selectedCustomer = useMemo(
+    () => customers.find((c) => c.id === customerId),
+    [customers, customerId]
+  );
+
+  // Dynamic pricing & stock calculation per line item (Section 3.2, 3.3, 3.4)
+  const computedLineItems = useMemo(() => {
+    return formItems.map((item) => {
+      const prod = products.find((p) => p.id === item.productId);
+      let tier: 'Institutional' | 'Wholesale' | 'Retail' | 'Online' = 'Retail';
+      let defaultPrice = prod?.pricing.retailKes || 0;
+
+      if (selectedCustomer?.isInstitutional) {
+        tier = 'Institutional';
+        defaultPrice = prod?.pricing.institutionalKes || 0;
+      } else if (channel === 'Recurring Weekly' || channel === 'Tender Supply') {
+        tier = 'Wholesale';
+        defaultPrice = prod?.pricing.wholesaleKes || 0;
+      }
+
+      const unitPrice =
+        item.overridePriceKes !== undefined && item.overridePriceKes > 0
+          ? item.overridePriceKes
+          : defaultPrice;
+
+      const qty = Number(item.quantity) || 0;
+      const lineTotal = Math.round(unitPrice * qty);
+      const available = prod?.availableQty || 0;
+      const hasShortage = qty > available;
+      const isPriceBelowSchedule =
+        item.overridePriceKes !== undefined &&
+        item.overridePriceKes > 0 &&
+        item.overridePriceKes < defaultPrice;
+
+      return {
+        ...item,
+        product: prod,
+        pricingTier: tier,
+        defaultPrice,
+        unitPrice,
+        lineTotal,
+        availableStock: available,
+        hasShortage,
+        isPriceBelowSchedule,
+      };
+    });
+  }, [formItems, selectedCustomer, channel, products]);
+
+  const orderSubtotalKes = useMemo(
+    () => computedLineItems.reduce((acc, it) => acc + it.lineTotal, 0),
+    [computedLineItems]
+  );
+
+  const totalQuantityUnits = useMemo(
+    () => computedLineItems.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0),
+    [computedLineItems]
+  );
+
+  const hasAnyShortage = computedLineItems.some((it) => it.hasShortage);
+  const hasAnyApprovalRequired = computedLineItems.some((it) => it.isPriceBelowSchedule);
+
+  const handleAddItem = () => {
+    // Pick the first product not yet added, or fallback to first product
+    const existingIds = new Set(formItems.map((it) => it.productId));
+    const nextProduct = products.find((p) => !existingIds.has(p.id)) || products[0];
+    setFormItems((prev) => [
+      ...prev,
+      {
+        id: `line-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        productId: nextProduct ? nextProduct.id : '',
+        quantity: 25,
+      },
+    ]);
+  };
+
+  const handleRemoveItem = (id: string) => {
+    if (formItems.length <= 1) return;
+    setFormItems((prev) => prev.filter((it) => it.id !== id));
+  };
+
+  const handleUpdateItem = (id: string, updates: Partial<FormLineItem>) => {
+    setFormItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, ...updates } : it))
+    );
+  };
+
+  const handleCreateOrder = async (isDraft: boolean = false) => {
+    const validItems = formItems.filter((it) => it.productId && Number(it.quantity) > 0);
+    if (validItems.length === 0) {
+      setFeedback({
+        msg: 'Order must contain at least one valid line item with quantity > 0.',
+        type: 'error',
+      });
+      return;
+    }
+
+    const res = await createOrder({
+      customerId,
+      channel,
+      deliveryDate,
+      warehouseName,
+      items: validItems.map((it) => ({
+        productId: it.productId,
+        quantity: Number(it.quantity),
+        overridePriceKes: it.overridePriceKes ? Number(it.overridePriceKes) : undefined,
+      })),
+      notes: notes.trim() || undefined,
+      orderReference: orderReference.trim() || undefined,
+      deliveryAddress: deliveryAddress.trim() || undefined,
+    });
+
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+    if (res.ok) {
+      setCreateOpen(false);
+      setComposerStep('compose');
+      setFormItems([{ id: 'line-1', productId: products[0]?.id || '', quantity: 50 }]);
+      setNotes('');
+    }
+  };
 
   // Top summary metrics (Section 22)
   const openCount = useMemo(
@@ -138,29 +291,6 @@ function OrdersWorkbenchContent() {
       return matchesStatus && matchesSearch;
     });
   }, [orders, statusFilter, search]);
-
-  const selectedProduct = products.find((p) => p.id === productId);
-  const selectedCustomer = customers.find((c) => c.id === customerId);
-
-  const handleCreateOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const res = await createOrder({
-      customerId,
-      channel,
-      deliveryDate,
-      warehouseName,
-      productId,
-      quantity: Number(quantity),
-      overridePriceKes: overridePrice ? Number(overridePrice) : undefined,
-      notes,
-    });
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) {
-      setCreateOpen(false);
-      setOverridePrice('');
-      setNotes('');
-    }
-  };
 
   const handleExportCsv = () => {
     const headers = [
@@ -626,138 +756,486 @@ function OrdersWorkbenchContent() {
         )}
       </Modal>
 
-      {/* New Order Modal */}
+      {/* Multi-Item Order Composer Modal (Phase A: 3.1 - 3.7) */}
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Create Institutional Order"
-        subtitle="Automated FEFO inventory allocation and pricing validation"
+        size="3xl"
+        title={composerStep === 'review' ? 'Review & Confirm Order' : 'Create Multi-Item Order'}
+        subtitle={
+          composerStep === 'review'
+            ? 'Verify customer details, pricing tier schedules, and automated FEFO batch reservations.'
+            : 'Compose institutional order lines with dynamic pricing schedules and FEFO stock verification.'
+        }
+        hasUnsavedChanges={formItems.length > 1 || Boolean(notes) || Boolean(orderReference)}
+        onConfirmDiscard={() => {
+          setCreateOpen(false);
+          setComposerStep('compose');
+          setFormItems([{ id: 'line-1', productId: products[0]?.id || '', quantity: 50 }]);
+          setNotes('');
+        }}
       >
-        <form onSubmit={handleCreateOrder} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-              Customer / Institutional Client
-            </label>
-            <select
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-            >
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.segment} · {c.paymentTerms})
-                </option>
-              ))}
-            </select>
-          </div>
+        {composerStep === 'compose' ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setComposerStep('review');
+            }}
+            className="space-y-5"
+          >
+            {/* Section A: Customer & Order Details */}
+            <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-[var(--text-primary)] inline-flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <span>Customer & Logistics Schedule</span>
+                </span>
+                {selectedCustomer && (
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#E5EFE6] dark:bg-[#122719] text-[#1F6A37] dark:text-[#4EB462]">
+                    {selectedCustomer.segment} · {selectedCustomer.paymentTerms}
+                  </span>
+                )}
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Supply Channel
-              </label>
-              <select
-                value={channel}
-                onChange={(e) => setChannel(e.target.value as OrderRecord['channel'])}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-              >
-                <option value="Institutional Contract">Institutional Contract</option>
-                <option value="Direct Sales">Direct Sales</option>
-                <option value="Online Portal">Online Portal</option>
-                <option value="Market Off-Take">Market Off-Take</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Fulfillment Hub
-              </label>
-              <select
-                value={warehouseName}
-                onChange={(e) => setWarehouseName(e.target.value)}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-              >
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.name}>
-                    {w.name} ({w.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="lg:col-span-2">
+                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                    Select Customer / Institution *
+                  </label>
+                  <select
+                    value={customerId}
+                    onChange={(e) => setCustomerId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+                  >
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.segment} · {c.county})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Target Product SKU
-              </label>
-              <select
-                value={productId}
-                onChange={(e) => setProductId(e.target.value)}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-              >
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.availableQty} {p.unit} avail)
-                  </option>
-                ))}
-              </select>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                    Supply Channel *
+                  </label>
+                  <select
+                    value={channel}
+                    onChange={(e) => setChannel(e.target.value as OrderRecord['channel'])}
+                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                  >
+                    <option value="Institutional Contract">Institutional Contract</option>
+                    <option value="Recurring Weekly">Recurring Weekly</option>
+                    <option value="Tender Supply">Tender Supply</option>
+                    <option value="Walk-In / Manual">Walk-In / Manual</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                    Expected Delivery Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={new Date().toISOString().split('T')[0]}
+                    value={deliveryDate}
+                    onChange={(e) => setDeliveryDate(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                    Fulfillment Hub *
+                  </label>
+                  <select
+                    value={warehouseName}
+                    onChange={(e) => setWarehouseName(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                  >
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.name}>
+                        {w.name} ({w.zoneType})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                    Customer PO Reference
+                  </label>
+                  <input
+                    type="text"
+                    value={orderReference}
+                    onChange={(e) => setOrderReference(e.target.value)}
+                    placeholder="e.g. PO-MOI-2026-441"
+                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                    Delivery Address & Receiving Point
+                  </label>
+                  <input
+                    type="text"
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    placeholder="Specific kitchen gate, stores receiving bay, or contact person"
+                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs"
+                  />
+                </div>
+              </div>
             </div>
+
+            {/* Section B: Dynamic Multi-Line Items Editor */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-[var(--text-primary)] inline-flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                    <span>Order Products & Quantities ({formItems.length} Lines)</span>
+                  </span>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    Tier pricing auto-applies by customer profile. Override requires authorization.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  className="h-8 px-3 rounded-lg bg-[#E5EFE6] dark:bg-[#122719] hover:bg-[#1F6A37] hover:text-white text-[#1F6A37] dark:text-[#4EB462] text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Line Item</span>
+                </button>
+              </div>
+
+              <div className="space-y-2.5">
+                {computedLineItems.map((item, idx) => {
+                  const prod = item.product;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3.5 rounded-xl border transition-colors ${
+                        item.hasShortage
+                          ? 'border-amber-500/40 bg-amber-50/40 dark:bg-amber-950/20'
+                          : 'border-[var(--border-subtle)] bg-[var(--bg-card)]'
+                      }`}
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                        {/* Line number and product selector */}
+                        <div className="sm:col-span-5">
+                          <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1">
+                            Line #{idx + 1} · Product SKU
+                          </label>
+                          <select
+                            value={item.productId}
+                            onChange={(e) =>
+                              handleUpdateItem(item.id, { productId: e.target.value })
+                            }
+                            className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+                          >
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} ({p.sku}) · {p.availableQty} {p.unit} avail
+                              </option>
+                            ))}
+                          </select>
+                          {prod && (
+                            <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--text-secondary)]">
+                              <span>SKU: {prod.sku}</span>
+                              <span>·</span>
+                              <span>Stock: {prod.availableQty} {prod.unit}</span>
+                              {item.hasShortage && (
+                                <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                                  (Exceeds Hub Stock)
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Quantity */}
+                        <div className="sm:col-span-2">
+                          <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1">
+                            Qty ({prod?.unit || 'units'})
+                          </label>
+                          <input
+                            type="number"
+                            min="0.1"
+                            step="any"
+                            required
+                            value={item.quantity}
+                            onChange={(e) =>
+                              handleUpdateItem(item.id, { quantity: Number(e.target.value) })
+                            }
+                            className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                          />
+                        </div>
+
+                        {/* Tier Price & Override */}
+                        <div className="sm:col-span-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] font-medium text-[var(--text-secondary)]">
+                              Price (KES/{prod?.unit || 'u'})
+                            </label>
+                            <span className="text-[10px] text-[#1F6A37] dark:text-[#4EB462] font-semibold">
+                              {item.pricingTier}
+                            </span>
+                          </div>
+                          <input
+                            type="number"
+                            placeholder={`Sched: ${item.defaultPrice}`}
+                            value={item.overridePriceKes !== undefined ? item.overridePriceKes : ''}
+                            onChange={(e) =>
+                              handleUpdateItem(item.id, {
+                                overridePriceKes: e.target.value ? Number(e.target.value) : undefined,
+                              })
+                            }
+                            className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-canvas)] border text-xs font-mono-tabular ${
+                              item.isPriceBelowSchedule
+                                ? 'border-amber-500 text-amber-700 dark:text-amber-300'
+                                : 'border-[var(--border-subtle)]'
+                            }`}
+                          />
+                          {item.isPriceBelowSchedule && (
+                            <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
+                              Below schedule (Needs approval)
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Line Total & Remove */}
+                        <div className="sm:col-span-2 flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-4">
+                          <div className="text-right">
+                            <div className="text-[10px] text-[var(--text-secondary)]">Line Total</div>
+                            <div className="font-mono-tabular font-semibold text-xs text-[var(--text-primary)]">
+                              KES {item.lineTotal.toLocaleString()}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={formItems.length <= 1}
+                            onClick={() => handleRemoveItem(item.id)}
+                            className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            aria-label="Remove item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Live Order Summary Bar (Section 3.3) */}
+            <div className="p-4 rounded-xl bg-[#08190C] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-6">
+                <div>
+                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Distinct SKUs</div>
+                  <div className="text-base font-semibold">{formItems.length} Products</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Total Quantity</div>
+                  <div className="text-base font-semibold font-mono-tabular">{totalQuantityUnits} Units</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Inventory Check</div>
+                  <div className="text-xs font-semibold flex items-center gap-1 mt-0.5">
+                    {hasAnyShortage ? (
+                      <span className="text-amber-400 inline-flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>FEFO Shortage Flagged</span>
+                      </span>
+                    ) : (
+                      <span className="text-[#4EB462] inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>100% Stock Available</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-white/10">
+                <div className="text-[10px] text-white/60 uppercase tracking-wider">Grand Total (KES)</div>
+                <div className="text-xl font-bold font-mono-tabular text-[#4EB462]">
+                  KES {orderSubtotalKes.toLocaleString()}
+                </div>
+              </div>
+            </div>
+
+            {/* Notes */}
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Order Quantity ({selectedProduct?.unit || 'units'})
+              <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                Fulfillment Notes & Instructions
               </label>
-              <input
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              <textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Specific packing requirements, cold room segregation, or driver notes..."
+                className="w-full p-2.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Delivery Target Date
-              </label>
-              <input
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-              />
+            {/* Form actions */}
+            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateOpen(false)}
+                className="h-10 px-4 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="h-10 px-5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-sm"
+              >
+                <span>Review Order & Allocations</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Price Override (KES, optional)
-              </label>
-              <input
-                type="number"
-                placeholder={selectedProduct ? `Default: ${selectedProduct.pricing.institutionalKes}` : ''}
-                value={overridePrice}
-                onChange={(e) => setOverridePrice(e.target.value)}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-              />
+          </form>
+        ) : (
+          /* Order Review Step (Section 3.6) */
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <div className="text-[11px] text-[var(--text-secondary)]">Client Institution</div>
+                  <div className="font-semibold text-[var(--text-primary)] mt-0.5">
+                    {selectedCustomer?.name}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-secondary)]">
+                    {selectedCustomer?.segment} · {selectedCustomer?.paymentTerms}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-[var(--text-secondary)]">Delivery Destination</div>
+                  <div className="font-medium text-[var(--text-primary)] mt-0.5">
+                    {deliveryAddress || 'Standard Warehouse Dispatch'}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-secondary)]">
+                    Target: {deliveryDate} · Hub: {warehouseName}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-[var(--text-secondary)]">Order Channel & PO</div>
+                  <div className="font-medium text-[var(--text-primary)] mt-0.5">
+                    {channel}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-secondary)] font-mono-tabular">
+                    Ref: {orderReference || 'N/A'}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setCreateOpen(false)}
-              className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="h-10 px-5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
-            >
-              Submit Order
-            </button>
+            {/* Warnings banner if shortage or overrides exist */}
+            {(hasAnyShortage || hasAnyApprovalRequired) && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+                {hasAnyShortage && (
+                  <div className="text-amber-800 dark:text-amber-300 flex items-center gap-1.5 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>One or more products exceed immediate hub stock. Stock override approval required.</span>
+                  </div>
+                )}
+                {hasAnyApprovalRequired && (
+                  <div className="text-amber-800 dark:text-amber-300 flex items-center gap-1.5 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Price overrides below schedule will trigger commercial supervisor sign-off.</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Itemized Table */}
+            <div className="border border-[var(--border-subtle)] rounded-xl overflow-hidden">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                    <th className="py-2.5 px-3">#</th>
+                    <th className="py-2.5 px-3">Product SKU</th>
+                    <th className="py-2.5 px-3 text-right">Quantity</th>
+                    <th className="py-2.5 px-3">Tier</th>
+                    <th className="py-2.5 px-3 text-right">Unit Price</th>
+                    <th className="py-2.5 px-3 text-right">Line Total (KES)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {computedLineItems.map((item, idx) => (
+                    <tr key={item.id} className="hover:bg-[var(--bg-canvas)]/40">
+                      <td className="py-2.5 px-3 text-[var(--text-secondary)]">{idx + 1}</td>
+                      <td className="py-2.5 px-3">
+                        <div className="font-medium text-[var(--text-primary)]">{item.product?.name}</div>
+                        <div className="text-[10px] text-[var(--text-secondary)] font-mono-tabular">
+                          {item.product?.sku}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono-tabular">
+                        {item.quantity} {item.product?.unit}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-medium">
+                          {item.pricingTier}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono-tabular">
+                        KES {item.unitPrice.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono-tabular font-semibold">
+                        KES {item.lineTotal.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-[var(--bg-canvas)] border-t border-[var(--border-subtle)] font-semibold">
+                    <td colSpan={5} className="py-3 px-3 text-right text-xs">
+                      Grand Order Total:
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono-tabular text-sm text-[#1F6A37] dark:text-[#4EB462]">
+                      KES {orderSubtotalKes.toLocaleString()}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* Actions */}
+            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setComposerStep('compose')}
+                className="h-10 px-4 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+              >
+                Back to Edit
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCreateOrder(true)}
+                  className="h-10 px-4 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+                >
+                  Save as Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCreateOrder(false)}
+                  className="h-10 px-5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Confirm & Create Order</span>
+                </button>
+              </div>
+            </div>
           </div>
-        </form>
+        )}
       </Modal>
     </div>
   );

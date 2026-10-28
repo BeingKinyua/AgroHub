@@ -190,6 +190,84 @@ export type OrderLifecycleStatus =
   | 'Partially Fulfilled'
   | 'Cancelled';
 
+export type PODStatus =
+  | 'Not Submitted'
+  | 'Pending Verification'
+  | 'Verified'
+  | 'Rejected';
+
+export type InvoiceGenerationStatus =
+  | 'Not Ready'
+  | 'Draft Ready'
+  | 'Draft Created'
+  | 'Issued'
+  | 'Paid';
+
+export interface PODDeliveredItem {
+  productId: string;
+  productName: string;
+  sku: string;
+  unit: UnitOfMeasure | string;
+  requestedQty: number;
+  deliveredQty: number;
+  rejectedQty: number;
+  rejectionReason?: string;
+  unitPriceKes: number;
+  orderedQuantity?: number;
+  deliveredQuantity?: number;
+  rejectedQuantity?: number;
+}
+
+export interface PODEvidenceRecord {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  deliveryRunId?: string;
+  customerName: string;
+  recipientName: string;
+  recipientRole?: string;
+  recipientPhone?: string;
+  deliveryDate: string;
+  submittedAt: string;
+  submittedBy: string;
+  status: PODStatus;
+  deliveredItems: PODDeliveredItem[];
+  evidenceFiles: {
+    name: string;
+    size: string;
+    type: string;
+    url: string;
+    caption?: string;
+  }[];
+  deliveryNotes?: string;
+  deliveryExceptions?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  verificationNotes?: string;
+  rejectionReason?: string;
+  invoiceCreated?: boolean;
+  invoiceNumber?: string;
+}
+
+export interface CreateOrderItemInput {
+  productId: string;
+  quantity: number;
+  overridePriceKes?: number;
+  allocatedBatch?: string;
+}
+
+export interface CreateOrderInput {
+  customerId: string;
+  channel: OrderRecord['channel'];
+  deliveryDate: string;
+  warehouseName: string;
+  items: CreateOrderItemInput[];
+  orderDate?: string;
+  orderReference?: string;
+  deliveryAddress?: string;
+  notes?: string;
+}
+
 export interface OrderLineItem {
   productId: string;
   productName: string;
@@ -198,7 +276,7 @@ export interface OrderLineItem {
   quantity: number;
   allocatedBatch: string;
   unitPriceKes: number;
-  pricingTier: 'Institutional' | 'Contract' | 'Wholesale' | 'Retail';
+  pricingTier: 'Institutional' | 'Contract' | 'Wholesale' | 'Retail' | 'Online';
   lineTotalKes: number;
 }
 
@@ -220,6 +298,14 @@ export interface OrderRecord {
   itemsCount: number;
   items: OrderLineItem[];
   notes?: string;
+  orderReference?: string;
+  deliveryAddress?: string;
+  customerPhone?: string;
+  deliveryRunId?: string;
+  podStatus?: PODStatus;
+  podEvidenceId?: string;
+  invoiceStatus?: InvoiceGenerationStatus;
+  invoiceNumber?: string;
 }
 
 export interface CustomerInstitutionRecord {
@@ -243,6 +329,7 @@ export interface CustomerInstitutionRecord {
   overdueBalanceKes: number;
   priceTier: 'Institutional Contract' | 'Custom Tender' | 'Wholesale' | 'Retail';
   status: 'Active' | 'Credit Watch' | 'Tender Renewal';
+  kraPin?: string;
 }
 
 export interface SupplierContract {
@@ -359,6 +446,9 @@ export interface DeliveryRunRecord {
   totalWeightKg: number;
   podCaptured: boolean;
   recipientSignOff?: string;
+  runCode?: string;
+  vehiclePlate?: string;
+  orderNumbers?: string[];
 }
 
 export interface InvoiceRecord {
@@ -374,6 +464,10 @@ export interface InvoiceRecord {
   balanceKes: number;
   status: 'Paid' | 'Partially Paid' | 'Overdue' | 'Issued';
   agingBucket: 'Current (0-15d)' | '16-30 Days' | '31-60 Days' | '60+ Days Overdue';
+  lineItems?: OrderLineItem[];
+  podRef?: string;
+  subtotalKes?: number;
+  paymentTerms?: string;
 }
 
 export interface PaymentRecord {

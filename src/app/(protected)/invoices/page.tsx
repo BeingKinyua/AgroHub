@@ -14,7 +14,7 @@ import {
 import { InvoiceRecord } from '@/types/domain/bos';
 
 export default function InvoicesPage() {
-  const { invoices } = useBos();
+  const { invoices, orders, customers } = useBos();
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRecord | null>(
     null
   );
@@ -119,53 +119,148 @@ export default function InvoicesPage() {
       <Modal
         open={Boolean(selectedInvoice)}
         onClose={() => setSelectedInvoice(null)}
+        size="lg"
         title={`Commercial Tax Invoice · ${selectedInvoice?.invoiceNumber}`}
-        subtitle={`Issued to ${selectedInvoice?.customerName}`}
+        subtitle={`KRA eTIMS compliant invoice issued to ${selectedInvoice?.customerName}`}
       >
-        {selectedInvoice && (
-          <div className="space-y-4 text-xs">
-            <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2">
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">
-                  Supplier Entity:
-                </span>
-                <span className="font-semibold">
-                  Agro-Deliveries Kenya Ltd (KRA PIN: P051928471K)
-                </span>
+        {selectedInvoice && (() => {
+          const linkedOrder = orders.find((o) => o.orderNumber === selectedInvoice.orderNumber);
+          const customer = customers.find(
+            (c) => c.id === selectedInvoice.customerId || c.name === selectedInvoice.customerName
+          );
+
+          return (
+            <div className="space-y-4 text-xs">
+              {/* Header Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                <div>
+                  <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider mb-1 font-semibold">
+                    Seller / Distribution Entity
+                  </div>
+                  <div className="font-semibold text-[var(--text-primary)]">
+                    Agro-Deliveries Kenya Limited
+                  </div>
+                  <div className="text-[11px] text-[var(--text-secondary)]">
+                    KRA PIN: <span className="font-mono-tabular font-medium">P051928471K</span>
+                  </div>
+                  <div className="text-[10px] text-[var(--text-secondary)]">
+                    eTIMS Serial: <span className="font-mono-tabular">KRA-ETIMS-2026-9041</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider mb-1 font-semibold">
+                    Buyer / Institutional Client
+                  </div>
+                  <div className="font-semibold text-[var(--text-primary)]">
+                    {selectedInvoice.customerName}
+                  </div>
+                  <div className="text-[11px] text-[var(--text-secondary)]">
+                    KRA PIN: <span className="font-mono-tabular font-medium">{customer?.kraPin || 'A009182341M'}</span>
+                  </div>
+                  <div className="text-[10px] text-[var(--text-secondary)]">
+                    Payment Terms: {customer?.paymentTerms || 'Net 30 Days'} · Due: {selectedInvoice.dueDate}
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">
-                  Linked Order:
-                </span>
-                <span className="font-mono-tabular font-semibold">
-                  {selectedInvoice.orderNumber}
-                </span>
+
+              {/* Linked Order & Dates */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px]">
+                <div>
+                  <span className="text-[var(--text-secondary)]">Linked Order: </span>
+                  <span className="font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                    {selectedInvoice.orderNumber}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[var(--text-secondary)]">Issue Date: </span>
+                  <span className="font-mono-tabular font-medium">{selectedInvoice.issueDate}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--text-secondary)]">Aging: </span>
+                  <span className="font-medium text-[var(--text-primary)]">{selectedInvoice.agingBucket}</span>
+                </div>
+                <div>
+                  <StatusBadge status={selectedInvoice.status} />
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">
-                  Total Invoice Amount:
-                </span>
-                <span className="font-mono-tabular font-semibold">
-                  KES {selectedInvoice.amountKes.toLocaleString()}
-                </span>
+
+              {/* Itemized Verified Lines */}
+              {linkedOrder && linkedOrder.items && linkedOrder.items.length > 0 && (
+                <div className="border border-[var(--border-subtle)] rounded-xl overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                        <th className="py-2 px-3">Product Description</th>
+                        <th className="py-2 px-3 text-right">Delivered Qty</th>
+                        <th className="py-2 px-3 text-right">Unit Price</th>
+                        <th className="py-2 px-3 text-right">Total (KES)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border-subtle)]">
+                      {linkedOrder.items.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-[var(--bg-canvas)]/50">
+                          <td className="py-2 px-3 font-medium text-[var(--text-primary)]">
+                            {item.productName} ({item.sku})
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono-tabular">
+                            {item.quantity} {item.unit}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono-tabular">
+                            KES {item.unitPriceKes.toLocaleString()}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono-tabular font-semibold">
+                            KES {item.lineTotalKes.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Financial Balances */}
+              <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Gross Invoiced Amount:</span>
+                  <span className="font-mono-tabular font-semibold">
+                    KES {selectedInvoice.amountKes.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Paid to Date (Settled):</span>
+                  <span className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462]">
+                    KES {selectedInvoice.paidAmountKes.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-[var(--border-subtle)] text-sm">
+                  <span className="font-bold text-[var(--text-primary)]">Net Balance Due:</span>
+                  <span className="font-mono-tabular font-bold text-base text-[var(--text-primary)]">
+                    KES {selectedInvoice.balanceKes.toLocaleString()}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">
-                  Paid to Date:
-                </span>
-                <span className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462]">
-                  KES {selectedInvoice.paidAmountKes.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between pt-2 border-t border-[var(--border-subtle)]">
-                <span className="font-semibold">Balance Due:</span>
-                <span className="font-mono-tabular text-sm font-semibold">
-                  KES {selectedInvoice.balanceKes.toLocaleString()}
-                </span>
+
+              {/* Actions */}
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoice(null)}
+                  className="h-9 px-4 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+                >
+                  Close
+                </button>
+                <Link
+                  href={`/payments?invoice=${selectedInvoice.invoiceNumber}`}
+                  className="h-9 px-4 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>Allocate Payment</span>
+                </Link>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </Modal>
     </div>
   );
