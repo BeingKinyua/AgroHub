@@ -12,10 +12,16 @@ import {
   InternalUser,
   InvoiceRecord,
   NotificationItem,
+  CreateOrderInput,
+  CreateOrderItemInput,
   OrderLifecycleStatus,
+  OrderLineItem,
   OrderRecord,
   PaymentRecord,
   PermissionKey,
+  PODDeliveredItem,
+  PODEvidenceRecord,
+  PODStatus,
   PriceHistoryEntry,
   ProcurementOrderRecord,
   ProductRecord,
@@ -118,6 +124,7 @@ interface BosContextValue {
   documents: DocumentRecord[];
   auditLogs: AuditLogRecord[];
   notifications: NotificationItem[];
+  podRecords: PODEvidenceRecord[];
 
   // Dashboard Widget Customization
   enabledWidgets: string[];
@@ -126,20 +133,53 @@ interface BosContextValue {
   resetDashboardWidgets: () => void;
 
   // Mutations (all RBAC-verified & Audit-Logged)
-  createOrder: (input: {
-    customerId: string;
-    channel: OrderRecord['channel'];
-    deliveryDate: string;
-    warehouseName: string;
-    productId: string;
-    quantity: number;
-    overridePriceKes?: number;
-    notes?: string;
-  }) => Promise<{ ok: boolean; message: string }>;
+  createOrder: (
+    input:
+      | CreateOrderInput
+      | {
+          customerId: string;
+          channel: OrderRecord['channel'];
+          deliveryDate: string;
+          warehouseName: string;
+          productId: string;
+          quantity: number;
+          overridePriceKes?: number;
+          notes?: string;
+        }
+  ) => Promise<{ ok: boolean; message: string; orderId?: string }>;
   advanceOrderStatus: (
     orderId: string,
     nextStatus: OrderLifecycleStatus
   ) => Promise<{ ok: boolean; message: string }>;
+  recordDeliveryArrival: (
+    orderId: string,
+    details: {
+      recipientName: string;
+      recipientRole?: string;
+      recipientPhone?: string;
+      deliveredItems: PODDeliveredItem[];
+      notes?: string;
+      exceptions?: string;
+      files?: {
+        name: string;
+        size: string;
+        type: string;
+        url: string;
+        caption?: string;
+      }[];
+    }
+  ) => Promise<{ ok: boolean; message: string; podId?: string }>;
+  verifyPOD: (
+    podId: string,
+    options?: { autoGenerateInvoice?: boolean; notes?: string }
+  ) => Promise<{ ok: boolean; message: string; invoiceNumber?: string }>;
+  rejectPOD: (
+    podId: string,
+    reason: string
+  ) => Promise<{ ok: boolean; message: string }>;
+  generateDraftInvoice: (
+    orderId: string
+  ) => Promise<{ ok: boolean; message: string; invoiceNumber?: string }>;
   createProduct: (
     input: Omit<
       ProductRecord,
@@ -323,6 +363,87 @@ const STORAGE_KEY_THEME = 'agro_bos_theme_v1';
 const STORAGE_KEY_WIDGETS = 'agro_bos_widgets_v1';
 const STORAGE_KEY_DEMO = 'agro_bos_demo_mode_v1';
 
+export const INITIAL_PODS: PODEvidenceRecord[] = [
+  {
+    id: 'POD-2026-001',
+    orderId: 'ORD-005',
+    orderNumber: 'ORD-2026-880',
+    deliveryRunId: 'DR-2026-080',
+    customerName: 'Aga Khan University Hospital Dietary Dept',
+    recipientName: 'Sister Beatrice Wanjala',
+    recipientRole: 'Dietary Stores Superintendent',
+    recipientPhone: '+254 722 300 812',
+    deliveryDate: '2026-09-30',
+    submittedAt: '2026-09-30 08:35 EAT',
+    submittedBy: 'Joseph Omondi (Driver)',
+    status: 'Verified',
+    deliveredItems: [
+      {
+        productId: 'PRD-001',
+        productName: 'Kinangop Roma Tomatoes (Grade 1)',
+        sku: 'AG-VEG-001',
+        unit: 'kilograms',
+        requestedQty: 180,
+        deliveredQty: 180,
+        rejectedQty: 0,
+        unitPriceKes: 105,
+      },
+    ],
+    evidenceFiles: [
+      {
+        name: 'AgaKhan_Signed_Delivery_Note_880.pdf',
+        size: '1.4 MB',
+        type: 'application/pdf',
+        url: '/assets/pod/delivery_note_880.pdf',
+        caption: 'Signed & stamped delivery note with hospital inspection mark',
+      },
+    ],
+    deliveryNotes: 'Delivered directly to Basement Cold Storage Bay 2.',
+    verifiedBy: 'Daniel Kiprop (Operations Manager)',
+    verifiedAt: '2026-09-30 09:15 EAT',
+    verificationNotes: 'All 180kg inspected and verified with zero transit damage.',
+    invoiceCreated: true,
+    invoiceNumber: 'INV-2026-8889',
+  },
+  {
+    id: 'POD-2026-002',
+    orderId: 'ORD-006',
+    orderNumber: 'ORD-2026-881',
+    deliveryRunId: 'DR-2026-081',
+    customerName: 'Brookhouse International School Runda',
+    recipientName: 'Chef Michael Otieno',
+    recipientRole: 'Executive Catering Chef',
+    recipientPhone: '+254 733 908 112',
+    deliveryDate: '2026-09-30',
+    submittedAt: '2026-09-30 09:40 EAT',
+    submittedBy: 'Peter Otieno (Driver)',
+    status: 'Pending Verification',
+    deliveredItems: [
+      {
+        productId: 'PRD-002',
+        productName: 'Murang’a Hass Avocados (Export Grade)',
+        sku: 'AG-FRT-004',
+        unit: 'pieces',
+        requestedQty: 400,
+        deliveredQty: 390,
+        rejectedQty: 10,
+        rejectionReason: '10 pieces bruised during transit over-stacking',
+        unitPriceKes: 48,
+      },
+    ],
+    evidenceFiles: [
+      {
+        name: 'Brookhouse_POD_Receipt_Stamp.jpg',
+        size: '2.1 MB',
+        type: 'image/jpeg',
+        url: '/assets/pod/receipt_881.jpg',
+        caption: 'Brookhouse catering receiving stamp with 10pcs rejected notation',
+      },
+    ],
+    deliveryNotes: '10 avocados rejected due to soft crate pressing; 390 accepted into prep kitchen.',
+  },
+];
+
 export function BosProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<InternalUser | null>(
     INITIAL_USERS[0]
@@ -366,6 +487,8 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>(
     INITIAL_NOTIFICATIONS
   );
+  const [podRecords, setPodRecords] =
+    useState<PODEvidenceRecord[]>(INITIAL_PODS);
   const [enabledWidgets, setEnabledWidgets] =
     useState<string[]>(DEFAULT_WIDGETS);
 
@@ -689,40 +812,134 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     if (!auth.ok) return { ok: false, message: auth.error! };
 
     const customer = customers.find((c) => c.id === input.customerId);
-    const product = products.find((p) => p.id === input.productId);
-    if (!customer || !product) {
-      return { ok: false, message: 'Selected customer or product not found.' };
+    if (!customer) {
+      return { ok: false, message: 'Selected customer not found in workspace records.' };
     }
 
-    if (input.quantity > product.availableQty && !can('orders.approve')) {
-      const msg = `Insufficient FEFO stock (${product.availableQty} ${product.unit} available). Stock override requires 'orders.approve' authority.`;
-      pushToast({ title: 'FEFO Stock Constraint', description: msg, tone: 'warning' });
-      return { ok: false, message: msg };
+    // Normalize single-item vs multi-item input
+    let itemsInput: CreateOrderItemInput[] = [];
+    if ('items' in input && Array.isArray(input.items)) {
+      itemsInput = input.items;
+    } else if ('productId' in input && input.productId) {
+      itemsInput = [
+        {
+          productId: input.productId,
+          quantity: input.quantity,
+          overridePriceKes: input.overridePriceKes,
+        },
+      ];
     }
 
-    const matchingBatch =
-      stockBatches
-        .filter((b) => b.productId === product.id && b.daysToExpiry > 0)
-        .sort((a, b) => a.daysToExpiry - b.daysToExpiry)[0]?.batchNumber ||
-      'LOT-FEFO-AUTO';
+    if (itemsInput.length === 0) {
+      return { ok: false, message: 'Order must contain at least one line item.' };
+    }
 
-    const defaultUnitPrice = customer.isInstitutional
-      ? product.pricing.institutionalKes
-      : product.pricing.retailKes;
-    const finalUnitPrice =
-      input.overridePriceKes && input.overridePriceKes > 0
-        ? input.overridePriceKes
-        : defaultUnitPrice;
+    // Validate all items before mutating state
+    const processedItems: OrderLineItem[] = [];
+    const stockDeltas: { productId: string; quantity: number }[] = [];
+    let orderTotalKes = 0;
+    const priceOverrideApprovals: {
+      product: ProductRecord;
+      overridePrice: number;
+      lineTotal: number;
+    }[] = [];
 
-    const lineTotalKes = Math.round(finalUnitPrice * input.quantity);
-    const orderNumber = `ORD-2026-${887 + orders.length}`;
+    // Check stock for every product and compute pricing
+    for (const item of itemsInput) {
+      if (!item.productId) {
+        return { ok: false, message: 'Invalid product selected in line items.' };
+      }
+      const qty = Number(item.quantity);
+      if (isNaN(qty) || qty <= 0) {
+        return { ok: false, message: 'Every line item must have a quantity greater than zero.' };
+      }
 
-    const needsPriceApproval =
-      input.overridePriceKes !== undefined &&
-      input.overridePriceKes < product.pricing.institutionalKes;
+      const product = products.find((p) => p.id === item.productId);
+      if (!product) {
+        return { ok: false, message: `Product ${item.productId} not found in catalog.` };
+      }
+
+      // Check stock sufficiency across lines
+      if (qty > product.availableQty && !can('orders.approve')) {
+        const msg = `Insufficient FEFO stock for ${product.name} (${product.availableQty} ${product.unit} available, requested ${qty} ${product.unit}). Stock override requires 'orders.approve' authority.`;
+        pushToast({ title: 'FEFO Stock Constraint', description: msg, tone: 'warning' });
+        return { ok: false, message: msg };
+      }
+
+      // Auto-assign FEFO batch
+      const matchingBatch =
+        item.allocatedBatch ||
+        stockBatches
+          .filter((b) => b.productId === product.id && b.daysToExpiry > 0)
+          .sort((a, b) => a.daysToExpiry - b.daysToExpiry)[0]?.batchNumber ||
+        'LOT-FEFO-AUTO';
+
+      // Determine pricing tier & unit price
+      let defaultUnitPrice = product.pricing.retailKes;
+      let pricingTier: OrderLineItem['pricingTier'] = 'Retail';
+
+      if (customer.isInstitutional) {
+        defaultUnitPrice = product.pricing.institutionalKes;
+        pricingTier = 'Institutional';
+      } else if (input.channel === 'Recurring Weekly' || input.channel === 'Tender Supply') {
+        defaultUnitPrice = product.pricing.wholesaleKes;
+        pricingTier = 'Wholesale';
+      } else if (input.channel === 'Walk-In / Manual') {
+        defaultUnitPrice = product.pricing.retailKes;
+        pricingTier = 'Retail';
+      } else {
+        defaultUnitPrice = product.pricing.wholesaleKes;
+        pricingTier = 'Wholesale';
+      }
+
+      const finalUnitPrice =
+        item.overridePriceKes !== undefined && item.overridePriceKes > 0
+          ? item.overridePriceKes
+          : defaultUnitPrice;
+
+      const lineTotalKes = Math.round(finalUnitPrice * qty);
+      orderTotalKes += lineTotalKes;
+
+      const baseSchedulePrice = customer.isInstitutional
+        ? product.pricing.institutionalKes
+        : product.pricing.wholesaleKes;
+
+      if (
+        item.overridePriceKes !== undefined &&
+        item.overridePriceKes > 0 &&
+        item.overridePriceKes < baseSchedulePrice
+      ) {
+        priceOverrideApprovals.push({
+          product,
+          overridePrice: finalUnitPrice,
+          lineTotal: lineTotalKes,
+        });
+      }
+
+      processedItems.push({
+        productId: product.id,
+        productName: product.name,
+        sku: product.sku,
+        unit: product.unit,
+        quantity: qty,
+        allocatedBatch: matchingBatch,
+        unitPriceKes: finalUnitPrice,
+        pricingTier,
+        lineTotalKes,
+      });
+
+      stockDeltas.push({ productId: product.id, quantity: qty });
+    }
+
+    const needsPriceApproval = priceOverrideApprovals.length > 0;
+    const orderNumber = `ORD-2026-${888 + orders.length}`;
+    const orderId = `ORD-00${orders.length + 1}`;
+    const todayStr = ('orderDate' in input && input.orderDate)
+      ? input.orderDate
+      : new Date().toISOString().split('T')[0];
 
     const newOrder: OrderRecord = {
-      id: `ORD-00${orders.length + 1}`,
+      id: orderId,
       orderNumber,
       customerId: customer.id,
       customerName: customer.name,
@@ -738,7 +955,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         customer.paymentTerms === 'Prepaid / M-Pesa'
           ? 'Pending Payment'
           : 'Invoiced (Net 30)',
-      orderDate: '2026-10-01',
+      orderDate: todayStr,
       deliveryDate: input.deliveryDate,
       warehouseName: input.warehouseName,
       assignedActor: needsPriceApproval
@@ -747,65 +964,64 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       nextStepLabel: needsPriceApproval
         ? 'Awaiting Finance/Operations Approval'
         : 'Release to Warehouse Picking Queue',
-      totalKes: lineTotalKes,
-      itemsCount: 1,
-      items: [
-        {
-          productId: product.id,
-          productName: product.name,
-          sku: product.sku,
-          unit: product.unit,
-          quantity: input.quantity,
-          allocatedBatch: matchingBatch,
-          unitPriceKes: finalUnitPrice,
-          pricingTier: customer.isInstitutional ? 'Institutional' : 'Retail',
-          lineTotalKes,
-        },
-      ],
+      totalKes: orderTotalKes,
+      itemsCount: processedItems.length,
+      items: processedItems,
       notes: input.notes,
+      orderReference: 'orderReference' in input ? input.orderReference : undefined,
+      deliveryAddress:
+        'deliveryAddress' in input && input.deliveryAddress
+          ? input.deliveryAddress
+          : `${customer.deliveryZone}, ${customer.county}`,
+      podStatus: 'Not Submitted',
+      invoiceStatus: 'Not Ready',
     };
 
+    // Atomic update of orders and product stock
     setOrders((prev) => [newOrder, ...prev]);
 
     setProducts((prev) =>
-      prev.map((p) =>
-        p.id === product.id
-          ? {
-              ...p,
-              availableQty: Math.max(0, p.availableQty - input.quantity),
-              reservedQty: p.reservedQty + input.quantity,
-            }
-          : p
-      )
+      prev.map((p) => {
+        const delta = stockDeltas.find((d) => d.productId === p.id);
+        if (!delta) return p;
+        return {
+          ...p,
+          availableQty: Math.max(0, p.availableQty - delta.quantity),
+          reservedQty: p.reservedQty + delta.quantity,
+        };
+      })
     );
 
+    // If approvals needed, generate ApprovalRequestRecords
     if (needsPriceApproval && currentUser) {
-      const apr: ApprovalRequestRecord = {
-        id: `APR-0${approvals.length + 1}`,
-        reference: orderNumber,
-        category: 'Institutional Price Override',
-        entityTitle: `${customer.name} · ${product.name} (@ KES ${finalUnitPrice}/${product.unit})`,
-        requesterName: currentUser.fullName,
-        requesterRole: currentUser.roleName,
-        valueKes: lineTotalKes,
-        reason: input.notes || 'Special institutional tender price override requested.',
-        requestedAt: 'Just now',
-        status: 'Pending',
-      };
-      setApprovals((prev) => [apr, ...prev]);
+      const newApprovals: ApprovalRequestRecord[] = priceOverrideApprovals.map(
+        (po, idx) => ({
+          id: `APR-0${approvals.length + idx + 1}`,
+          reference: orderNumber,
+          category: 'Institutional Price Override',
+          entityTitle: `${customer.name} · ${po.product.name} (@ KES ${po.overridePrice}/${po.product.unit})`,
+          requesterName: currentUser.fullName,
+          requesterRole: currentUser.roleName,
+          valueKes: po.lineTotal,
+          reason: input.notes || 'Institutional tender price override requested below catalog schedule.',
+          requestedAt: 'Just now',
+          status: 'Pending',
+        })
+      );
+      setApprovals((prev) => [...newApprovals, ...prev]);
     }
 
     appendAudit(
       'Orders',
       orderNumber,
-      'Created Order & Reserved FEFO Stock',
+      'Created Multi-Item Order & Reserved FEFO Stock',
       'None',
-      `${customer.name} · KES ${lineTotalKes.toLocaleString()} (${newOrder.status})`
+      `${customer.name} · ${processedItems.length} products · KES ${orderTotalKes.toLocaleString()} (${newOrder.status})`
     );
 
     const msg = needsPriceApproval
-      ? `Order ${orderNumber} created and routed to Approval Center for price override review.`
-      : `Order ${orderNumber} confirmed with FEFO batch ${matchingBatch} reserved.`;
+      ? `Order ${orderNumber} created with ${processedItems.length} items and routed to Approval Center for price override review.`
+      : `Order ${orderNumber} created with ${processedItems.length} products. FEFO stock reserved.`;
 
     pushToast({
       title: `Order ${orderNumber} Created`,
@@ -813,7 +1029,319 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       tone: 'success',
     });
 
-    return { ok: true, message: msg };
+    return { ok: true, message: msg, orderId };
+  };
+
+  const recordDeliveryArrival: BosContextValue['recordDeliveryArrival'] = async (
+    orderId,
+    details
+  ) => {
+    const auth = await verifyServerAction('deliveries.dispatch', 'Record Delivery Arrival');
+    if (!auth.ok) return { ok: false, message: auth.error! };
+
+    const order = orders.find((o) => o.id === orderId || o.orderNumber === orderId);
+    if (!order) return { ok: false, message: 'Order not found.' };
+
+    const podId = `POD-2026-${String(podRecords.length + 1).padStart(3, '0')}`;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const newPod: PODEvidenceRecord = {
+      id: podId,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      recipientName: details.recipientName,
+      recipientRole: details.recipientRole || 'Receiving Staff',
+      recipientPhone: details.recipientPhone,
+      deliveryDate: todayStr,
+      submittedAt: `${todayStr} ${new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })} EAT`,
+      submittedBy: currentUser ? `${currentUser.fullName} (${currentUser.roleName})` : 'Delivery Driver',
+      status: 'Pending Verification',
+      deliveredItems: details.deliveredItems,
+      evidenceFiles: details.files || [],
+      deliveryNotes: details.notes,
+      deliveryExceptions: details.exceptions,
+    };
+
+    setPodRecords((prev) => [newPod, ...prev]);
+
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === order.id
+          ? {
+              ...o,
+              status: 'Delivered',
+              podStatus: 'Pending Verification',
+              podEvidenceId: podId,
+              nextStepLabel: 'Awaiting POD Verification by Operations / Finance',
+            }
+          : o
+      )
+    );
+
+    appendAudit(
+      'Deliveries',
+      order.orderNumber,
+      'Recorded Physical Delivery Arrival & Submitted POD',
+      'Dispatched',
+      `Delivered · POD ${podId} Pending Verification`
+    );
+
+    pushToast({
+      title: 'Delivery Arrival Recorded',
+      description: `Delivery documented for ${order.customerName}. POD submitted for verification.`,
+      tone: 'success',
+    });
+
+    return { ok: true, message: `Delivery recorded. POD ${podId} awaiting verification.`, podId };
+  };
+
+  const verifyPOD: BosContextValue['verifyPOD'] = async (podId, options) => {
+    const auth = await verifyServerAction('orders.approve', 'Verify Proof of Delivery');
+    if (!auth.ok) return { ok: false, message: auth.error! };
+
+    const pod = podRecords.find((p) => p.id === podId);
+    if (!pod) return { ok: false, message: 'POD record not found.' };
+
+    if (pod.status === 'Verified') {
+      return { ok: false, message: 'This Proof of Delivery has already been verified.' };
+    }
+
+    const order = orders.find((o) => o.id === pod.orderId || o.orderNumber === pod.orderNumber);
+    const customer = customers.find((c) => c.name === pod.customerName || (order && c.id === order.customerId));
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const updatedPod: PODEvidenceRecord = {
+      ...pod,
+      status: 'Verified',
+      verifiedBy: currentUser ? `${currentUser.fullName} (${currentUser.roleName})` : 'Operations Manager',
+      verifiedAt: `${todayStr} ${new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })} EAT`,
+      verificationNotes: options?.notes || 'POD sign-off and delivered quantities verified.',
+    };
+
+    let generatedInvoiceNumber: string | undefined;
+
+    // Check customer billing policy: if institutional customer on credit terms (Net 15/30/45) and no invoice exists
+    const shouldInvoice =
+      options?.autoGenerateInvoice !== false &&
+      customer &&
+      customer.isInstitutional &&
+      customer.paymentTerms !== 'Prepaid / M-Pesa';
+
+    const existingInvoice = invoices.find(
+      (inv) => inv.orderNumber === pod.orderNumber
+    );
+
+    if (shouldInvoice && !existingInvoice && order) {
+      const billableTotal = pod.deliveredItems.reduce(
+        (sum, item) => sum + Math.round(item.deliveredQty * item.unitPriceKes),
+        0
+      );
+
+      const invNum = `INV-2026-${8890 + invoices.length}`;
+      generatedInvoiceNumber = invNum;
+
+      const dueDate = new Date();
+      if (customer.paymentTerms === 'Net 15') dueDate.setDate(dueDate.getDate() + 15);
+      else if (customer.paymentTerms === 'Net 45') dueDate.setDate(dueDate.getDate() + 45);
+      else dueDate.setDate(dueDate.getDate() + 30); // Net 30 default
+
+      const finalAmount = billableTotal > 0 ? billableTotal : order.totalKes;
+
+      const newInvoice: InvoiceRecord = {
+        id: `INV-00${invoices.length + 1}`,
+        invoiceNumber: invNum,
+        orderNumber: order.orderNumber,
+        customerId: customer.id,
+        customerName: customer.name,
+        issueDate: todayStr,
+        dueDate: dueDate.toISOString().split('T')[0],
+        amountKes: finalAmount,
+        paidAmountKes: 0,
+        balanceKes: finalAmount,
+        status: 'Issued',
+        agingBucket: 'Current (0-15d)',
+        lineItems: order.items,
+        podRef: pod.id,
+        paymentTerms: customer.paymentTerms,
+      };
+
+      setInvoices((prev) => [newInvoice, ...prev]);
+      updatedPod.invoiceCreated = true;
+      updatedPod.invoiceNumber = invNum;
+
+      // Update customer balance in state
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c.id === customer.id
+            ? { ...c, outstandingBalanceKes: c.outstandingBalanceKes + finalAmount }
+            : c
+        )
+      );
+    }
+
+    setPodRecords((prev) => prev.map((p) => (p.id === pod.id ? updatedPod : p)));
+
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.orderNumber === pod.orderNumber
+          ? {
+              ...o,
+              podStatus: 'Verified',
+              invoiceStatus: generatedInvoiceNumber ? 'Draft Created' : o.invoiceStatus,
+              invoiceNumber: generatedInvoiceNumber || o.invoiceNumber,
+              nextStepLabel: generatedInvoiceNumber
+                ? `Invoice ${generatedInvoiceNumber} Issued · Track Net Receivables`
+                : 'Order Verified · Ready for Invoicing / Closure',
+            }
+          : o
+      )
+    );
+
+    appendAudit(
+      'Fulfillment',
+      pod.orderNumber,
+      'Verified Electronic POD & Validated Delivered Quantities',
+      'POD Pending Verification',
+      generatedInvoiceNumber
+        ? `POD Verified · Auto-generated Commercial Tax Invoice ${generatedInvoiceNumber}`
+        : 'POD Verified'
+    );
+
+    const successMsg = generatedInvoiceNumber
+      ? `Proof of Delivery verified for ${pod.customerName}. Draft Invoice ${generatedInvoiceNumber} generated.`
+      : `Proof of Delivery verified for ${pod.customerName}.`;
+
+    pushToast({
+      title: 'POD Verified',
+      description: successMsg,
+      tone: 'success',
+    });
+
+    return { ok: true, message: successMsg, invoiceNumber: generatedInvoiceNumber };
+  };
+
+  const rejectPOD: BosContextValue['rejectPOD'] = async (podId, reason) => {
+    const auth = await verifyServerAction('orders.approve', 'Reject Proof of Delivery');
+    if (!auth.ok) return { ok: false, message: auth.error! };
+
+    const pod = podRecords.find((p) => p.id === podId);
+    if (!pod) return { ok: false, message: 'POD record not found.' };
+
+    if (!reason || reason.trim().length === 0) {
+      return { ok: false, message: 'A rejection reason is required.' };
+    }
+
+    const updatedPod: PODEvidenceRecord = {
+      ...pod,
+      status: 'Rejected',
+      rejectionReason: reason,
+      verifiedBy: currentUser ? `${currentUser.fullName} (${currentUser.roleName})` : 'Operations',
+      verifiedAt: `${new Date().toISOString().split('T')[0]} ${new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })} EAT`,
+    };
+
+    setPodRecords((prev) => prev.map((p) => (p.id === pod.id ? updatedPod : p)));
+
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.orderNumber === pod.orderNumber
+          ? {
+              ...o,
+              podStatus: 'Rejected',
+              nextStepLabel: `POD Rejected: ${reason}. Driver re-capture required.`,
+            }
+          : o
+      )
+    );
+
+    appendAudit(
+      'Fulfillment',
+      pod.orderNumber,
+      'Rejected Proof of Delivery',
+      'Pending Verification',
+      `Rejected: ${reason}`
+    );
+
+    pushToast({
+      title: 'POD Rejected',
+      description: `POD for ${pod.customerName} rejected: ${reason}`,
+      tone: 'warning',
+    });
+
+    return { ok: true, message: `POD marked as rejected. Driver notification queued.` };
+  };
+
+  const generateDraftInvoice: BosContextValue['generateDraftInvoice'] = async (orderId) => {
+    const auth = await verifyServerAction('finance.view', 'Generate Draft Invoice');
+    if (!auth.ok) return { ok: false, message: auth.error! };
+
+    const order = orders.find((o) => o.id === orderId || o.orderNumber === orderId);
+    if (!order) return { ok: false, message: 'Order not found.' };
+
+    const existing = invoices.find((i) => i.orderNumber === order.orderNumber);
+    if (existing) {
+      return { ok: false, message: `Invoice ${existing.invoiceNumber} already exists for this order.` };
+    }
+
+    const customer = customers.find((c) => c.id === order.customerId);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const invNum = `INV-2026-${8890 + invoices.length}`;
+
+    const dueDate = new Date();
+    const terms = customer?.paymentTerms || 'Net 30';
+    if (terms === 'Net 15') dueDate.setDate(dueDate.getDate() + 15);
+    else if (terms === 'Net 45') dueDate.setDate(dueDate.getDate() + 45);
+    else dueDate.setDate(dueDate.getDate() + 30);
+
+    const newInvoice: InvoiceRecord = {
+      id: `INV-00${invoices.length + 1}`,
+      invoiceNumber: invNum,
+      orderNumber: order.orderNumber,
+      customerId: order.customerId,
+      customerName: order.customerName,
+      issueDate: todayStr,
+      dueDate: dueDate.toISOString().split('T')[0],
+      amountKes: order.totalKes,
+      paidAmountKes: 0,
+      balanceKes: order.totalKes,
+      status: 'Issued',
+      agingBucket: 'Current (0-15d)',
+      lineItems: order.items,
+      podRef: order.podEvidenceId,
+      paymentTerms: terms,
+    };
+
+    setInvoices((prev) => [newInvoice, ...prev]);
+
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === order.id
+          ? {
+              ...o,
+              invoiceStatus: 'Draft Created',
+              invoiceNumber: invNum,
+              paymentStatus: 'Invoiced (Net 30)',
+              nextStepLabel: `Invoice ${invNum} Generated · Awaiting Payment Settlement`,
+            }
+          : o
+      )
+    );
+
+    appendAudit(
+      'Finance',
+      order.orderNumber,
+      'Generated Commercial Tax Invoice',
+      'Uninvoiced',
+      `${invNum} · KES ${order.totalKes.toLocaleString()}`
+    );
+
+    pushToast({
+      title: `Invoice ${invNum} Generated`,
+      description: `Commercial tax invoice created for ${order.customerName}.`,
+      tone: 'success',
+    });
+
+    return { ok: true, message: `Invoice ${invNum} generated successfully.`, invoiceNumber: invNum };
   };
 
   const advanceOrderStatus: BosContextValue['advanceOrderStatus'] = async (
@@ -2222,12 +2750,17 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         documents,
         auditLogs,
         notifications,
+        podRecords,
         enabledWidgets,
         toggleDashboardWidget,
         moveDashboardWidget,
         resetDashboardWidgets,
         createOrder,
         advanceOrderStatus,
+        recordDeliveryArrival,
+        verifyPOD,
+        rejectPOD,
+        generateDraftInvoice,
         createProduct,
         updateProduct,
         updateProductPrice,

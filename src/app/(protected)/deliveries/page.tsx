@@ -31,7 +31,7 @@ import { DeliveryRunRecord } from '@/types/domain/bos';
 
 function DeliveriesContent() {
   const searchParams = useSearchParams();
-  const { deliveries, can, updateDeliveryStatus } = useBos();
+  const { deliveries, orders, can, updateDeliveryStatus, recordDeliveryArrival } = useBos();
 
   const [filterMode, setFilterMode] = useState<'all' | 'exceptions' | 'in-transit' | 'pending' | 'delivered'>('all');
   const [podRun, setPodRun] = useState<DeliveryRunRecord | null>(null);
@@ -72,10 +72,35 @@ function DeliveriesContent() {
   const handlePodSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!podRun) return;
+
+    const signOffRecipient = recipientName.trim() || 'Institutional Receiving Officer';
+
+    // Record formal electronic POD for each order on this run
+    for (const orderNum of podRun.ordersIncluded) {
+      const ord = orders.find((o) => o.orderNumber === orderNum || o.id === orderNum);
+      if (ord) {
+        await recordDeliveryArrival(ord.id, {
+          recipientName: signOffRecipient,
+          recipientRole: 'Stores Receiving Officer / Head Cateress',
+          deliveredItems: ord.items.map((it) => ({
+            productId: it.productId,
+            productName: it.productName,
+            sku: it.sku,
+            unit: it.unit,
+            requestedQty: it.quantity,
+            deliveredQty: it.quantity,
+            rejectedQty: 0,
+            unitPriceKes: it.unitPriceKes,
+          })),
+          notes: `Delivered via Run ${podRun.runNumber} (${podRun.vehiclePlate || podRun.vehicleReg})`,
+        });
+      }
+    }
+
     await handleStatusChange(
       podRun.id,
       'Delivered',
-      `${recipientName || 'Institutional Receiving Officer'} · Signed Electronic POD`
+      `${signOffRecipient} · Signed Electronic POD`
     );
     setPodRun(null);
     setRecipientName('');

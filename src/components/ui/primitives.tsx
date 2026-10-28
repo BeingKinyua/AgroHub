@@ -8,18 +8,24 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Check,
   CheckCircle2,
   ChevronRight,
   Clock,
+  FileCheck,
   FileText,
+  Image as ImageIcon,
   Inbox,
   Leaf,
   Lock,
   Package,
   RefreshCw,
+  Search,
   ShieldAlert,
   SlidersHorizontal,
+  Trash2,
   Truck,
+  UploadCloud,
   X,
   XCircle,
 } from 'lucide-react';
@@ -979,33 +985,155 @@ export function LoadingSkeleton({ rows = 4 }: { rows?: number }) {
   );
 }
 
+export function ConfirmDiscardDialog({
+  open,
+  onKeepEditing,
+  onDiscard,
+}: {
+  open: boolean;
+  onKeepEditing: () => void;
+  onDiscard: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[calc(var(--z-modal)+20)] flex items-center justify-center p-4 bg-[#08190C]/80 backdrop-blur-xs"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onKeepEditing();
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-[18px] bg-[var(--bg-card)] border border-amber-500/30 p-5 shadow-[var(--shadow-lg)] space-y-4"
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
+              Discard unsaved changes?
+            </h3>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+              Your changes haven't been saved. Any entered data will be lost if you leave this form now.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onKeepEditing}
+            className="px-3.5 py-2 rounded-[10px] border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] transition-colors cursor-pointer"
+          >
+            Keep Editing
+          </button>
+          <button
+            type="button"
+            onClick={onDiscard}
+            className="px-3.5 py-2 rounded-[10px] bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors cursor-pointer"
+          >
+            Discard Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Modal({
   open,
   onClose,
   title,
   subtitle,
   children,
+  size = 'md',
+  allowBackdropClose = true,
+  allowEscapeClose = true,
+  hasUnsavedChanges = false,
+  onRequestClose,
+  onConfirmDiscard,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full';
+  allowBackdropClose?: boolean;
+  allowEscapeClose?: boolean;
+  hasUnsavedChanges?: boolean;
+  onRequestClose?: () => void;
+  onConfirmDiscard?: () => void;
 }) {
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+  const handleAttemptClose = () => {
+    if (hasUnsavedChanges) {
+      setShowDiscardConfirm(true);
+      return;
+    }
+    if (onRequestClose) {
+      onRequestClose();
+    } else {
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showDiscardConfirm) {
+          setShowDiscardConfirm(false);
+          return;
+        }
+        if (allowEscapeClose) {
+          handleAttemptClose();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, allowEscapeClose, hasUnsavedChanges, showDiscardConfirm]);
+
+  const sizeClasses = {
+    sm: 'max-w-md',
+    md: 'max-w-xl',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl',
+    '2xl': 'max-w-5xl',
+    '3xl': 'max-w-6xl',
+    full: 'max-w-[96vw] xl:max-w-7xl',
+  };
+
   return (
     <AnimatePresence>
       {open && (
         <div
-          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-[#08190C]/70 backdrop-blur-xs"
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-3 sm:p-5 bg-[#08190C]/75 backdrop-blur-xs overflow-y-auto"
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && allowBackdropClose) {
+              handleAttemptClose();
+            }
+          }}
         >
           <motion.div
             {...DROPDOWN_MOTION}
-            className="w-full max-w-xl rounded-[20px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-6 shadow-[var(--shadow-lg)] max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full ${sizeClasses[size] || 'max-w-xl'} rounded-[20px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6 shadow-[var(--shadow-lg)] max-h-[92vh] flex flex-col my-auto`}
           >
-            <div className="flex items-start justify-between gap-4 pb-4 border-b border-[var(--border-subtle)] mb-5">
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-[var(--border-subtle)] mb-4 shrink-0">
               <div>
                 <h2
                   id="modal-title"
@@ -1014,25 +1142,218 @@ export function Modal({
                   {title}
                 </h2>
                 {subtitle && (
-                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-relaxed">
                     {subtitle}
                   </p>
                 )}
               </div>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleAttemptClose}
                 aria-label="Close modal"
-                className="p-1.5 rounded-full text-[var(--text-secondary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] cursor-pointer"
+                className="p-1.5 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            {children}
+            <div className="flex-1 overflow-y-auto pr-1">
+              {children}
+            </div>
           </motion.div>
+
+          <ConfirmDiscardDialog
+            open={showDiscardConfirm}
+            onKeepEditing={() => setShowDiscardConfirm(false)}
+            onDiscard={() => {
+              setShowDiscardConfirm(false);
+              if (onConfirmDiscard) onConfirmDiscard();
+              onClose();
+            }}
+          />
         </div>
       )}
     </AnimatePresence>
+  );
+}
+
+export function ImageUploadZone({
+  imageUrl,
+  fallbackCategory,
+  onImageSelected,
+  onImageRemoved,
+  label = 'Product Primary Image',
+  disabled = false,
+  value,
+  onChange,
+  category,
+  productName,
+}: {
+  imageUrl?: string | null;
+  fallbackCategory?: string;
+  onImageSelected?: (dataUrl: string, file: File) => void;
+  onImageRemoved?: () => void;
+  label?: string;
+  disabled?: boolean;
+  value?: string | null;
+  onChange?: (val: string | null) => void;
+  category?: string;
+  productName?: string;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const effectiveImage = value !== undefined ? value : imageUrl;
+  const effectiveFallback = category || fallbackCategory || 'Produce';
+
+  const processFile = (file: File) => {
+    setErrorMsg(null);
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setErrorMsg('Invalid file type. Please upload a JPG, PNG, or WebP image.');
+      return;
+    }
+    const maxBytes = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxBytes) {
+      setErrorMsg('File too large. Maximum supported image size is 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (result) {
+        if (onChange) onChange(result);
+        if (onImageSelected) onImageSelected(result, file);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemove = () => {
+    if (onChange) onChange(null);
+    if (onImageRemoved) onImageRemoved();
+  };
+
+  const isUploadedImage = Boolean(
+    effectiveImage &&
+      (effectiveImage.startsWith('data:') ||
+        effectiveImage.startsWith('blob:') ||
+        effectiveImage.startsWith('http') ||
+        effectiveImage.startsWith('/'))
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-medium text-[var(--text-primary)]">
+          {label}
+        </label>
+        <span className="text-[11px] text-[var(--text-secondary)]">
+          JPG, PNG, WebP · Max 5MB
+        </span>
+      </div>
+
+      {isUploadedImage ? (
+        <div className="relative rounded-[16px] border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-3 flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative w-28 h-28 rounded-xl overflow-hidden bg-black/5 shrink-0 border border-[var(--border-subtle)]">
+            <img
+              src={effectiveImage!}
+              alt={productName || 'Uploaded Preview'}
+              className="w-full h-full object-cover"
+            />
+            <span className="absolute bottom-1 left-1 right-1 text-center text-[9px] font-mono-tabular bg-[#08190C]/85 text-[#4EB462] px-1 py-0.5 rounded font-medium">
+              Local Preview
+            </span>
+          </div>
+
+          <div className="flex-1 space-y-1.5 text-center sm:text-left min-w-0">
+            <div className="text-xs font-semibold text-[var(--text-primary)] flex items-center justify-center sm:justify-start gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+              <span>Image Attached for Record</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+              Frontend preview active. In production, this image streams to Supabase Storage with CDN optimization.
+            </p>
+
+            <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+              <label className="h-8 px-3 rounded-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium hover:border-[#1F6A37] hover:text-[#1F6A37] dark:hover:text-[#4EB462] inline-flex items-center gap-1.5 cursor-pointer transition-colors">
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>Replace Image</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={disabled}
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) processFile(f);
+                  }}
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={handleRemove}
+                disabled={disabled}
+                className="h-8 px-3 rounded-[10px] border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/10 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Remove</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const f = e.dataTransfer.files?.[0];
+            if (f) processFile(f);
+          }}
+          className={`relative rounded-[16px] border-2 border-dashed p-6 text-center transition-all ${
+            dragOver
+              ? 'border-[#1F6A37] bg-[#E5EFE6]/40 dark:bg-[#142B1B]/40'
+              : 'border-[var(--border-subtle)] bg-[var(--bg-canvas)]/60 hover:bg-[var(--bg-canvas)]'
+          }`}
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462] flex items-center justify-center mx-auto mb-2">
+            <UploadCloud className="w-5 h-5" />
+          </div>
+          <p className="text-xs font-semibold text-[var(--text-primary)]">
+            Drag and drop product photo, or{' '}
+            <label className="text-[#1F6A37] dark:text-[#4EB462] hover:underline cursor-pointer">
+              browse files
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={disabled}
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) processFile(f);
+                }}
+              />
+            </label>
+          </p>
+          <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+            Supports JPG, PNG, WebP up to 5MB. If omitted, default {fallbackCategory || 'category'} placeholder will be applied.
+          </p>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="text-[11px] text-red-600 dark:text-red-400 flex items-center gap-1 pt-1">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+    </div>
   );
 }
 

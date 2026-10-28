@@ -25,6 +25,7 @@ import { useBos } from '@/lib/services/bos-context';
 import {
   Card,
   FeedbackBanner,
+  ImageUploadZone,
   KPI,
   Modal,
   PageHeader,
@@ -78,16 +79,42 @@ export default function ProductsPage() {
   const [editOnlineKes, setEditOnlineKes] = useState(120);
   const [editCostKes, setEditCostKes] = useState(70);
 
-  // New Product state
+  // New Product state (Phase B: 4.1 - 4.4)
   const [name, setName] = useState('');
   const [sku, setSku] = useState('AG-VEG-019');
   const [category, setCategory] =
     useState<ProductRecord['category']>('Fresh Vegetables');
   const [unit, setUnit] = useState<UnitOfMeasure>('kilograms');
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<ProductRecord['status']>('Active');
+  const [batchTracked, setBatchTracked] = useState(true);
+  const [expiryTracked, setExpiryTracked] = useState(true);
+  const [reorderPoint, setReorderPoint] = useState(50);
   const [newInstKes, setNewInstKes] = useState(95);
   const [newWhlKes, setNewWhlKes] = useState(105);
   const [newRetKes, setNewRetKes] = useState(125);
+  const [newOnlineKes, setNewOnlineKes] = useState(120);
   const [newCostKes, setNewCostKes] = useState(70);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+
+  const resetNewProductForm = () => {
+    setName('');
+    setSku(`AG-${category.substring(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`);
+    setUploadedImage(null);
+    setDescription('');
+    setStatus('Active');
+    setBatchTracked(true);
+    setExpiryTracked(true);
+    setReorderPoint(50);
+    setNewCostKes(70);
+    setNewInstKes(95);
+    setNewWhlKes(105);
+    setNewRetKes(125);
+    setNewOnlineKes(120);
+    setFormErrors({});
+  };
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -227,31 +254,69 @@ export default function ProductsPage() {
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: { [key: string]: string } = {};
+
+    const cleanName = name.trim();
+    const cleanSku = sku.trim().toUpperCase();
+
+    if (!cleanName) {
+      errors.name = 'Product name is required.';
+    }
+    if (!cleanSku) {
+      errors.sku = 'SKU code is required.';
+    } else if (products.some((p) => p.sku.trim().toUpperCase() === cleanSku)) {
+      errors.sku = `SKU "${cleanSku}" is already registered. Please choose a unique SKU.`;
+    }
+
+    if (newCostKes <= 0) errors.cost = 'Cost price must be greater than zero.';
+    if (newInstKes <= 0) errors.inst = 'Institutional price must be greater than zero.';
+    if (newWhlKes <= 0) errors.whl = 'Wholesale price must be greater than zero.';
+    if (newRetKes <= 0) errors.ret = 'Retail price must be greater than zero.';
+    if (newOnlineKes <= 0) errors.online = 'Online price must be greater than zero.';
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      setFeedback({
+        msg: 'Please correct the validation errors in the product form.',
+        type: 'error',
+      });
+      return;
+    }
+
+    setFormErrors({});
+    setIsSubmitting(true);
+
+    const fallbackImage =
+      category === 'Dry Grains & Cereals'
+        ? IMAGE_PATHS.dryGrains
+        : category === 'Dairy & Cold Chain'
+        ? IMAGE_PATHS.warehouseColdChain
+        : IMAGE_PATHS.freshProduce;
+
     const res = await createProduct({
-      name,
-      sku,
+      name: cleanName,
+      sku: cleanSku,
       category,
       unit,
-      description: `Institutional and wholesale graded ${name} (${unit}).`,
-      imageUrl:
-        category === 'Dry Grains & Cereals'
-          ? IMAGE_PATHS.dryGrains
-          : IMAGE_PATHS.freshProduce,
-      batchTracked: true,
-      expiryTracked: true,
-      reorderPoint: 100,
+      description: description.trim() || `Grade A ${cleanName} (${unit}) graded for institutional kitchens and B2B off-take.`,
+      imageUrl: uploadedImage || fallbackImage,
+      batchTracked,
+      expiryTracked,
+      reorderPoint: Number(reorderPoint) || 50,
       pricing: {
         retailKes: Number(newRetKes),
-        onlineKes: Number(newRetKes) - 5,
+        onlineKes: Number(newOnlineKes),
         wholesaleKes: Number(newWhlKes),
         institutionalKes: Number(newInstKes),
         supplierCostKes: Number(newCostKes),
       },
     });
+
+    setIsSubmitting(false);
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
     if (res.ok) {
       setCreateOpen(false);
-      setName('');
+      resetNewProductForm();
     }
   };
 
@@ -722,136 +787,307 @@ export default function ProductsPage() {
         )}
       </Modal>
 
-      {/* Create New Product Modal */}
+      {/* Create New Product Modal (Phase B: 4.1 - 4.4) */}
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+        size="2xl"
         title="Register New Catalog Product SKU"
-        subtitle="Configure unit of measure, FEFO batch tracking, and multi-channel pricing."
+        subtitle="Configure primary product image, FEFO batch tracking, buffer thresholds, and multi-tier pricing."
+        hasUnsavedChanges={Boolean(name.trim()) || Boolean(uploadedImage) || Boolean(description.trim())}
+        onConfirmDiscard={() => {
+          setCreateOpen(false);
+          resetNewProductForm();
+        }}
       >
         <form onSubmit={handleCreateProduct} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Product Name
-              </label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Naivasha French Beans (Fine Grade)"
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-              />
+          {/* Section 1: Basic Information */}
+          <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
+            <div className="text-xs font-semibold text-[var(--text-primary)]">
+              1. Basic SKU Information
             </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">SKU Code</label>
-              <input
-                type="text"
-                required
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Product Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: '' }));
+                  }}
+                  placeholder="e.g., Naivasha Grade A French Beans"
+                  className={`w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border text-xs font-medium ${
+                    formErrors.name ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  }`}
+                />
+                {formErrors.name && (
+                  <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-1">
+                    {formErrors.name}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Unique SKU Code *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={sku}
+                  onChange={(e) => {
+                    setSku(e.target.value);
+                    if (formErrors.sku) setFormErrors((prev) => ({ ...prev, sku: '' }));
+                  }}
+                  placeholder="e.g., AG-VEG-045"
+                  className={`w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular uppercase ${
+                    formErrors.sku ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  }`}
+                />
+                {formErrors.sku && (
+                  <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-1">
+                    {formErrors.sku}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Product Category *
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) =>
+                    setCategory(e.target.value as ProductRecord['category'])
+                  }
+                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                >
+                  {CATEGORIES.filter((c) => c !== 'All').map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Unit of Measure *
+                </label>
+                <select
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value as UnitOfMeasure)}
+                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                >
+                  <option value="kilograms">kilograms (kg)</option>
+                  <option value="pieces">pieces (pcs)</option>
+                  <option value="bunches">bunches</option>
+                  <option value="dozens">dozens</option>
+                  <option value="packs">packs</option>
+                  <option value="bags">bags (90kg / 50kg)</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Description & Grading Specifications
+                </label>
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Export rejection grade, sorted and washed, chilled to 4°C within 2 hours of harvest."
+                  className="w-full p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium mb-1">Category</label>
-              <select
-                value={category}
-                onChange={(e) =>
-                  setCategory(e.target.value as ProductRecord['category'])
-                }
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-              >
-                {CATEGORIES.filter((c) => c !== 'All').map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+          {/* Section 2: Product Image Management (Section 4.1) */}
+          <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold text-[var(--text-primary)]">
+                2. Product Image Asset
+              </div>
+              <span className="text-[10px] text-[var(--text-secondary)]">
+                {uploadedImage ? 'Custom file attached' : 'Default category asset active'}
+              </span>
             </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Unit of Measure
-              </label>
-              <select
-                value={unit}
-                onChange={(e) => setUnit(e.target.value as UnitOfMeasure)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-              >
-                <option value="kilograms">kilograms</option>
-                <option value="pieces">pieces</option>
-                <option value="bunches">bunches</option>
-                <option value="dozens">dozens</option>
-                <option value="packs">packs</option>
-                <option value="bags">bags</option>
-              </select>
+
+            <ImageUploadZone
+              label="Primary Product Photograph (JPG, PNG, WebP up to 5MB)"
+              value={uploadedImage}
+              onChange={(dataUrl) => setUploadedImage(dataUrl)}
+              category={category}
+              productName={name || 'New SKU'}
+            />
+          </div>
+
+          {/* Section 3: Inventory & Warehouse Configuration (Section 4.3) */}
+          <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
+            <div className="text-xs font-semibold text-[var(--text-primary)]">
+              3. Inventory & Warehouse Configuration
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Reorder Buffer Target ({unit}) *
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={reorderPoint}
+                  onChange={(e) => setReorderPoint(Number(e.target.value))}
+                  className="w-full h-9 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-5">
+                <input
+                  type="checkbox"
+                  id="newBatchTracked"
+                  checked={batchTracked}
+                  onChange={(e) => setBatchTracked(e.target.checked)}
+                  className="rounded text-[#1F6A37] focus:ring-[#1F6A37]"
+                />
+                <label
+                  htmlFor="newBatchTracked"
+                  className="text-xs text-[var(--text-secondary)] cursor-pointer"
+                >
+                  FEFO Batch Tracked
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2 pt-5">
+                <input
+                  type="checkbox"
+                  id="newExpiryTracked"
+                  checked={expiryTracked}
+                  onChange={(e) => setExpiryTracked(e.target.checked)}
+                  className="rounded text-[#1F6A37] focus:ring-[#1F6A37]"
+                />
+                <label
+                  htmlFor="newExpiryTracked"
+                  className="text-xs text-[var(--text-secondary)] cursor-pointer"
+                >
+                  Expiry Date Tracked
+                </label>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-[11px] font-medium mb-1">
-                Supplier Cost
-              </label>
-              <input
-                type="number"
-                value={newCostKes}
-                onChange={(e) => setNewCostKes(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
+          {/* Section 4: Multi-Channel Price Schedule (Section 4.3) */}
+          <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
+            <div className="text-xs font-semibold text-[var(--text-primary)]">
+              4. Multi-Channel Price Schedule (KES / {unit})
             </div>
-            <div>
-              <label className="block text-[11px] font-medium mb-1">
-                Institutional
-              </label>
-              <input
-                type="number"
-                value={newInstKes}
-                onChange={(e) => setNewInstKes(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium mb-1">
-                Wholesale
-              </label>
-              <input
-                type="number"
-                value={newWhlKes}
-                onChange={(e) => setNewWhlKes(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium mb-1">
-                Retail
-              </label>
-              <input
-                type="number"
-                value={newRetKes}
-                onChange={(e) => setNewRetKes(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Supplier Cost *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={newCostKes}
+                  onChange={(e) => setNewCostKes(Number(e.target.value))}
+                  className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular ${
+                    formErrors.cost ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Institutional *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={newInstKes}
+                  onChange={(e) => setNewInstKes(Number(e.target.value))}
+                  className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462] ${
+                    formErrors.inst ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Wholesale *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={newWhlKes}
+                  onChange={(e) => setNewWhlKes(Number(e.target.value))}
+                  className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular font-semibold ${
+                    formErrors.whl ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Retail (POS) *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={newRetKes}
+                  onChange={(e) => setNewRetKes(Number(e.target.value))}
+                  className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular ${
+                    formErrors.ret ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Online *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={newOnlineKes}
+                  onChange={(e) => setNewOnlineKes(Number(e.target.value))}
+                  className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular ${
+                    formErrors.online ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  }`}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          {/* Form Actions */}
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
             <button
               type="button"
               onClick={() => setCreateOpen(false)}
-              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="h-10 px-4 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
+              disabled={isSubmitting}
+              className="h-10 px-5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] disabled:opacity-50 text-white text-xs font-semibold cursor-pointer shadow-sm inline-flex items-center gap-1.5"
             >
-              Create Product SKU
+              <Plus className="w-4 h-4" />
+              <span>{isSubmitting ? 'Registering SKU...' : 'Create Product SKU'}</span>
             </button>
           </div>
         </form>
