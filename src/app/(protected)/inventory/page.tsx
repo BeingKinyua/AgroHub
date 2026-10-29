@@ -41,11 +41,13 @@ function InventoryContent() {
     warehouses,
     stockBatches,
     stockMovements,
+    orders,
+    procurementOrders,
     can,
     recordStockMovement,
   } = useBos();
 
-  const [activeTab, setActiveTab] = useState<'batches' | 'products' | 'movements' | 'warehouses'>('batches');
+  const [activeTab, setActiveTab] = useState<'direct-flow' | 'batches' | 'products' | 'movements' | 'warehouses'>('direct-flow');
   const [batchFilter, setBatchFilter] = useState<'all' | 'at-risk' | 'expiring'>('all');
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -306,12 +308,23 @@ function InventoryContent() {
         </div>
       </section>
 
-      {/* View Switcher Tabs (Section 23: FEFO Batch View, Stock Table, Movements, Warehouses) */}
-      <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit">
+      {/* View Switcher Tabs (Hybrid Operating Models: Direct Procurement vs FEFO Storage) */}
+      <div className="flex flex-wrap items-center gap-1 p-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTab('direct-flow')}
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+            activeTab === 'direct-flow'
+              ? 'bg-[#1F6A37] text-white shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          Direct Farm-to-Client Flow (Transit Staging)
+        </button>
         <button
           type="button"
           onClick={() => setActiveTab('batches')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
             activeTab === 'batches'
               ? 'bg-[#1F6A37] text-white shadow-sm'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -322,7 +335,7 @@ function InventoryContent() {
         <button
           type="button"
           onClick={() => setActiveTab('products')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
             activeTab === 'products'
               ? 'bg-[#1F6A37] text-white shadow-sm'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -333,28 +346,132 @@ function InventoryContent() {
         <button
           type="button"
           onClick={() => setActiveTab('movements')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
             activeTab === 'movements'
               ? 'bg-[#1F6A37] text-white shadow-sm'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          Wastage & Movement Ledger ({stockMovements.length})
+          Wastage & Movements ({stockMovements.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('warehouses')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
             activeTab === 'warehouses'
               ? 'bg-[#1F6A37] text-white shadow-sm'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          Cold-Chain Hub Facilities
+          Cold-Chain Facilities
         </button>
       </div>
 
-      {/* Tab 1: FEFO Batch View */}
+      {/* Tab 0: Direct Farm-to-Client Transit & Staging (Operating Model A) */}
+      {activeTab === 'direct-flow' && (
+        <Card padding="p-0" className="overflow-hidden">
+          <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/30">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
+                  Operating Model A: Demand-Driven Direct Procurement Flow
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  Goods sourced directly from smallholder farm cooperatives upon customer demand, staged at cross-docking bays, and delivered without permanent warehouse holding.
+                </p>
+              </div>
+              <span className="text-[11px] font-semibold text-[#1F6A37] dark:text-[#4EB462] bg-[#E5EFE6] dark:bg-[#122719] px-2.5 py-1 rounded-md shrink-0">
+                Zero-Warehouse Paradigm Active
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <th className="py-3 px-4">Customer Order</th>
+                  <th className="py-3 px-4">Destination Client</th>
+                  <th className="py-3 px-4">Commodity & Quantity</th>
+                  <th className="py-3 px-4">Origin Sourcing Farm</th>
+                  <th className="py-3 px-4">Transit & Staging Stage</th>
+                  <th className="py-3 px-4 text-right">Invoiced / Cost (KES)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+                {orders.flatMap((ord) =>
+                  ord.items
+                    .filter((it) => it.sourcingMode === 'Direct Procurement' || it.sourcingMode === 'Mixed Sourcing' || ord.status === 'Confirmed' || ord.status === 'Picking')
+                    .map((item, idx) => {
+                      const linkedPo = procurementOrders.find(
+                        (po) => po.customerOrderId === ord.id || po.supplierName === item.supplierName
+                      );
+                      const isCollected = linkedPo?.goodsCollected || ord.status === 'Packed' || ord.status === 'Dispatched' || ord.status === 'Delivered';
+
+                      return (
+                        <tr key={`${ord.id}-${idx}`} className="hover:bg-[var(--bg-canvas)]/60 transition-colors">
+                          <td className="py-3.5 px-4 font-mono-tabular font-semibold text-[var(--text-primary)]">
+                            {ord.orderNumber}
+                            <div className="text-[11px] font-normal text-[var(--text-secondary)]">
+                              Target: {ord.deliveryDate}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-[var(--text-primary)]">
+                              {ord.customerName}
+                            </div>
+                            <div className="text-[11px] text-[var(--text-secondary)]">
+                              {ord.customerSegment} · {ord.warehouseName}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-medium text-[var(--text-primary)]">
+                              {item.productName}
+                            </div>
+                            <div className="text-[11px] font-mono-tabular text-[var(--text-secondary)]">
+                              {item.quantity} {item.unit} @ KES {item.unitPriceKes}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-medium text-[var(--text-primary)]">
+                              {item.supplierName || linkedPo?.supplierName || 'Kinangop Farmers Co-op'}
+                            </div>
+                            <div className="text-[11px] text-[var(--text-secondary)]">
+                              Farmgate Sourcing Cost: KES {(item.purchaseCostKes || 65).toLocaleString()}/{item.unit}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {isCollected ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Collected & Staged for Route</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                                <Clock className="w-3 h-3" />
+                                <span>Farmgate Collection Pending</span>
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="font-mono-tabular font-semibold text-[var(--text-primary)]">
+                              KES {item.lineTotalKes.toLocaleString()}
+                            </div>
+                            <div className="text-[10px] text-[var(--text-secondary)] font-mono-tabular">
+                              Est. Sourcing: KES {Math.round((item.purchaseCostKes || 65) * item.quantity).toLocaleString()}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {/* Tab 1: FEFO Batch View (Operating Model B) */}
       {activeTab === 'batches' && (
         <Card padding="p-0" className="overflow-hidden">
           <div className="p-4 border-b border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">

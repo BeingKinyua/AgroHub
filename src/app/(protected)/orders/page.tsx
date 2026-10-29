@@ -57,6 +57,7 @@ function OrdersWorkbenchContent() {
     can,
     createOrder,
     advanceOrderStatus,
+    getSuppliersForProduct,
   } = useBos();
 
   const [statusFilter, setStatusFilter] = useState<'All' | 'Needs Action' | OrderLifecycleStatus>('All');
@@ -112,10 +113,21 @@ function OrdersWorkbenchContent() {
     productId: string;
     quantity: number;
     overridePriceKes?: number;
+    sourcingMode?: 'direct_procurement' | 'existing_stock' | 'mixed';
+    stockAllocatedQty?: number;
+    directProcuredQty?: number;
+    supplierId?: string;
+    supplierName?: string;
+    purchaseCostKes?: number;
   }
 
   const [formItems, setFormItems] = useState<FormLineItem[]>([
-    { id: 'line-1', productId: products[0]?.id || '', quantity: 50 },
+    {
+      id: 'line-1',
+      productId: products[0]?.id || '',
+      quantity: 50,
+      sourcingMode: 'direct_procurement',
+    },
   ]);
 
   // Synchronize customer details (segment, delivery zone, default PO ref)
@@ -158,14 +170,45 @@ function OrdersWorkbenchContent() {
       const qty = Number(item.quantity) || 0;
       const lineTotal = Math.round(unitPrice * qty);
       const available = prod?.availableQty || 0;
-      const hasShortage = qty > available;
+
+      // Default sourcing mode: if direct is specified or stock is insufficient, direct procurement
+      const mode = item.sourcingMode || (qty > available ? 'direct_procurement' : 'existing_stock');
+      const isDirectOnly = mode === 'direct_procurement';
+      const isStockOnly = mode === 'existing_stock';
+
+      const stockAllocated = item.stockAllocatedQty !== undefined
+        ? item.stockAllocatedQty
+        : isDirectOnly
+        ? 0
+        : Math.min(qty, available);
+
+      const directProcured = item.directProcuredQty !== undefined
+        ? item.directProcuredQty
+        : isDirectOnly
+        ? qty
+        : Math.max(0, qty - stockAllocated);
+
+      const hasShortage = isStockOnly && qty > available;
       const isPriceBelowSchedule =
         item.overridePriceKes !== undefined &&
         item.overridePriceKes > 0 &&
         item.overridePriceKes < defaultPrice;
 
+      const quotingSuppliers = prod ? getSuppliersForProduct(prod.id) : [];
+      const activeSupplier = quotingSuppliers.find((s) => s.supplierId === item.supplierId) || quotingSuppliers[0];
+      const purchaseCost = item.purchaseCostKes !== undefined
+        ? item.purchaseCostKes
+        : (activeSupplier?.quotingPriceKes || prod?.costPriceKes || 0);
+
       return {
         ...item,
+        sourcingMode: mode,
+        stockAllocatedQty: stockAllocated,
+        directProcuredQty: directProcured,
+        supplierId: item.supplierId || activeSupplier?.supplierId,
+        supplierName: item.supplierName || activeSupplier?.supplierName,
+        purchaseCostKes: purchaseCost,
+        quotingSuppliers,
         product: prod,
         pricingTier: tier,
         defaultPrice,
@@ -176,7 +219,7 @@ function OrdersWorkbenchContent() {
         isPriceBelowSchedule,
       };
     });
-  }, [formItems, selectedCustomer, channel, products]);
+  }, [formItems, selectedCustomer, channel, products, getSuppliersForProduct]);
 
   const orderSubtotalKes = useMemo(
     () => computedLineItems.reduce((acc, it) => acc + it.lineTotal, 0),
@@ -185,6 +228,16 @@ function OrdersWorkbenchContent() {
 
   const totalQuantityUnits = useMemo(
     () => computedLineItems.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0),
+    [computedLineItems]
+  );
+
+  const totalDirectProcuredUnits = useMemo(
+    () => computedLineItems.reduce((acc, it) => acc + (Number(it.directProcuredQty) || 0), 0),
+    [computedLineItems]
+  );
+
+  const totalStockAllocatedUnits = useMemo(
+    () => computedLineItems.reduce((acc, it) => acc + (Number(it.stockAllocatedQty) || 0), 0),
     [computedLineItems]
   );
 
@@ -201,6 +254,7 @@ function OrdersWorkbenchContent() {
         id: `line-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         productId: nextProduct ? nextProduct.id : '',
         quantity: 25,
+        sourcingMode: 'direct_procurement',
       },
     ]);
   };
@@ -217,7 +271,7 @@ function OrdersWorkbenchContent() {
   };
 
   const handleCreateOrder = async (isDraft: boolean = false) => {
-    const validItems = formItems.filter((it) => it.productId && Number(it.quantity) > 0);
+    const validItems = computedLineItems.filter((it) => it.productId && Number(it.quantity) > 0);
     if (validItems.length === 0) {
       setFeedback({
         msg: 'Order must contain at least one valid line item with quantity > 0.',
@@ -235,6 +289,12 @@ function OrdersWorkbenchContent() {
         productId: it.productId,
         quantity: Number(it.quantity),
         overridePriceKes: it.overridePriceKes ? Number(it.overridePriceKes) : undefined,
+        sourcingMode: it.sourcingMode,
+        stockAllocatedQty: it.stockAllocatedQty,
+        directProcuredQty: it.directProcuredQty,
+        supplierId: it.supplierId,
+        supplierName: it.supplierName,
+        purchaseCostKes: it.purchaseCostKes,
       })),
       notes: notes.trim() || undefined,
       orderReference: orderReference.trim() || undefined,
@@ -245,7 +305,7 @@ function OrdersWorkbenchContent() {
     if (res.ok) {
       setCreateOpen(false);
       setComposerStep('compose');
-      setFormItems([{ id: 'line-1', productId: products[0]?.id || '', quantity: 50 }]);
+      setFormItems([{ id: 'line-1', productId: products[0]?.id || '', quantity: 50, sourcingMode: 'direct_procurement' }]);
       setNotes('');
     }
   };
@@ -475,13 +535,13 @@ function OrdersWorkbenchContent() {
       {/* Filter & Search Bar */}
       <Card className="mb-6" padding="p-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-canvas)] overflow-x-auto">
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-[var(--bg-canvas)] overflow-x-auto border border-[var(--border-subtle)]">
             {STATUS_FILTERS.map((st) => (
               <button
                 key={st}
                 type="button"
                 onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                   statusFilter === st
                     ? 'bg-[#1F6A37] text-white shadow-sm'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -499,7 +559,7 @@ function OrdersWorkbenchContent() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter by order # or customer..."
-              className="w-full h-9 pl-9 pr-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+              className="w-full h-9 pl-9 pr-3 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
             />
           </div>
         </div>
@@ -576,7 +636,7 @@ function OrdersWorkbenchContent() {
                           <button
                             type="button"
                             onClick={() => handleQuickAdvance(ord)}
-                            className="h-8 px-3 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            className="h-8 px-3 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
                           >
                             <span>{getNextStageLabel(ord.status)}</span>
                             <ArrowRight className="w-3 h-3" />
@@ -585,7 +645,7 @@ function OrdersWorkbenchContent() {
                         <button
                           type="button"
                           onClick={() => setSelectedOrder(ord)}
-                          className="h-8 px-2.5 rounded-full border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] inline-flex items-center gap-1 cursor-pointer"
+                          className="h-8 px-2.5 rounded-md border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] inline-flex items-center gap-1 cursor-pointer"
                           title="Inspect Details"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -683,31 +743,61 @@ function OrdersWorkbenchContent() {
 
             <div>
               <div className="text-xs font-semibold mb-2 text-[var(--text-primary)]">
-                Allocated FEFO Line Items
+                Order Line Items & Sourcing Allocation
               </div>
               <div className="space-y-2">
-                {selectedOrder.items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between text-xs"
-                  >
-                    <div>
-                      <div className="font-semibold text-[var(--text-primary)]">
-                        {item.productName}
+                {selectedOrder.items.map((item, idx) => {
+                  const isDirect = item.sourcingMode === 'direct_procurement';
+                  const isMixed = item.sourcingMode === 'mixed';
+
+                  return (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between text-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-[var(--text-primary)]">
+                            {item.productName}
+                          </span>
+                          {isDirect ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                              Direct Farm Procurement
+                            </span>
+                          ) : isMixed ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300">
+                              Mixed Sourcing
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-300">
+                              FEFO Hub Stock
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-[var(--text-secondary)]">
+                          {isDirect ? (
+                            <span>
+                              Farm Partner: <strong className="text-[var(--text-primary)]">{item.supplierName || 'Cooperative Partner'}</strong>
+                              {item.purchaseCostKes ? ` · Farmgate Cost: KES ${item.purchaseCostKes}/${item.unit}` : ''}
+                            </span>
+                          ) : isMixed ? (
+                            <span>
+                              Allocated: <strong>{item.stockAllocatedQty || 0} {item.unit}</strong> stock · <strong>{item.directProcuredQty || 0} {item.unit}</strong> direct from {item.supplierName || 'Farm'}
+                            </span>
+                          ) : (
+                            <span>
+                              Batch: <span className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462]">{item.allocatedBatch}</span>
+                            </span>
+                          )}
+                          <span> · {item.quantity} {item.unit} @ KES {item.unitPriceKes} ({item.pricingTier})</span>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">
-                        Batch:{' '}
-                        <span className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462]">
-                          {item.allocatedBatch}
-                        </span>{' '}
-                        · {item.quantity} {item.unit} @ KES {item.unitPriceKes} ({item.pricingTier})
+                      <div className="font-mono-tabular font-semibold">
+                        KES {item.lineTotalKes.toLocaleString()}
                       </div>
                     </div>
-                    <div className="font-mono-tabular font-semibold">
-                      KES {item.lineTotalKes.toLocaleString()}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -739,7 +829,7 @@ function OrdersWorkbenchContent() {
                       });
                       if (res.ok) setSelectedOrder({ ...selectedOrder, status: st });
                     }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                       selectedOrder.status === st
                         ? 'bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)] opacity-50 cursor-not-allowed'
                         : st === 'On Hold'
@@ -912,13 +1002,16 @@ function OrdersWorkbenchContent() {
                 </button>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {computedLineItems.map((item, idx) => {
                   const prod = item.product;
+                  const isDirect = item.sourcingMode === 'direct_procurement';
+                  const isMixed = item.sourcingMode === 'mixed';
+
                   return (
                     <div
                       key={item.id}
-                      className={`p-3.5 rounded-xl border transition-colors ${
+                      className={`p-3.5 rounded-xl border transition-colors space-y-3 ${
                         item.hasShortage
                           ? 'border-amber-500/40 bg-amber-50/40 dark:bg-amber-950/20'
                           : 'border-[var(--border-subtle)] bg-[var(--bg-card)]'
@@ -939,7 +1032,7 @@ function OrdersWorkbenchContent() {
                           >
                             {products.map((p) => (
                               <option key={p.id} value={p.id}>
-                                {p.name} ({p.sku}) · {p.availableQty} {p.unit} avail
+                                {p.name} ({p.sku}) · {p.availableQty} {p.unit} in hub
                               </option>
                             ))}
                           </select>
@@ -947,10 +1040,10 @@ function OrdersWorkbenchContent() {
                             <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--text-secondary)]">
                               <span>SKU: {prod.sku}</span>
                               <span>·</span>
-                              <span>Stock: {prod.availableQty} {prod.unit}</span>
+                              <span>Hub Stock: {prod.availableQty} {prod.unit}</span>
                               {item.hasShortage && (
                                 <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                                  (Exceeds Hub Stock)
+                                  (Exceeds Stock — Switch to Direct Procurement)
                                 </span>
                               )}
                             </div>
@@ -979,7 +1072,7 @@ function OrdersWorkbenchContent() {
                         <div className="sm:col-span-3">
                           <div className="flex items-center justify-between mb-1">
                             <label className="text-[10px] font-medium text-[var(--text-secondary)]">
-                              Price (KES/{prod?.unit || 'u'})
+                              Selling Price (KES/{prod?.unit || 'u'})
                             </label>
                             <span className="text-[10px] text-[#1F6A37] dark:text-[#4EB462] font-semibold">
                               {item.pricingTier}
@@ -1026,6 +1119,83 @@ function OrdersWorkbenchContent() {
                           </button>
                         </div>
                       </div>
+
+                      {/* Sourcing Strategy Row (Hybrid Operating Model) */}
+                      <div className="pt-2.5 border-t border-[var(--border-subtle)]/70 grid grid-cols-1 sm:grid-cols-12 gap-3 items-center text-xs">
+                        <div className="sm:col-span-4">
+                          <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1">
+                            Sourcing Fulfillment Mode
+                          </label>
+                          <select
+                            value={item.sourcingMode}
+                            onChange={(e) =>
+                              handleUpdateItem(item.id, {
+                                sourcingMode: e.target.value as FormLineItem['sourcingMode'],
+                              })
+                            }
+                            className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px] font-medium cursor-pointer"
+                          >
+                            <option value="direct_procurement">Farm-to-Client Direct Procurement</option>
+                            <option value="existing_stock">Warehouse FEFO Stock</option>
+                            <option value="mixed">Mixed (Stock + Direct Farm)</option>
+                          </select>
+                        </div>
+
+                        {/* Connected Supplier & Farmgate Quoted Cost */}
+                        {(isDirect || isMixed) ? (
+                          <>
+                            <div className="sm:col-span-5">
+                              <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1">
+                                Sourcing Farm / Cooperative
+                              </label>
+                              <select
+                                value={item.supplierId || ''}
+                                onChange={(e) => {
+                                  const selectedSup = item.quotingSuppliers?.find((s) => s.supplierId === e.target.value);
+                                  handleUpdateItem(item.id, {
+                                    supplierId: e.target.value,
+                                    supplierName: selectedSup?.supplierName,
+                                    purchaseCostKes: selectedSup?.quotingPriceKes,
+                                  });
+                                }}
+                                className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px] cursor-pointer"
+                              >
+                                {item.quotingSuppliers && item.quotingSuppliers.length > 0 ? (
+                                  item.quotingSuppliers.map((qs) => (
+                                    <option key={qs.supplierId} value={qs.supplierId}>
+                                      {qs.supplierName} (KES {qs.quotingPriceKes}/{prod?.unit} · {qs.leadTimeDays}d lead · Min {qs.minOrderQty})
+                                    </option>
+                                  ))
+                                ) : (
+                                  <option value="">No quoting supplier configured (General Sourcing)</option>
+                                )}
+                              </select>
+                            </div>
+
+                            <div className="sm:col-span-3">
+                              <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1">
+                                Est. Purchase Cost (KES/{prod?.unit})
+                              </label>
+                              <input
+                                type="number"
+                                value={item.purchaseCostKes || ''}
+                                onChange={(e) =>
+                                  handleUpdateItem(item.id, {
+                                    purchaseCostKes: Number(e.target.value),
+                                  })
+                                }
+                                placeholder="Farmgate cost"
+                                className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px] font-mono-tabular"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <div className="sm:col-span-8 flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+                            <span className="font-semibold text-[#1F6A37] dark:text-[#4EB462]">FEFO Warehouse Allocation:</span>
+                            <span>{item.quantity} {prod?.unit} reserved from cold hub inventory batch.</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -1040,21 +1210,29 @@ function OrdersWorkbenchContent() {
                   <div className="text-base font-semibold">{formItems.length} Products</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Total Quantity</div>
-                  <div className="text-base font-semibold font-mono-tabular">{totalQuantityUnits} Units</div>
+                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Direct Procurement</div>
+                  <div className="text-base font-semibold font-mono-tabular text-[#4EB462]">
+                    {totalDirectProcuredUnits} Units
+                  </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Inventory Check</div>
+                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Hub Stock Allocation</div>
+                  <div className="text-base font-semibold font-mono-tabular text-emerald-300">
+                    {totalStockAllocatedUnits} Units
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Logistics Flow</div>
                   <div className="text-xs font-semibold flex items-center gap-1 mt-0.5">
-                    {hasAnyShortage ? (
-                      <span className="text-amber-400 inline-flex items-center gap-1">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        <span>FEFO Shortage Flagged</span>
-                      </span>
-                    ) : (
+                    {totalDirectProcuredUnits > 0 ? (
                       <span className="text-[#4EB462] inline-flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>100% Stock Available</span>
+                        <span>Farm-to-Client Demand Flow</span>
+                      </span>
+                    ) : (
+                      <span className="text-emerald-300 inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>100% Stock Allocated</span>
                       </span>
                     )}
                   </div>
@@ -1062,7 +1240,7 @@ function OrdersWorkbenchContent() {
               </div>
 
               <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-white/10">
-                <div className="text-[10px] text-white/60 uppercase tracking-wider">Grand Total (KES)</div>
+                <div className="text-[10px] text-white/60 uppercase tracking-wider">Invoiced Total (KES)</div>
                 <div className="text-xl font-bold font-mono-tabular text-[#4EB462]">
                   KES {orderSubtotalKes.toLocaleString()}
                 </div>

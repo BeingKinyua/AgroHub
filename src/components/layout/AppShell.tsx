@@ -10,6 +10,7 @@ import {
   Bell,
   Boxes,
   Building2,
+  Car,
   CheckCheck,
   CheckCircle2,
   CheckSquare,
@@ -222,7 +223,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ],
       },
       {
-        group: 'OPERATIONS',
+        group: 'COMMERCIAL',
         items: [
           {
             label: 'Orders',
@@ -233,57 +234,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               (o) => o.status !== 'Delivered' && o.status !== 'Closed'
             ).length,
           },
-          {
-            label: 'Fulfillment',
-            href: '/fulfillment',
-            permission: 'fulfillment.view',
-            icon: Boxes,
-          },
-          {
-            label: 'Deliveries',
-            href: '/deliveries',
-            permission: 'deliveries.view',
-            icon: Truck,
-          },
-        ],
-      },
-      {
-        group: 'CATALOG & STOCK',
-        items: [
-          {
-            label: 'Products',
-            href: '/products',
-            permission: 'products.view',
-            icon: Package,
-          },
-          {
-            label: 'Inventory',
-            href: '/inventory',
-            permission: 'inventory.view',
-            icon: Warehouse,
-          },
-        ],
-      },
-      {
-        group: 'PROCUREMENT',
-        items: [
-          {
-            label: 'Procurement',
-            href: '/procurement',
-            permission: 'procurement.view',
-            icon: FolderKanban,
-          },
-          {
-            label: 'Suppliers',
-            href: '/suppliers',
-            permission: 'suppliers.view',
-            icon: Handshake,
-          },
-        ],
-      },
-      {
-        group: 'CUSTOMERS & CRM',
-        items: [
           {
             label: 'Customers',
             href: '/customers',
@@ -301,6 +251,53 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href: '/crm',
             permission: 'crm.view',
             icon: Activity,
+          },
+        ],
+      },
+      {
+        group: 'OPERATIONS',
+        items: [
+          {
+            label: 'Fulfillment',
+            href: '/fulfillment',
+            permission: 'fulfillment.view',
+            icon: Boxes,
+          },
+          {
+            label: 'Deliveries',
+            href: '/deliveries',
+            permission: 'deliveries.view',
+            icon: Truck,
+          },
+          {
+            label: 'Fleet & Drivers',
+            href: '/fleet',
+            permission: 'fleet.view',
+            icon: Car,
+          },
+          {
+            label: 'Inventory',
+            href: '/inventory',
+            permission: 'inventory.view',
+            icon: Warehouse,
+          },
+          {
+            label: 'Products',
+            href: '/products',
+            permission: 'products.view',
+            icon: Package,
+          },
+          {
+            label: 'Procurement',
+            href: '/procurement',
+            permission: 'procurement.view',
+            icon: FolderKanban,
+          },
+          {
+            label: 'Suppliers',
+            href: '/suppliers',
+            permission: 'suppliers.view',
+            icon: Handshake,
           },
         ],
       },
@@ -325,11 +322,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             permission: 'finance.view',
             icon: Landmark,
           },
-        ],
-      },
-      {
-        group: 'INSIGHTS',
-        items: [
           {
             label: 'Reports',
             href: '/reports',
@@ -339,7 +331,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ],
       },
       {
-        group: 'CONTROL & VAULT',
+        group: 'MANAGEMENT & GOVERNANCE',
         items: [
           {
             label: 'Approvals',
@@ -355,11 +347,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             icon: FileText,
             badgeCount: unverifiedDocsCount,
           },
-        ],
-      },
-      {
-        group: 'ADMINISTRATION',
-        items: [
           {
             label: 'Users',
             href: '/administration/users',
