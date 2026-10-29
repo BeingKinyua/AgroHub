@@ -2,15 +2,21 @@
 
 import React, { useMemo, useState } from 'react';
 import {
+  Archive,
   Edit2,
+  ExternalLink,
   History,
+  Info,
   LineChart,
   Minus,
   Package,
   Plus,
+  RotateCcw,
   Search,
+  Trash2,
   TrendingDown,
   TrendingUp,
+  Truck,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -46,14 +52,29 @@ const CATEGORIES = [
 ] as const;
 
 export default function ProductsPage() {
-  const { products, can, createProduct, updateProduct } = useBos();
+  const {
+    products,
+    can,
+    createProduct,
+    updateProduct,
+    getNextSku,
+    archiveProduct,
+    restoreProduct,
+    deleteProduct,
+    getSuppliersForProduct,
+  } = useBos();
+
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editDetailsProduct, setEditDetailsProduct] = useState<ProductRecord | null>(
     null
   );
   const [historyProduct, setHistoryProduct] = useState<ProductRecord | null>(
+    null
+  );
+  const [sourcingModalProduct, setSourcingModalProduct] = useState<ProductRecord | null>(
     null
   );
   const [feedback, setFeedback] = useState<{
@@ -73,17 +94,18 @@ export default function ProductsPage() {
   const [editReorderPoint, setEditReorderPoint] = useState(100);
   const [editBatchTracked, setEditBatchTracked] = useState(true);
   const [editExpiryTracked, setEditExpiryTracked] = useState(true);
+  const [editImageUrl, setEditImageUrl] = useState('');
   const [editInstKes, setEditInstKes] = useState(95);
   const [editWhlKes, setEditWhlKes] = useState(105);
   const [editRetKes, setEditRetKes] = useState(125);
   const [editOnlineKes, setEditOnlineKes] = useState(120);
   const [editCostKes, setEditCostKes] = useState(70);
 
-  // New Product state (Phase B: 4.1 - 4.4)
+  // New Product state
   const [name, setName] = useState('');
-  const [sku, setSku] = useState('AG-VEG-019');
   const [category, setCategory] =
     useState<ProductRecord['category']>('Fresh Vegetables');
+  const [sku, setSku] = useState('AD-VEG-001');
   const [unit, setUnit] = useState<UnitOfMeasure>('kilograms');
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [description, setDescription] = useState('');
@@ -99,9 +121,16 @@ export default function ProductsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
+  const handleCategoryChange = (newCat: ProductRecord['category']) => {
+    setCategory(newCat);
+    setSku(getNextSku(newCat));
+  };
+
   const resetNewProductForm = () => {
     setName('');
-    setSku(`AG-${category.substring(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`);
+    const generatedSku = getNextSku('Fresh Vegetables');
+    setCategory('Fresh Vegetables');
+    setSku(generatedSku);
     setUploadedImage(null);
     setDescription('');
     setStatus('Active');
@@ -120,15 +149,19 @@ export default function ProductsPage() {
     return products.filter((p) => {
       const matchCat =
         categoryFilter === 'All' || p.category === categoryFilter;
+      const matchStatus =
+        statusFilter === 'All'
+          ? p.status !== 'Archived'
+          : p.status === statusFilter;
       const q = search.trim().toLowerCase();
       const matchSearch =
         !q ||
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
         p.unit.toLowerCase().includes(q);
-      return matchCat && matchSearch;
+      return matchCat && matchStatus && matchSearch;
     });
-  }, [products, categoryFilter, search]);
+  }, [products, categoryFilter, statusFilter, search]);
 
   // Derived Supplier Cost trend metrics and timeline chart data
   const supplierTrend = useMemo(() => {
@@ -220,6 +253,7 @@ export default function ProductsPage() {
     setEditReorderPoint(prod.reorderPoint);
     setEditBatchTracked(prod.batchTracked);
     setEditExpiryTracked(prod.expiryTracked);
+    setEditImageUrl(prod.imageUrl || '');
     setEditInstKes(prod.pricing.institutionalKes);
     setEditWhlKes(prod.pricing.wholesaleKes);
     setEditRetKes(prod.pricing.retailKes);
@@ -230,6 +264,13 @@ export default function ProductsPage() {
   const handleSaveEditProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editDetailsProduct) return;
+    const fallback =
+      editCategory === 'Dry Grains & Cereals'
+        ? IMAGE_PATHS.dryGrains
+        : editCategory === 'Dairy & Cold Chain'
+        ? IMAGE_PATHS.warehouseColdChain
+        : IMAGE_PATHS.freshProduce;
+
     const res = await updateProduct(editDetailsProduct.id, {
       name: editName.trim(),
       sku: editSku.trim(),
@@ -237,6 +278,7 @@ export default function ProductsPage() {
       unit: editUnit,
       description: editDescription.trim(),
       status: editStatus,
+      imageUrl: editImageUrl || fallback,
       reorderPoint: Number(editReorderPoint),
       batchTracked: editBatchTracked,
       expiryTracked: editExpiryTracked,
@@ -250,6 +292,21 @@ export default function ProductsPage() {
     });
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
     if (res.ok) setEditDetailsProduct(null);
+  };
+
+  const handleArchiveProduct = async (prod: ProductRecord) => {
+    const res = await archiveProduct(prod.id);
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+  };
+
+  const handleRestoreProduct = async (prod: ProductRecord) => {
+    const res = await restoreProduct(prod.id);
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+  };
+
+  const handleDeleteProduct = async (prod: ProductRecord) => {
+    const res = await deleteProduct(prod.id);
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
   };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
@@ -330,8 +387,11 @@ export default function ProductsPage() {
           can('products.create') && (
             <button
               type="button"
-              onClick={() => setCreateOpen(true)}
-              className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+              onClick={() => {
+                resetNewProductForm();
+                setCreateOpen(true);
+              }}
+              className="h-10 px-4 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer shadow-xs"
             >
               <Plus className="w-4 h-4" />
               <span>New Product SKU</span>
@@ -375,35 +435,56 @@ export default function ProductsPage() {
         />
       </div>
 
-      {/* Filter Bar */}
+      {/* Filter and Status Bar */}
       <Card className="mb-6" padding="p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-canvas)] overflow-x-auto">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Status Tabs */}
+            <div className="flex items-center gap-1.5 p-1 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] overflow-x-auto">
+              {(['All', 'Active', 'Seasonal Hold', 'Discontinued', 'Archived'] as const).map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                    statusFilter === st
+                      ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
+                  }`}
+                >
+                  {st} {st === 'Archived' ? `(${products.filter((p) => p.status === 'Archived').length})` : ''}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search SKU, name, or unit..."
+                className="w-full h-9 pl-9 pr-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[#1F6A37]"
+              />
+            </div>
+          </div>
+
+          {/* Category Tabs */}
+          <div className="flex items-center gap-1.5 p-1 rounded-md bg-[var(--bg-canvas)] overflow-x-auto border border-[var(--border-subtle)]">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setCategoryFilter(cat)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap cursor-pointer ${
+                className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
                   categoryFilter === cat
                     ? 'bg-[#1F6A37] text-white'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
                 }`}
               >
                 {cat}
               </button>
             ))}
-          </div>
-
-          <div className="relative w-full lg:w-64">
-            <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search SKU, name, or unit..."
-              className="w-full h-9 pl-9 pr-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-            />
           </div>
         </div>
       </Card>
@@ -503,27 +584,72 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            <div className="px-5 py-3.5 border-t border-[var(--border-subtle)] bg-[var(--bg-canvas)]/40 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => setHistoryProduct(prod)}
-                className="px-2.5 py-1.5 rounded-full text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-                title="View supplier purchase price timeline graph and cost trend"
-              >
-                <LineChart className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
-                <span>Price History</span>
-              </button>
+            <div className="px-4 py-3 border-t border-[var(--border-subtle)] bg-[var(--bg-canvas)]/40 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setHistoryProduct(prod)}
+                  className="px-2.5 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] inline-flex items-center gap-1.5 cursor-pointer border border-transparent hover:border-[var(--border-subtle)] transition-colors"
+                  title="View supplier purchase price timeline graph and cost trend"
+                >
+                  <LineChart className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <span>Price History</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSourcingModalProduct(prod)}
+                  className="px-2.5 py-1.5 rounded-md text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 inline-flex items-center gap-1.5 cursor-pointer border border-emerald-200 dark:border-emerald-800 transition-colors"
+                  title="View suppliers sourcing this product, lead times, and quotes"
+                >
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>Sourcing ({getSuppliersForProduct(prod.id).length})</span>
+                </button>
+              </div>
+
               <div className="flex items-center gap-1.5">
                 {can('products.edit') && (
-                  <button
-                    type="button"
-                    onClick={() => openEditProduct(prod)}
-                    className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
-                    title="Edit product details, SKU, specifications, and pricing"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    <span>Edit Product</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => openEditProduct(prod)}
+                      className="px-3 py-1.5 rounded-md bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                      title="Edit product details, SKU, specifications, and pricing"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+
+                    {prod.status === 'Archived' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreProduct(prod)}
+                        className="px-3 py-1.5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                        title="Restore product to active status"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Restore</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleArchiveProduct(prod)}
+                        className="px-2.5 py-1.5 rounded-md text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-amber-200 dark:border-amber-800 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Archive product (preserves historical data, hides from active ordering)"
+                      >
+                        <Archive className="w-3.5 h-3.5" />
+                        <span>Archive</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteProduct(prod)}
+                      className="px-2 py-1.5 rounded-md text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Permanently delete product if no orders/stock/PO references exist"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -834,8 +960,32 @@ export default function ProductsPage() {
 
               <div>
                 <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
-                  Unique SKU Code *
+                  Product Category *
                 </label>
+                <select
+                  value={category}
+                  onChange={(e) =>
+                    handleCategoryChange(e.target.value as ProductRecord['category'])
+                  }
+                  className="w-full h-10 px-3 rounded-md bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                >
+                  {CATEGORIES.filter((c) => c !== 'All').map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-medium text-[var(--text-secondary)]">
+                    Unique SKU Code *
+                  </label>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
+                    AD-{'{CAT}'}-{'{SEQ}'}
+                  </span>
+                </div>
                 <input
                   type="text"
                   required
@@ -844,35 +994,19 @@ export default function ProductsPage() {
                     setSku(e.target.value);
                     if (formErrors.sku) setFormErrors((prev) => ({ ...prev, sku: '' }));
                   }}
-                  placeholder="e.g., AG-VEG-045"
-                  className={`w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular uppercase ${
+                  placeholder="AD-VEG-001"
+                  className={`w-full h-10 px-3 rounded-md bg-[var(--bg-card)] border text-xs font-mono-tabular uppercase ${
                     formErrors.sku ? 'border-rose-500' : 'border-[var(--border-subtle)]'
                   }`}
                 />
+                <div className="text-[10px] text-neutral-500 mt-1">
+                  Generated sequence is monotonic and non-reusable.
+                </div>
                 {formErrors.sku && (
                   <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-1">
                     {formErrors.sku}
                   </div>
                 )}
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
-                  Product Category *
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) =>
-                    setCategory(e.target.value as ProductRecord['category'])
-                  }
-                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs cursor-pointer"
-                >
-                  {CATEGORIES.filter((c) => c !== 'All').map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div>
@@ -1170,11 +1304,12 @@ export default function ProductsPage() {
                 onChange={(e) =>
                   setEditStatus(e.target.value as ProductRecord['status'])
                 }
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium"
+                className="w-full h-10 px-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium"
               >
                 <option value="Active">Active</option>
                 <option value="Seasonal Hold">Seasonal Hold</option>
                 <option value="Discontinued">Discontinued</option>
+                <option value="Archived">Archived</option>
               </select>
             </div>
           </div>
@@ -1188,12 +1323,35 @@ export default function ProductsPage() {
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
               placeholder="Grading specifications, packaging standard, origin county..."
-              className="w-full p-2.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="w-full p-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+            />
+          </div>
+
+          {/* Product Image Asset in Edit Modal */}
+          <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]">
+              <span>Product Image Asset</span>
+              {editImageUrl && (
+                <button
+                  type="button"
+                  onClick={() => setEditImageUrl('')}
+                  className="text-[11px] text-rose-600 dark:text-rose-400 hover:underline"
+                >
+                  Remove Custom Image
+                </button>
+              )}
+            </div>
+            <ImageUploadZone
+              label="Replace Product Photograph (JPG, PNG, WebP up to 5MB)"
+              value={editImageUrl || null}
+              onChange={(dataUrl) => setEditImageUrl(dataUrl || '')}
+              category={editCategory}
+              productName={editName || 'Product'}
             />
           </div>
 
           {/* Reorder and Inventory Configuration */}
-          <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
+          <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
             <div className="text-xs font-semibold text-[var(--text-primary)]">
               Warehouse & Stock Thresholds
             </div>
@@ -1311,19 +1469,111 @@ export default function ProductsPage() {
             <button
               type="button"
               onClick={() => setEditDetailsProduct(null)}
-              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="px-4 py-2 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-sm inline-flex items-center gap-1.5"
+              className="px-5 py-2 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5"
             >
               <Edit2 className="w-3.5 h-3.5" />
               <span>Save Changes</span>
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Connected Suppliers Sourcing Modal */}
+      <Modal
+        open={Boolean(sourcingModalProduct)}
+        onClose={() => setSourcingModalProduct(null)}
+        title={`Connected Sourcing Suppliers · ${sourcingModalProduct?.name}`}
+        subtitle={`Registered farm cooperatives and vendors providing SKU ${sourcingModalProduct?.sku} (${sourcingModalProduct?.unit}).`}
+      >
+        {sourcingModalProduct && (
+          <div className="space-y-4">
+            {getSuppliersForProduct(sourcingModalProduct.id).length === 0 ? (
+              <div className="rounded-lg border border-dashed border-neutral-300 p-8 text-center dark:border-neutral-700">
+                <Truck className="mx-auto h-8 w-8 text-neutral-400" />
+                <h4 className="mt-2 text-sm font-semibold text-neutral-900 dark:text-white">
+                  No direct suppliers configured
+                </h4>
+                <p className="mt-1 text-xs text-neutral-500">
+                  This product does not currently have registered suppliers in its sourcing price list.
+                  Add this SKU in the Suppliers module to track farmgate costs and lead times.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {getSuppliersForProduct(sourcingModalProduct.id).map((sup) => {
+                  const supplyItem = sup.suppliedProducts?.find(
+                    (p) => p.productId === sourcingModalProduct.id
+                  );
+                  return (
+                    <div
+                      key={sup.id}
+                      className="rounded-lg border border-neutral-200 bg-white p-4 shadow-xs dark:border-neutral-800 dark:bg-neutral-900"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">
+                              {sup.name}
+                            </h4>
+                            <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              {sup.code}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-xs text-neutral-500">
+                            {sup.region} · Contact: {sup.contactPerson} ({sup.phone})
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-bold text-emerald-700 dark:text-emerald-400 font-mono">
+                            KES {supplyItem?.currentCostKes.toLocaleString()} / {supplyItem?.unit || sourcingModalProduct.unit}
+                          </div>
+                          <p className="text-[10px] text-neutral-500">Quoted Farmgate Cost</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-neutral-100 pt-2 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
+                        <div>
+                          <span className="text-neutral-400">Lead Time: </span>
+                          <strong className="text-neutral-800 dark:text-neutral-200">
+                            {supplyItem?.leadTimeDays ?? sup.leadTimeDays} days
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-neutral-400">Min Order Qty: </span>
+                          <strong className="text-neutral-800 dark:text-neutral-200">
+                            {supplyItem?.moq ?? 10} {sourcingModalProduct.unit}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-neutral-400">Quality Score: </span>
+                          <strong className="text-neutral-800 dark:text-neutral-200">
+                            {sup.qualityScorePct}%
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setSourcingModalProduct(null)}
+                className="rounded-md border border-neutral-300 px-3.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

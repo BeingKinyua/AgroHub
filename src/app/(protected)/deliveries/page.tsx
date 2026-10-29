@@ -31,10 +31,22 @@ import { DeliveryRunRecord } from '@/types/domain/bos';
 
 function DeliveriesContent() {
   const searchParams = useSearchParams();
-  const { deliveries, orders, can, updateDeliveryStatus, recordDeliveryArrival } = useBos();
+  const {
+    deliveries,
+    orders,
+    vehicles,
+    drivers,
+    can,
+    updateDeliveryStatus,
+    recordDeliveryArrival,
+  } = useBos();
 
   const [filterMode, setFilterMode] = useState<'all' | 'exceptions' | 'in-transit' | 'pending' | 'delivered'>('all');
   const [podRun, setPodRun] = useState<DeliveryRunRecord | null>(null);
+  const [reassignRun, setReassignRun] = useState<DeliveryRunRecord | null>(null);
+  const [selectedVehicleReg, setSelectedVehicleReg] = useState('');
+  const [selectedDriverName, setSelectedDriverName] = useState('');
+  const [transportCostInput, setTransportCostInput] = useState<number>(4500);
   const [recipientName, setRecipientName] = useState('');
   const [feedback, setFeedback] = useState<{
     msg: string;
@@ -283,6 +295,10 @@ function DeliveriesContent() {
                   <span>Driver: <strong className="text-[var(--text-primary)]">{run.driverName}</strong> ({run.driverPhone})</span>
                   <span>·</span>
                   <span className="font-mono-tabular">Payload: {run.totalWeightKg.toLocaleString()} kg</span>
+                  <span>·</span>
+                  <span className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462] font-semibold">
+                    Transport Cost: KES {(run.transportCostKes || 4500).toLocaleString()}
+                  </span>
                 </div>
 
                 <div className="text-xs text-[var(--text-secondary)] pt-1">
@@ -301,43 +317,144 @@ function DeliveriesContent() {
               </div>
 
               {/* Status-Driven Primary Action (Section 26) */}
-              {can('deliveries.dispatch') && (
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  {run.status === 'Planned' && (
-                    <button
-                      type="button"
-                      onClick={() => handleStatusChange(run.id, 'Loaded')}
-                      className="h-9 px-4 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-semibold hover:border-[#4EB462] cursor-pointer"
-                    >
-                      Confirm Loading
-                    </button>
-                  )}
-                  {(run.status === 'Planned' || run.status === 'Loaded') && (
-                    <button
-                      type="button"
-                      onClick={() => handleStatusChange(run.id, 'Dispatched')}
-                      className="h-9 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Truck className="w-3.5 h-3.5" />
-                      <span>Dispatch Route</span>
-                    </button>
-                  )}
-                  {run.status !== 'Delivered' && (
-                    <button
-                      type="button"
-                      onClick={() => setPodRun(run)}
-                      className="h-9 px-4 rounded-full bg-[#12512C] hover:bg-[#1F6A37] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Capture POD</span>
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReassignRun(run);
+                    setSelectedVehicleReg(run.vehicleReg);
+                    setSelectedDriverName(run.driverName);
+                    setTransportCostInput(run.transportCostKes || 4500);
+                  }}
+                  className="h-9 px-3.5 rounded-md border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+                >
+                  Assign Fleet / Driver
+                </button>
+
+                {can('deliveries.dispatch') && (
+                  <>
+                    {run.status === 'Planned' && (
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange(run.id, 'Loaded')}
+                        className="h-9 px-4 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-semibold hover:border-[#4EB462] cursor-pointer"
+                      >
+                        Confirm Loading
+                      </button>
+                    )}
+                    {(run.status === 'Planned' || run.status === 'Loaded') && (
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange(run.id, 'Dispatched')}
+                        className="h-9 px-4 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Truck className="w-3.5 h-3.5" />
+                        <span>Dispatch Route</span>
+                      </button>
+                    )}
+                    {run.status !== 'Delivered' && (
+                      <button
+                        type="button"
+                        onClick={() => setPodRun(run)}
+                        className="h-9 px-4 rounded-md bg-[#12512C] hover:bg-[#1F6A37] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Capture POD</span>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </Card>
         ))}
       </div>
+
+      {/* Reassign Vehicle & Driver Modal */}
+      <Modal
+        open={Boolean(reassignRun)}
+        onClose={() => setReassignRun(null)}
+        title={reassignRun ? `Assign Vehicle & Driver · ${reassignRun.runNumber}` : ''}
+        subtitle="Select from registered AgroHub fleet vehicles and certified driver roster"
+      >
+        {reassignRun && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const foundDriver = drivers.find((d) => d.fullName === selectedDriverName);
+              const foundVehicle = vehicles.find((v) => v.registration === selectedVehicleReg);
+              reassignRun.vehicleReg = selectedVehicleReg;
+              reassignRun.driverName = selectedDriverName;
+              reassignRun.driverPhone = foundDriver?.phone || reassignRun.driverPhone;
+              reassignRun.transportCostKes = Number(transportCostInput);
+              reassignRun.assignedVehicleId = foundVehicle?.id;
+              reassignRun.assignedDriverId = foundDriver?.id;
+              setFeedback({
+                msg: `Route ${reassignRun.runNumber} assigned to ${selectedVehicleReg} (${selectedDriverName}). Transport cost: KES ${Number(transportCostInput).toLocaleString()}`,
+                type: 'success',
+              });
+              setReassignRun(null);
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-xs font-medium mb-1">Select Fleet Vehicle</label>
+              <select
+                value={selectedVehicleReg}
+                onChange={(e) => setSelectedVehicleReg(e.target.value)}
+                className="w-full h-10 px-3 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+              >
+                {vehicles.map((v) => (
+                  <option key={v.id} value={v.registration}>
+                    {v.registration} · {v.makeModel} ({v.type} · Capacity {v.capacityKg} kg · {v.status})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1">Select Assigned Driver</label>
+              <select
+                value={selectedDriverName}
+                onChange={(e) => setSelectedDriverName(e.target.value)}
+                className="w-full h-10 px-3 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+              >
+                {drivers.map((d) => (
+                  <option key={d.id} value={d.fullName}>
+                    {d.fullName} ({d.phone} · DL: {d.licenseNumber} · {d.status})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1">Estimated Transport & Fuel Cost (KES)</label>
+              <input
+                type="number"
+                value={transportCostInput}
+                onChange={(e) => setTransportCostInput(Number(e.target.value))}
+                className="w-full h-10 px-3 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+              />
+            </div>
+
+            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setReassignRun(null)}
+                className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
+              >
+                Save Assignment
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       {/* Electronic Proof of Delivery Modal */}
       <Modal
@@ -357,7 +474,7 @@ function DeliveriesContent() {
               value={recipientName}
               onChange={(e) => setRecipientName(e.target.value)}
               placeholder="e.g. Mrs. Esther Wambui · Stores Cateress (Stamp #402)"
-              className="w-full h-10 px-3.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="w-full h-10 px-3.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
             />
           </div>
 
@@ -369,13 +486,13 @@ function DeliveriesContent() {
             <button
               type="button"
               onClick={() => setPodRun(null)}
-              className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+              className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-10 px-5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
+              className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
             >
               Verify POD & Complete
             </button>

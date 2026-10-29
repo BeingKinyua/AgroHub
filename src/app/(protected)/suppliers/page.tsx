@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
+  Archive,
   Award,
   Ban,
   Calendar,
@@ -22,6 +23,7 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  Truck,
   Upload,
   X,
 } from 'lucide-react';
@@ -39,6 +41,8 @@ import {
   SupplierContract,
   SupplierDocumentItem,
   SupplierEvaluationRecord,
+  SupplierPayableRecord,
+  SupplierPaymentRecord,
   SupplierRecord,
   UnitOfMeasure,
 } from '@/types/domain/bos';
@@ -62,6 +66,13 @@ export default function SuppliersPage() {
     addSupplierDocument,
     verifySupplierDocument,
     evaluateSupplierPerformance,
+    supplierPayables,
+    supplierPayments,
+    archiveSupplier,
+    restoreSupplier,
+    deleteSupplier,
+    addSupplierProduct,
+    recordSupplierPayment,
   } = useBos();
 
   // Search & Filter State
@@ -91,7 +102,78 @@ export default function SuppliersPage() {
   const [contractsOpen, setContractsOpen] = useState(false);
   const [priceListOpen, setPriceListOpen] = useState(false);
   const [documentsOpen, setDocumentsOpen] = useState(false);
-  const [evaluationOpen, setEvaluationOpen] = useState(false);
+  // View mode tab: directory or accounts payable ledger
+  const [viewTab, setViewTab] = useState<'directory' | 'payables'>('directory');
+
+  // Payment Recording State
+  const [paymentPayable, setPaymentPayable] = useState<SupplierPayableRecord | null>(null);
+  const [payAmount, setPayAmount] = useState<number>(0);
+  const [payMethod, setPayMethod] = useState<SupplierPaymentRecord['paymentMethod']>('M-Pesa Paybill');
+  const [payRef, setPayRef] = useState('');
+  const [payNotes, setPayNotes] = useState('');
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+
+  // Sourcing Product Link Modal State
+  const [sourcingSupplier, setSourcingSupplier] = useState<SupplierRecord | null>(null);
+  const [sourceProductId, setSourceProductId] = useState(products[0]?.id || '');
+  const [sourceCostKes, setSourceCostKes] = useState(70);
+  const [sourceLeadDays, setSourceLeadDays] = useState(1);
+  const [sourceMoq, setSourceMoq] = useState(10);
+
+  const handleOpenRecordPayment = (payable: SupplierPayableRecord) => {
+    setPaymentPayable(payable);
+    setPayAmount(payable.balanceKes);
+    setPayRef('');
+    setPayNotes(`Disbursement for ${payable.poNumber}`);
+  };
+
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentPayable) return;
+    setIsSubmittingPayment(true);
+    const res = await recordSupplierPayment({
+      payableId: paymentPayable.id,
+      amountKes: Number(payAmount),
+      paymentMethod: payMethod,
+      referenceNumber: payRef.trim() || `TX-${Date.now().toString().slice(-6)}`,
+      notes: payNotes.trim(),
+    });
+    setIsSubmittingPayment(false);
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+    if (res.ok) setPaymentPayable(null);
+  };
+
+  const handleArchiveSupplier = async (sup: SupplierRecord) => {
+    const res = await archiveSupplier(sup.id);
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+  };
+
+  const handleRestoreSupplier = async (sup: SupplierRecord) => {
+    const res = await restoreSupplier(sup.id);
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+  };
+
+  const handleDeleteSupplier = async (sup: SupplierRecord) => {
+    const res = await deleteSupplier(sup.id);
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+  };
+
+  const handleSaveSourcingProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sourcingSupplier || !sourceProductId) return;
+    const prod = products.find((p) => p.id === sourceProductId);
+    if (!prod) return;
+    const res = await addSupplierProduct(sourcingSupplier.id, {
+      productId: prod.id,
+      productName: prod.name,
+      unit: prod.unit,
+      currentCostKes: Number(sourceCostKes),
+      leadTimeDays: Number(sourceLeadDays),
+      moq: Number(sourceMoq),
+    });
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+    if (res.ok) setSourcingSupplier(null);
+  };
 
   // 1. Create Supplier Form State
   const [newName, setNewName] = useState('');
@@ -498,6 +580,32 @@ export default function SuppliersPage() {
         </div>
       </div>
 
+      {/* Primary Module Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+        <button
+          type="button"
+          onClick={() => setViewTab('directory')}
+          className={`px-4 py-2 text-xs font-semibold rounded-md transition-colors ${
+            viewTab === 'directory'
+              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-canvas)]'
+          }`}
+        >
+          Supplier Directory & Sourcing ({suppliers.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewTab('payables')}
+          className={`px-4 py-2 text-xs font-semibold rounded-md transition-colors ${
+            viewTab === 'payables'
+              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-canvas)]'
+          }`}
+        >
+          Accounts Payable (AP) Ledger ({supplierPayables.length})
+        </button>
+      </div>
+
       {/* Decision KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPI
@@ -526,36 +634,38 @@ export default function SuppliersPage() {
         />
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(['All', 'Active', 'Under Review', 'Suspended'] as const).map((st) => (
-            <button
-              key={st}
-              type="button"
-              onClick={() => setStatusFilter(st)}
-              className={`h-8 px-3.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
-                statusFilter === st
-                  ? 'bg-[#1F6A37] text-white shadow-sm'
-                  : 'bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)]'
-              }`}
-            >
-              <span>{st}</span>
-              {st === 'Under Review' && underReviewCount > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px]">
-                  {underReviewCount}
-                </span>
-              )}
-              {st === 'Suspended' && suspendedCount > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px]">
-                  {suspendedCount}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+      {/* Filter and Search Bar (Directory Mode) */}
+      {viewTab === 'directory' && (
+        <div className="space-y-6">
+          <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(['All', 'Active', 'Under Review', 'Suspended'] as const).map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setStatusFilter(st)}
+                className={`h-8 px-3.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                  statusFilter === st
+                    ? 'bg-[#1F6A37] text-white shadow-xs'
+                    : 'bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)]'
+                }`}
+              >
+                <span>{st}</span>
+                {st === 'Under Review' && underReviewCount > 0 && (
+                  <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px]">
+                    {underReviewCount}
+                  </span>
+                )}
+                {st === 'Suspended' && suspendedCount > 0 && (
+                  <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px]">
+                    {suspendedCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
           {/* Category Dropdown */}
           <select
             value={categoryFilter}
@@ -788,7 +898,7 @@ export default function SuppliersPage() {
                     <button
                       type="button"
                       onClick={() => handleOpenDocuments(sup)}
-                      className="h-7 px-2.5 rounded-full bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                      className="h-7 px-2.5 rounded-md bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
                       title="Manage compliance documents"
                     >
                       <FileCheck className="w-3 h-3 text-[var(--text-secondary)]" />
@@ -799,21 +909,32 @@ export default function SuppliersPage() {
                     <button
                       type="button"
                       onClick={() => handleOpenEvaluation(sup)}
-                      className="h-7 px-2.5 rounded-full bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                      className="h-7 px-2.5 rounded-md bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
                       title="Evaluate performance score"
                     >
                       <Award className="w-3 h-3 text-amber-600 dark:text-amber-400" />
                       <span>Audit ({sup.qualityScorePct}%)</span>
                     </button>
+
+                    {/* 5. Sourcing Product Config */}
+                    <button
+                      type="button"
+                      onClick={() => setSourcingSupplier(sup)}
+                      className="h-7 px-2.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Link and manage products supplied by this vendor"
+                    >
+                      <Truck className="w-3 h-3" />
+                      <span>Sourcing ({productsCount})</span>
+                    </button>
                   </div>
 
-                  {/* Lifecycle Controls: Approve or Suspend */}
+                  {/* Lifecycle Controls: Approve, Suspend, Archive, Delete */}
                   <div className="flex items-center gap-1.5">
                     {isUnderReview && canApprove && (
                       <button
                         type="button"
                         onClick={() => handleOpenApprove(sup)}
-                        className="h-7 px-3 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shadow-sm"
+                        className="h-7 px-3 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shadow-xs"
                       >
                         <CheckCircle2 className="w-3 h-3" />
                         <span>Approve</span>
@@ -824,17 +945,141 @@ export default function SuppliersPage() {
                       <button
                         type="button"
                         onClick={() => handleOpenSuspend(sup)}
-                        className="h-7 px-3 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                        className="h-7 px-3 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
                       >
                         <Ban className="w-3 h-3" />
                         <span>Suspend</span>
                       </button>
                     )}
+
+                    {sup.isArchived ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreSupplier(sup)}
+                        className="h-7 px-2.5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shadow-xs"
+                        title="Restore supplier to active status"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Restore</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleArchiveSupplier(sup)}
+                        className="h-7 px-2.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Archive supplier record"
+                      >
+                        <Archive className="w-3 h-3" />
+                        <span>Archive</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSupplier(sup)}
+                      className="h-7 px-2 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium inline-flex items-center cursor-pointer transition-colors"
+                      title="Permanently delete vendor if no POs or payables exist"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               </Card>
             );
           })}
+        </div>
+      )}
+        </div>
+      )}
+
+      {/* Accounts Payable (AP) Ledger View */}
+      {viewTab === 'payables' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                Accounts Payable Ledger & Farm Sourcing Disbursements
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Every purchase confirmation creates an immutable payable obligation. Record M-Pesa, EFT, or Cheque settlements here.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400">
+                Outstanding: KES {supplierPayables.reduce((acc, p) => acc + p.balanceKes, 0).toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
+            <table className="min-w-full divide-y divide-neutral-200 dark:divide-neutral-800">
+              <thead className="bg-neutral-50 dark:bg-neutral-800/50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">Payable Ref & PO</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">Supplier Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">Due Date</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500">Total Obligation</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500">Settled (Paid)</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500">Outstanding Balance</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-neutral-500">Status</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                {supplierPayables.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-xs text-neutral-500">
+                      No supplier payables recorded. Confirming goods collection on purchase orders creates payables automatically.
+                    </td>
+                  </tr>
+                ) : (
+                  supplierPayables.map((p) => (
+                    <tr key={p.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30">
+                      <td className="px-4 py-3 text-xs">
+                        <div className="font-semibold text-neutral-900 dark:text-white font-mono">{p.id}</div>
+                        <div className="text-neutral-500 font-mono">{p.poNumber} · {p.invoiceRef}</div>
+                      </td>
+                      <td className="px-4 py-3 text-xs font-medium text-neutral-900 dark:text-white">
+                        {p.supplierName}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-neutral-600 dark:text-neutral-300">
+                        {p.dueDate}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-right font-mono font-medium text-neutral-900 dark:text-white">
+                        KES {p.amountKes.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-right font-mono text-emerald-600 dark:text-emerald-400">
+                        KES {p.paidAmountKes.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-right font-mono font-bold text-neutral-900 dark:text-white">
+                        KES {p.balanceKes.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-center">
+                        <StatusBadge
+                          status={p.status}
+                          tone={p.status === 'Paid' ? 'success' : p.status === 'Partially Paid' ? 'warning' : 'error'}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs">
+                        {p.balanceKes > 0 && can('finance.record_payment') && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRecordPayment(p)}
+                            className="rounded-md bg-[#1F6A37] px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-[#12512C]"
+                          >
+                            Record Payment
+                          </button>
+                        )}
+                        {p.balanceKes === 0 && (
+                          <span className="text-xs text-emerald-600 font-medium">Fully Settled</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -1925,19 +2170,223 @@ export default function SuppliersPage() {
             <button
               type="button"
               onClick={() => setEvaluationOpen(false)}
-              className="h-9 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-9 px-5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-sm inline-flex items-center gap-1.5"
+              className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5"
             >
               <Award className="w-4 h-4" />
               <span>Record Performance Audit</span>
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* 9. RECORD SUPPLIER PAYMENT MODAL */}
+      {/* ========================================================================= */}
+      <Modal
+        open={Boolean(paymentPayable)}
+        onClose={() => setPaymentPayable(null)}
+        title={`Record Supplier Payment · ${paymentPayable?.supplierName}`}
+        subtitle={`Disburse payment against payable obligation ${paymentPayable?.id} (PO: ${paymentPayable?.poNumber}).`}
+      >
+        {paymentPayable && (
+          <form onSubmit={handleRecordPaymentSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs">
+              <div>
+                <span className="text-[var(--text-secondary)]">Total Invoiced:</span>
+                <p className="font-mono font-semibold text-neutral-900 dark:text-white">
+                  KES {paymentPayable.amountKes.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <span className="text-[var(--text-secondary)]">Outstanding Balance:</span>
+                <p className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                  KES {paymentPayable.balanceKes.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                Disbursement Amount (KES) *
+              </label>
+              <input
+                type="number"
+                required
+                min={1}
+                max={paymentPayable.balanceKes}
+                value={payAmount}
+                onChange={(e) => setPayAmount(Number(e.target.value))}
+                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-mono font-semibold text-[var(--text-primary)]"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Payment Method *
+                </label>
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value as SupplierPaymentRecord['paymentMethod'])}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                >
+                  <option value="M-Pesa Paybill">M-Pesa Paybill</option>
+                  <option value="EFT / Bank Transfer">EFT / Bank Transfer</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Transaction Code / Ref *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. QK9182XZ71"
+                  value={payRef}
+                  onChange={(e) => setPayRef(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-mono uppercase"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                Settlement Notes & Remittance Advice
+              </label>
+              <input
+                type="text"
+                value={payNotes}
+                onChange={(e) => setPayNotes(e.target.value)}
+                placeholder="e.g. Cleared via NCBA Business Banking"
+                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
+              <button
+                type="button"
+                onClick={() => setPaymentPayable(null)}
+                className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingPayment}
+                className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <DollarSign className="w-4 h-4" />
+                <span>{isSubmittingPayment ? 'Processing...' : 'Confirm Disbursement'}</span>
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* 10. CONFIGURE SOURCING PRODUCT MODAL */}
+      {/* ========================================================================= */}
+      <Modal
+        open={Boolean(sourcingSupplier)}
+        onClose={() => setSourcingSupplier(null)}
+        title={`Configure Sourced Product · ${sourcingSupplier?.name}`}
+        subtitle={`Link products and farmgate procurement costs for ${sourcingSupplier?.code}.`}
+      >
+        {sourcingSupplier && (
+          <form onSubmit={handleSaveSourcingProduct} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                Select Product from Catalog *
+              </label>
+              <select
+                value={sourceProductId}
+                onChange={(e) => {
+                  setSourceProductId(e.target.value);
+                  const p = products.find((prod) => prod.id === e.target.value);
+                  if (p) setSourceCostKes(p.pricing.supplierCostKes);
+                }}
+                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+              >
+                {products.filter((p) => p.status !== 'Archived').map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.sku}) · Unit: {p.unit}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Quoted Farmgate Cost (KES) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  value={sourceCostKes}
+                  onChange={(e) => setSourceCostKes(Number(e.target.value))}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-mono font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Lead Time (Days) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={30}
+                  value={sourceLeadDays}
+                  onChange={(e) => setSourceLeadDays(Number(e.target.value))}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Min Order Qty (MOQ) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  value={sourceMoq}
+                  onChange={(e) => setSourceMoq(Number(e.target.value))}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
+              <button
+                type="button"
+                onClick={() => setSourcingSupplier(null)}
+                className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+              >
+                <Truck className="w-4 h-4" />
+                <span>Save Sourced Product</span>
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );

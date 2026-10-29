@@ -9,6 +9,7 @@ import {
   CustomerInstitutionRecord,
   DeliveryRunRecord,
   DocumentRecord,
+  DriverRecord,
   InternalUser,
   InvoiceRecord,
   NotificationItem,
@@ -31,8 +32,11 @@ import {
   SupplierContract,
   SupplierDocumentItem,
   SupplierEvaluationRecord,
+  SupplierPayableRecord,
+  SupplierPaymentRecord,
   SupplierRecord,
   UnitOfMeasure,
+  VehicleRecord,
   WarehouseRecord,
 } from '@/types/domain/bos';
 import {
@@ -47,6 +51,7 @@ import {
   INITIAL_CUSTOMERS,
   INITIAL_DELIVERIES,
   INITIAL_DOCUMENTS,
+  INITIAL_DRIVERS,
   INITIAL_INVOICES,
   INITIAL_NOTIFICATIONS,
   INITIAL_ORDERS,
@@ -56,7 +61,10 @@ import {
   INITIAL_STOCK_BATCHES,
   INITIAL_STOCK_MOVEMENTS,
   INITIAL_SUPPLIERS,
+  INITIAL_SUPPLIER_PAYABLES,
+  INITIAL_SUPPLIER_PAYMENTS,
   INITIAL_USERS,
+  INITIAL_VEHICLES,
   INITIAL_WAREHOUSES,
 } from '@/lib/services/initial-data';
 
@@ -125,6 +133,11 @@ interface BosContextValue {
   auditLogs: AuditLogRecord[];
   notifications: NotificationItem[];
   podRecords: PODEvidenceRecord[];
+  vehicles: VehicleRecord[];
+  drivers: DriverRecord[];
+  supplierPayables: SupplierPayableRecord[];
+  supplierPayments: SupplierPaymentRecord[];
+  deletedSkus: string[];
 
   // Dashboard Widget Customization
   enabledWidgets: string[];
@@ -209,6 +222,9 @@ interface BosContextValue {
     itemsSummary: string;
     totalKes: number;
     expectedDate: string;
+    purpose?: 'Direct Customer Fulfillment' | 'Bulk Stock Procurement';
+    customerOrderId?: string;
+    customerOrderNumber?: string;
   }) => Promise<{ ok: boolean; message: string }>;
   advanceProcurementStage: (
     poId: string
@@ -345,6 +361,49 @@ interface BosContextValue {
     supplierId: string,
     evaluation: Omit<SupplierEvaluationRecord, 'id' | 'evaluationDate' | 'evaluator'>
   ) => Promise<{ ok: boolean; message: string }>;
+
+  // SKU & Product Lifecycle
+  getNextSku: (category: string) => string;
+  archiveProduct: (productId: string) => Promise<{ ok: boolean; message: string }>;
+  restoreProduct: (productId: string) => Promise<{ ok: boolean; message: string }>;
+  deleteProduct: (productId: string) => Promise<{ ok: boolean; message: string }>;
+
+  // Supplier Enhancements & Sourcing
+  archiveSupplier: (supplierId: string) => Promise<{ ok: boolean; message: string }>;
+  restoreSupplier: (supplierId: string) => Promise<{ ok: boolean; message: string }>;
+  deleteSupplier: (supplierId: string) => Promise<{ ok: boolean; message: string }>;
+  addSupplierProduct: (
+    supplierId: string,
+    item: {
+      productId: string;
+      productName: string;
+      unit: UnitOfMeasure;
+      currentCostKes: number;
+      leadTimeDays?: number;
+      moq?: number;
+    }
+  ) => Promise<{ ok: boolean; message: string }>;
+  getSuppliersForProduct: (productId: string) => SupplierRecord[];
+
+  // Procurement Sourcing & Supplier Payables
+  confirmPurchaseAndCollection: (
+    poId: string,
+    actualCostKes: number,
+    notes?: string
+  ) => Promise<{ ok: boolean; message: string; payableId?: string }>;
+  recordSupplierPayment: (input: {
+    payableId: string;
+    amountKes: number;
+    paymentMethod: SupplierPaymentRecord['paymentMethod'];
+    referenceNumber: string;
+    notes?: string;
+  }) => Promise<{ ok: boolean; message: string }>;
+
+  // Fleet & Driver Management
+  createVehicle: (input: Omit<VehicleRecord, 'id'>) => Promise<{ ok: boolean; message: string }>;
+  updateVehicle: (id: string, updates: Partial<VehicleRecord>) => Promise<{ ok: boolean; message: string }>;
+  createDriver: (input: Omit<DriverRecord, 'id' | 'deliveriesCompleted' | 'rating'>) => Promise<{ ok: boolean; message: string }>;
+  updateDriver: (id: string, updates: Partial<DriverRecord>) => Promise<{ ok: boolean; message: string }>;
 }
 
 const DEFAULT_WIDGETS = [
@@ -489,6 +548,13 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
   );
   const [podRecords, setPodRecords] =
     useState<PODEvidenceRecord[]>(INITIAL_PODS);
+  const [vehicles, setVehicles] = useState<VehicleRecord[]>(INITIAL_VEHICLES);
+  const [drivers, setDrivers] = useState<DriverRecord[]>(INITIAL_DRIVERS);
+  const [supplierPayables, setSupplierPayables] =
+    useState<SupplierPayableRecord[]>(INITIAL_SUPPLIER_PAYABLES);
+  const [supplierPayments, setSupplierPayments] =
+    useState<SupplierPaymentRecord[]>(INITIAL_SUPPLIER_PAYMENTS);
+  const [deletedSkus, setDeletedSkus] = useState<string[]>([]);
   const [enabledWidgets, setEnabledWidgets] =
     useState<string[]>(DEFAULT_WIDGETS);
 
@@ -859,9 +925,27 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: `Product ${item.productId} not found in catalog.` };
       }
 
-      // Check stock sufficiency across lines
-      if (qty > product.availableQty && !can('orders.approve')) {
-        const msg = `Insufficient FEFO stock for ${product.name} (${product.availableQty} ${product.unit} available, requested ${qty} ${product.unit}). Stock override requires 'orders.approve' authority.`;
+      // Sourcing mode resolution: direct procurement does not demand warehouse stock
+      const sourcingMode =
+        item.sourcingMode ||
+        (qty > product.availableQty ? 'direct_procurement' : 'existing_stock');
+      const isDirectOnly = sourcingMode === 'direct_procurement';
+      const stockQty =
+        item.stockAllocatedQty !== undefined
+          ? item.stockAllocatedQty
+          : isDirectOnly
+          ? 0
+          : Math.min(qty, product.availableQty);
+      const directQty =
+        item.directProcuredQty !== undefined
+          ? item.directProcuredQty
+          : isDirectOnly
+          ? qty
+          : Math.max(0, qty - stockQty);
+
+      // Check stock sufficiency only for lines allocating from warehouse stock
+      if (stockQty > product.availableQty && !can('orders.approve')) {
+        const msg = `Insufficient FEFO stock for ${product.name} (${product.availableQty} ${product.unit} available, stock allocation requested ${stockQty} ${product.unit}). Stock override requires 'orders.approve' authority.`;
         pushToast({ title: 'FEFO Stock Constraint', description: msg, tone: 'warning' });
         return { ok: false, message: msg };
       }
@@ -869,10 +953,12 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       // Auto-assign FEFO batch
       const matchingBatch =
         item.allocatedBatch ||
-        stockBatches
-          .filter((b) => b.productId === product.id && b.daysToExpiry > 0)
-          .sort((a, b) => a.daysToExpiry - b.daysToExpiry)[0]?.batchNumber ||
-        'LOT-FEFO-AUTO';
+        (isDirectOnly
+          ? 'DIRECT-FARM-DISPATCH'
+          : stockBatches
+              .filter((b) => b.productId === product.id && b.daysToExpiry > 0)
+              .sort((a, b) => a.daysToExpiry - b.daysToExpiry)[0]?.batchNumber ||
+            'LOT-FEFO-AUTO');
 
       // Determine pricing tier & unit price
       let defaultUnitPrice = product.pricing.retailKes;
@@ -926,9 +1012,17 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         unitPriceKes: finalUnitPrice,
         pricingTier,
         lineTotalKes,
+        sourcingMode,
+        stockAllocatedQty: stockQty,
+        directProcuredQty: directQty,
+        supplierId: item.supplierId,
+        supplierName: item.supplierName,
+        purchaseCostKes: item.purchaseCostKes,
       });
 
-      stockDeltas.push({ productId: product.id, quantity: qty });
+      if (stockQty > 0) {
+        stockDeltas.push({ productId: product.id, quantity: stockQty });
+      }
     }
 
     const needsPriceApproval = priceOverrideApprovals.length > 0;
@@ -1651,6 +1745,9 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       supplierId: supplier.id,
       supplierName: supplier.name,
       warehouseName: input.warehouseName,
+      purpose: input.purpose || 'Direct Customer Fulfillment',
+      customerOrderId: input.customerOrderId,
+      customerOrderNumber: input.customerOrderNumber,
       stage: input.totalKes >= 250000 ? 'Pending Approval' : 'PO Issued',
       expectedDate: input.expectedDate,
       totalKes: input.totalKes,
@@ -2713,6 +2810,573 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     return { ok: true, message: 'Performance evaluation completed.' };
   };
 
+  // SKU Auto-Sequence Generator strictly formatted AD-{CAT}-{SEQ}
+  const getNextSku: BosContextValue['getNextSku'] = (category: string) => {
+    const categoryMap: Record<string, string> = {
+      Vegetables: 'VEG',
+      Fruits: 'FRU',
+      'Cereals & Pulses': 'CER',
+      'Tubers & Roots': 'TUB',
+      'Dairy & Eggs': 'DAI',
+      'Herbs & Spices': 'HRB',
+    };
+    const prefix = categoryMap[category] || category.slice(0, 3).toUpperCase();
+    const regex = new RegExp(`^AD-${prefix}-(\\d+)$`);
+    
+    let maxSeq = 0;
+    products.forEach((p) => {
+      const match = p.sku.match(regex);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxSeq) maxSeq = num;
+      }
+    });
+    deletedSkus.forEach((sku) => {
+      const match = sku.match(regex);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxSeq) maxSeq = num;
+      }
+    });
+    
+    const nextSeq = maxSeq + 1;
+    return `AD-${prefix}-${String(nextSeq).padStart(3, '0')}`;
+  };
+
+  const archiveProduct: BosContextValue['archiveProduct'] = async (productId) => {
+    if (!can('products.edit')) {
+      const msg = 'Access Denied: Your role lacks permission (products.edit) to archive products.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = products.find((p) => p.id === productId);
+    if (!target) return { ok: false, message: 'Product not found.' };
+
+    const now = new Date().toISOString();
+    const updated: ProductRecord = {
+      ...target,
+      status: 'Archived',
+      archivedAt: now,
+    };
+    setProducts((prev) => prev.map((p) => (p.id === productId ? updated : p)));
+    appendAudit(
+      'Products',
+      `${target.sku} (${target.name})`,
+      'Archived Product SKU',
+      target.status,
+      'Archived'
+    );
+    pushToast({
+      title: 'Product Archived',
+      description: `${target.name} (${target.sku}) has been archived. It will no longer appear for active order placement.`,
+      tone: 'info',
+    });
+    return { ok: true, message: `Product ${target.sku} archived successfully.` };
+  };
+
+  const restoreProduct: BosContextValue['restoreProduct'] = async (productId) => {
+    if (!can('products.edit')) {
+      const msg = 'Access Denied: Your role lacks permission (products.edit) to restore products.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = products.find((p) => p.id === productId);
+    if (!target) return { ok: false, message: 'Product not found.' };
+
+    const updated: ProductRecord = {
+      ...target,
+      status: 'Active',
+      archivedAt: undefined,
+    };
+    setProducts((prev) => prev.map((p) => (p.id === productId ? updated : p)));
+    appendAudit(
+      'Products',
+      `${target.sku} (${target.name})`,
+      'Restored Product SKU',
+      'Archived',
+      'Active'
+    );
+    pushToast({
+      title: 'Product Restored',
+      description: `${target.name} (${target.sku}) is restored to Active status.`,
+      tone: 'success',
+    });
+    return { ok: true, message: `Product ${target.sku} restored successfully.` };
+  };
+
+  const deleteProduct: BosContextValue['deleteProduct'] = async (productId) => {
+    if (!can('products.edit')) {
+      const msg = 'Access Denied: Your role lacks permission (products.edit) to delete products.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = products.find((p) => p.id === productId);
+    if (!target) return { ok: false, message: 'Product not found.' };
+
+    // Strict dependency check
+    const hasOrderRefs = orders.some((o) =>
+      o.items?.some((i) => i.productId === productId || i.sku === target.sku)
+    );
+    const hasStockRefs = stockBatches.some((b) => b.productId === productId || b.sku === target.sku);
+    const hasProcurementRefs = procurementOrders.some((p) =>
+      p.lines?.some((l) => l.productId === productId || l.sku === target.sku)
+    );
+
+    if (hasOrderRefs || hasStockRefs || hasProcurementRefs) {
+      const reason = [
+        hasOrderRefs ? 'historical customer orders' : '',
+        hasStockRefs ? 'warehouse stock batches' : '',
+        hasProcurementRefs ? 'procurement purchase orders' : '',
+      ]
+        .filter(Boolean)
+        .join(', ');
+      const msg = `Cannot permanently delete product: SKU ${target.sku} is referenced in ${reason}. Please Archive the product instead to maintain audit integrity.`;
+      pushToast({ title: 'Deletion Prohibited', description: msg, tone: 'error' });
+      return { ok: false, message: msg };
+    }
+
+    setDeletedSkus((prev) => [...prev, target.sku]);
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    appendAudit(
+      'Products',
+      `${target.sku} (${target.name})`,
+      'Permanently Deleted Product SKU',
+      target.status,
+      'Deleted'
+    );
+    pushToast({
+      title: 'Product Deleted',
+      description: `${target.name} (${target.sku}) was permanently removed from the catalog.`,
+      tone: 'info',
+    });
+    return { ok: true, message: 'Product deleted successfully.' };
+  };
+
+  const archiveSupplier: BosContextValue['archiveSupplier'] = async (supplierId) => {
+    if (!can('suppliers.edit') && !can('suppliers.suspend')) {
+      const msg = 'Access Denied: Your role lacks permission to archive suppliers.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const updated: SupplierRecord = {
+      ...target,
+      status: 'Suspended',
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+    };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Archived Supplier',
+      target.status,
+      'Archived'
+    );
+    pushToast({
+      title: 'Supplier Archived',
+      description: `${target.name} has been archived.`,
+      tone: 'info',
+    });
+    return { ok: true, message: `${target.name} archived.` };
+  };
+
+  const restoreSupplier: BosContextValue['restoreSupplier'] = async (supplierId) => {
+    if (!can('suppliers.edit')) {
+      const msg = 'Access Denied: Your role lacks permission to restore suppliers.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const updated: SupplierRecord = {
+      ...target,
+      status: 'Active',
+      isArchived: false,
+      archivedAt: undefined,
+    };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Restored Supplier',
+      'Archived',
+      'Active'
+    );
+    pushToast({
+      title: 'Supplier Restored',
+      description: `${target.name} is now restored to Active status.`,
+      tone: 'success',
+    });
+    return { ok: true, message: `${target.name} restored.` };
+  };
+
+  const deleteSupplier: BosContextValue['deleteSupplier'] = async (supplierId) => {
+    if (!can('suppliers.edit')) {
+      const msg = 'Access Denied: Your role lacks permission to delete suppliers.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const hasProcurement = procurementOrders.some((p) => p.supplierId === supplierId);
+    const hasPayables = supplierPayables.some((p) => p.supplierId === supplierId);
+
+    if (hasProcurement || hasPayables) {
+      const msg = `Cannot permanently delete supplier: ${target.name} has associated purchase orders or payables ledger records. Please Archive or Suspend instead.`;
+      pushToast({ title: 'Deletion Prohibited', description: msg, tone: 'error' });
+      return { ok: false, message: msg };
+    }
+
+    setSuppliers((prev) => prev.filter((s) => s.id !== supplierId));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Permanently Deleted Supplier',
+      target.status,
+      'Deleted'
+    );
+    pushToast({
+      title: 'Supplier Deleted',
+      description: `${target.name} was removed from the directory.`,
+      tone: 'info',
+    });
+    return { ok: true, message: 'Supplier deleted successfully.' };
+  };
+
+  const addSupplierProduct: BosContextValue['addSupplierProduct'] = async (supplierId, item) => {
+    if (!can('suppliers.edit')) {
+      const msg = 'Access Denied: Your role lacks permission (suppliers.edit) to configure sourcing products.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const existingIndex = (target.suppliedProducts || []).findIndex(
+      (p) => p.productId === item.productId
+    );
+
+    let updatedProducts = [...(target.suppliedProducts || [])];
+    if (existingIndex >= 0) {
+      updatedProducts[existingIndex] = {
+        ...updatedProducts[existingIndex],
+        productName: item.productName,
+        unit: item.unit,
+        currentCostKes: item.currentCostKes,
+        leadTimeDays: item.leadTimeDays ?? target.leadTimeDays,
+        moq: item.moq ?? 10,
+        lastUpdated: todayStr,
+      };
+    } else {
+      updatedProducts.push({
+        productId: item.productId,
+        productName: item.productName,
+        unit: item.unit,
+        currentCostKes: item.currentCostKes,
+        previousCostKes: item.currentCostKes,
+        leadTimeDays: item.leadTimeDays ?? target.leadTimeDays,
+        moq: item.moq ?? 10,
+        lastUpdated: todayStr,
+      });
+    }
+
+    const updated: SupplierRecord = {
+      ...target,
+      suppliedProducts: updatedProducts,
+    };
+    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
+    appendAudit(
+      'Suppliers',
+      target.code,
+      'Configured Sourced Product in Catalog',
+      'Previous Sourcing List',
+      `${item.productName} @ KES ${item.currentCostKes}/${item.unit}`
+    );
+    pushToast({
+      title: 'Sourced Product Linked',
+      description: `${item.productName} linked to ${target.name} at KES ${item.currentCostKes}/${item.unit}.`,
+      tone: 'success',
+    });
+    return { ok: true, message: 'Sourced product saved.' };
+  };
+
+  const getSuppliersForProduct: BosContextValue['getSuppliersForProduct'] = (productId: string) => {
+    return suppliers.filter(
+      (s) =>
+        s.status !== 'Suspended' &&
+        !s.isArchived &&
+        s.suppliedProducts?.some((p) => p.productId === productId)
+    );
+  };
+
+  const confirmPurchaseAndCollection: BosContextValue['confirmPurchaseAndCollection'] = async (
+    poId,
+    actualCostKes,
+    notes
+  ) => {
+    if (!can('procurement.create') && !can('procurement.approve') && !can('inventory.receive')) {
+      const msg = 'Access Denied: Your role lacks permission to confirm goods collection.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = procurementOrders.find((p) => p.id === poId);
+    if (!target) return { ok: false, message: 'Purchase order not found.' };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+    const payableId = `PAYABLE-2026-${String(supplierPayables.length + 1).padStart(3, '0')}`;
+
+    const newPayable: SupplierPayableRecord = {
+      id: payableId,
+      supplierId: target.supplierId,
+      supplierName: target.supplierName,
+      purchaseOrderId: target.id,
+      poNumber: target.poNumber,
+      invoiceRef: `INV-SUP-${target.poNumber}`,
+      amountKes: actualCostKes,
+      paidAmountKes: 0,
+      balanceKes: actualCostKes,
+      dueDate,
+      status: 'Unpaid',
+      createdAt: todayStr,
+    };
+
+    setSupplierPayables((prev) => [newPayable, ...prev]);
+
+    const updatedPo: ProcurementOrderRecord = {
+      ...target,
+      stage: 'Goods Collected',
+      goodsCollected: true,
+      collectionDate: todayStr,
+      actualPurchaseCostKes: actualCostKes,
+      supplierPayableCreated: true,
+      supplierPayableId: payableId,
+    };
+    setProcurementOrders((prev) => prev.map((p) => (p.id === poId ? updatedPo : p)));
+
+    setSuppliers((prev) =>
+      prev.map((s) =>
+        s.id === target.supplierId
+          ? { ...s, payableBalanceKes: (s.payableBalanceKes || 0) + actualCostKes }
+          : s
+      )
+    );
+
+    if (target.customerOrderId) {
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === target.customerOrderId
+            ? {
+                ...o,
+                status: 'Packed',
+                nextStepLabel: 'Direct Procured Goods Collected · Ready for Dispatch',
+              }
+            : o
+        )
+      );
+    }
+
+    appendAudit(
+      'Procurement',
+      target.poNumber,
+      'Confirmed Goods Collection & Created Supplier Payable',
+      `PO Stage: ${target.stage}`,
+      `Goods Collected · Payable ${payableId} Created (KES ${actualCostKes.toLocaleString()})`
+    );
+
+    pushToast({
+      title: 'Goods Collected & Payable Created',
+      description: `Collection confirmed for ${target.poNumber}. Supplier payable ${payableId} for KES ${actualCostKes.toLocaleString()} generated for ${target.supplierName}.`,
+      tone: 'success',
+    });
+
+    return { ok: true, message: 'Goods collection confirmed and payable created.', payableId };
+  };
+
+  const recordSupplierPayment: BosContextValue['recordSupplierPayment'] = async (input) => {
+    if (!can('finance.record_payment')) {
+      const msg = 'Access Denied: Your role lacks permission (finance.record_payment) to disburse vendor payments.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const payable = supplierPayables.find((p) => p.id === input.payableId);
+    if (!payable) return { ok: false, message: 'Supplier payable not found.' };
+
+    if (input.amountKes <= 0) {
+      return { ok: false, message: 'Payment amount must be greater than zero.' };
+    }
+    if (input.amountKes > payable.balanceKes) {
+      return {
+        ok: false,
+        message: `Payment amount (KES ${input.amountKes.toLocaleString()}) exceeds outstanding balance (KES ${payable.balanceKes.toLocaleString()}).`,
+      };
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newPaidAmount = payable.paidAmountKes + input.amountKes;
+    const newBalance = payable.balanceKes - input.amountKes;
+    const newStatus = newBalance <= 0 ? 'Paid' : 'Partially Paid';
+
+    const newPayment: SupplierPaymentRecord = {
+      id: `SPAY-${Date.now().toString().slice(-6)}`,
+      payableId: payable.id,
+      supplierId: payable.supplierId,
+      supplierName: payable.supplierName,
+      amountKes: input.amountKes,
+      paymentDate: todayStr,
+      paymentMethod: input.paymentMethod,
+      referenceNumber: input.referenceNumber,
+      notes: input.notes,
+      recordedBy: currentUser?.fullName || 'Finance Operations',
+    };
+
+    setSupplierPayments((prev) => [newPayment, ...prev]);
+
+    setSupplierPayables((prev) =>
+      prev.map((p) =>
+        p.id === input.payableId
+          ? { ...p, paidAmountKes: newPaidAmount, balanceKes: newBalance, status: newStatus }
+          : p
+      )
+    );
+
+    setSuppliers((prev) =>
+      prev.map((s) =>
+        s.id === payable.supplierId
+          ? { ...s, payableBalanceKes: Math.max(0, (s.payableBalanceKes || 0) - input.amountKes) }
+          : s
+      )
+    );
+
+    appendAudit(
+      'Finance',
+      payable.poNumber,
+      'Disbursed Supplier Payment',
+      `Outstanding: KES ${payable.balanceKes.toLocaleString()}`,
+      `Paid KES ${input.amountKes.toLocaleString()} via ${input.paymentMethod} (${input.referenceNumber})`
+    );
+
+    pushToast({
+      title: 'Supplier Payment Recorded',
+      description: `Disbursed KES ${input.amountKes.toLocaleString()} to ${payable.supplierName} (${input.paymentMethod} Ref: ${input.referenceNumber}).`,
+      tone: 'success',
+    });
+
+    return { ok: true, message: 'Supplier payment recorded successfully.' };
+  };
+
+  const createVehicle: BosContextValue['createVehicle'] = async (input) => {
+    if (!can('fleet.manage')) {
+      const msg = 'Access Denied: Your role lacks permission (fleet.manage) to register vehicles.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const newVehicle: VehicleRecord = {
+      ...input,
+      id: `VEH-${String(vehicles.length + 1).padStart(3, '0')}`,
+    };
+    setVehicles((prev) => [newVehicle, ...prev]);
+    appendAudit(
+      'Fleet',
+      newVehicle.registration,
+      'Registered Fleet Vehicle',
+      'None',
+      `${newVehicle.makeModel} (${newVehicle.type}) · Capacity: ${newVehicle.capacityKg} kg`
+    );
+    pushToast({
+      title: 'Vehicle Registered',
+      description: `${newVehicle.registration} (${newVehicle.makeModel}) added to active fleet.`,
+      tone: 'success',
+    });
+    return { ok: true, message: 'Vehicle registered.' };
+  };
+
+  const updateVehicle: BosContextValue['updateVehicle'] = async (id, updates) => {
+    if (!can('fleet.manage')) {
+      const msg = 'Access Denied: Your role lacks permission (fleet.manage) to update vehicles.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = vehicles.find((v) => v.id === id);
+    if (!target) return { ok: false, message: 'Vehicle not found.' };
+
+    const updated = { ...target, ...updates };
+    setVehicles((prev) => prev.map((v) => (v.id === id ? updated : v)));
+    appendAudit(
+      'Fleet',
+      target.registration,
+      'Updated Vehicle Record',
+      target.status,
+      updated.status
+    );
+    pushToast({
+      title: 'Vehicle Updated',
+      description: `${target.registration} updated successfully.`,
+      tone: 'success',
+    });
+    return { ok: true, message: 'Vehicle updated.' };
+  };
+
+  const createDriver: BosContextValue['createDriver'] = async (input) => {
+    if (!can('fleet.manage')) {
+      const msg = 'Access Denied: Your role lacks permission (fleet.manage) to onboard drivers.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const newDriver: DriverRecord = {
+      ...input,
+      id: `DRV-${String(drivers.length + 1).padStart(3, '0')}`,
+      deliveriesCompleted: 0,
+      rating: 5.0,
+    };
+    setDrivers((prev) => [newDriver, ...prev]);
+    appendAudit(
+      'Fleet',
+      newDriver.fullName,
+      'Onboarded Delivery Driver',
+      'None',
+      `DL: ${newDriver.licenseNumber} · Phone: ${newDriver.phone}`
+    );
+    pushToast({
+      title: 'Driver Onboarded',
+      description: `${newDriver.fullName} added to driver roster.`,
+      tone: 'success',
+    });
+    return { ok: true, message: 'Driver onboarded.' };
+  };
+
+  const updateDriver: BosContextValue['updateDriver'] = async (id, updates) => {
+    if (!can('fleet.manage')) {
+      const msg = 'Access Denied: Your role lacks permission (fleet.manage) to update drivers.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const target = drivers.find((d) => d.id === id);
+    if (!target) return { ok: false, message: 'Driver not found.' };
+
+    const updated = { ...target, ...updates };
+    setDrivers((prev) => prev.map((d) => (d.id === id ? updated : d)));
+    appendAudit(
+      'Fleet',
+      target.fullName,
+      'Updated Driver Record',
+      target.status,
+      updated.status
+    );
+    pushToast({
+      title: 'Driver Updated',
+      description: `${target.fullName} updated successfully.`,
+      tone: 'success',
+    });
+    return { ok: true, message: 'Driver updated.' };
+  };
+
   return (
     <BosContext.Provider
       value={{
@@ -2751,6 +3415,11 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         auditLogs,
         notifications,
         podRecords,
+        vehicles,
+        drivers,
+        supplierPayables,
+        supplierPayments,
+        deletedSkus,
         enabledWidgets,
         toggleDashboardWidget,
         moveDashboardWidget,
@@ -2795,6 +3464,21 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         addSupplierDocument,
         verifySupplierDocument,
         evaluateSupplierPerformance,
+        getNextSku,
+        archiveProduct,
+        restoreProduct,
+        deleteProduct,
+        archiveSupplier,
+        restoreSupplier,
+        deleteSupplier,
+        addSupplierProduct,
+        getSuppliersForProduct,
+        confirmPurchaseAndCollection,
+        recordSupplierPayment,
+        createVehicle,
+        updateVehicle,
+        createDriver,
+        updateDriver,
       }}
     >
       {children}

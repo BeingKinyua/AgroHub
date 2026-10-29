@@ -41,6 +41,8 @@ export type PermissionKey =
   | 'deliveries.view'
   | 'deliveries.assign'
   | 'deliveries.dispatch'
+  | 'fleet.view'
+  | 'fleet.manage'
   | 'finance.view'
   | 'finance.record_payment'
   | 'finance.allocate_payment'
@@ -114,7 +116,8 @@ export interface ProductRecord {
   unit: UnitOfMeasure;
   description: string;
   imageUrl: string;
-  status: 'Active' | 'Seasonal Hold' | 'Discontinued';
+  status: 'Active' | 'Seasonal Hold' | 'Discontinued' | 'Archived';
+  archivedAt?: string;
   batchTracked: boolean;
   expiryTracked: boolean;
   availableQty: number;
@@ -254,6 +257,12 @@ export interface CreateOrderItemInput {
   quantity: number;
   overridePriceKes?: number;
   allocatedBatch?: string;
+  sourcingMode?: 'Direct Procurement' | 'Existing Stock' | 'Mixed Sourcing';
+  stockAllocatedQty?: number;
+  directProcuredQty?: number;
+  supplierId?: string;
+  supplierName?: string;
+  purchaseCostKes?: number;
 }
 
 export interface CreateOrderInput {
@@ -278,6 +287,12 @@ export interface OrderLineItem {
   unitPriceKes: number;
   pricingTier: 'Institutional' | 'Contract' | 'Wholesale' | 'Retail' | 'Online';
   lineTotalKes: number;
+  sourcingMode?: 'Direct Procurement' | 'Existing Stock' | 'Mixed Sourcing';
+  stockAllocatedQty?: number;
+  directProcuredQty?: number;
+  supplierId?: string;
+  supplierName?: string;
+  purchaseCostKes?: number;
 }
 
 export interface OrderRecord {
@@ -376,6 +391,17 @@ export interface SupplierEvaluationRecord {
   recommendation: 'Preferred Cooperative' | 'Standard Approved' | 'Performance Watch' | 'Suspended';
 }
 
+export interface SupplierProductItem {
+  productId: string;
+  productName: string;
+  unit: UnitOfMeasure;
+  currentCostKes: number;
+  previousCostKes: number;
+  lastUpdated: string;
+  leadTimeDays?: number;
+  moq?: number;
+}
+
 export interface SupplierRecord {
   id: string;
   code: string;
@@ -390,19 +416,25 @@ export interface SupplierRecord {
   payableBalanceKes: number;
   qualityScorePct: number;
   recentPriceTrend: 'Stable' | 'Increased +6%' | 'Decreased -4%' | 'Price Review Needed';
-  suppliedProducts: {
-    productId: string;
-    productName: string;
-    unit: UnitOfMeasure;
-    currentCostKes: number;
-    previousCostKes: number;
-    lastUpdated: string;
-  }[];
+  suppliedProducts: SupplierProductItem[];
   status: 'Active' | 'Under Review' | 'Suspended';
+  isArchived?: boolean;
+  archivedAt?: string;
   suspendedReason?: string;
   contracts?: SupplierContract[];
   documents?: SupplierDocumentItem[];
   evaluations?: SupplierEvaluationRecord[];
+}
+
+export interface PurchaseOrderLineItem {
+  productId: string;
+  productName: string;
+  sku: string;
+  unit: UnitOfMeasure;
+  quantity: number;
+  unitCostKes: number;
+  lineTotalKes: number;
+  customerOrderRef?: string;
 }
 
 export interface ProcurementOrderRecord {
@@ -412,18 +444,40 @@ export interface ProcurementOrderRecord {
   supplierId: string;
   supplierName: string;
   warehouseName: string;
+  purpose?: 'Direct Customer Fulfillment' | 'Bulk Stock Procurement';
+  customerOrderId?: string;
+  customerOrderNumber?: string;
+  lines?: PurchaseOrderLineItem[];
   stage:
     | 'Purchase Request'
     | 'Pending Approval'
     | 'PO Issued'
     | 'Receiving (GRN)'
     | 'Quality Check'
-    | 'Stock Posted';
+    | 'Stock Posted'
+    | 'Goods Collected'
+    | 'Completed';
   expectedDate: string;
   totalKes: number;
   itemsSummary: string;
   qualityCheckPassPct?: number;
   requestedBy: string;
+  goodsCollected?: boolean;
+  collectionDate?: string;
+  collectionLocation?: string;
+  actualPurchaseCostKes?: number;
+  supplierPayableCreated?: boolean;
+  supplierPayableId?: string;
+}
+
+export interface DeliveryRunStop {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  deliveryAddress: string;
+  status: 'Pending' | 'Delivered' | 'Failed';
+  deliveredAt?: string;
+  notes?: string;
 }
 
 export interface DeliveryRunRecord {
@@ -449,6 +503,71 @@ export interface DeliveryRunRecord {
   runCode?: string;
   vehiclePlate?: string;
   orderNumbers?: string[];
+  assignedVehicleId?: string;
+  assignedDriverId?: string;
+  transportCostKes?: number;
+  fuelExpensesKes?: number;
+  stops?: DeliveryRunStop[];
+}
+
+export interface VehicleRecord {
+  id: string;
+  registration: string;
+  makeModel: string;
+  type: 'Refrigerated Van' | 'Ambient Pickup' | '3-Ton Truck' | 'Motorbike Box';
+  capacityKg: number;
+  fuelType: 'Diesel' | 'Petrol' | 'Electric';
+  status: 'Available' | 'On Route' | 'Maintenance' | 'Out of Service';
+  assignedDriverId?: string;
+  assignedDriverName?: string;
+  lastServiceDate?: string;
+  insuranceExpiry?: string;
+}
+
+export interface DriverRecord {
+  id: string;
+  fullName: string;
+  phone: string;
+  licenseNumber: string;
+  licenseClasses: string;
+  status: 'Available' | 'On Delivery' | 'Off Duty' | 'Leave';
+  assignedVehicleId?: string;
+  assignedVehicleReg?: string;
+  deliveriesCompleted: number;
+  rating: number;
+}
+
+export interface SupplierPayableRecord {
+  id: string;
+  payableNumber: string;
+  supplierId: string;
+  supplierName: string;
+  purchaseOrderId: string;
+  poNumber: string;
+  customerOrderNumber?: string;
+  issueDate: string;
+  dueDate: string;
+  totalAmountKes: number;
+  paidAmountKes: number;
+  balanceKes: number;
+  status: 'Pending' | 'Partially Paid' | 'Paid' | 'Overdue';
+  goodsCollectedDate?: string;
+  lineItemsSummary: string;
+}
+
+export interface SupplierPaymentRecord {
+  id: string;
+  paymentNumber: string;
+  supplierPayableId: string;
+  payableNumber: string;
+  supplierId: string;
+  supplierName: string;
+  amountKes: number;
+  paymentMethod: 'M-Pesa Business' | 'Bank EFT' | 'Cheque' | 'Cash';
+  referenceNumber: string;
+  paymentDate: string;
+  recordedBy: string;
+  notes?: string;
 }
 
 export interface InvoiceRecord {
