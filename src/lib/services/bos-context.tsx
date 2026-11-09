@@ -926,10 +926,14 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Sourcing mode resolution: direct procurement does not demand warehouse stock
-      const sourcingMode =
-        item.sourcingMode ||
-        (qty > product.availableQty ? 'direct_procurement' : 'existing_stock');
-      const isDirectOnly = sourcingMode === 'direct_procurement';
+      const rawMode = item.sourcingMode || (qty > product.availableQty ? 'Direct Procurement' : 'Existing Stock');
+      const sourcingMode: 'Direct Procurement' | 'Existing Stock' | 'Mixed Sourcing' =
+        rawMode === 'direct_procurement' || rawMode === 'Direct Procurement'
+          ? 'Direct Procurement'
+          : rawMode === 'mixed' || rawMode === 'Mixed Sourcing'
+          ? 'Mixed Sourcing'
+          : 'Existing Stock';
+      const isDirectOnly = sourcingMode === 'Direct Procurement';
       const stockQty =
         item.stockAllocatedQty !== undefined
           ? item.stockAllocatedQty
