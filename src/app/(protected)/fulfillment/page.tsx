@@ -32,6 +32,7 @@ import {
   StatusBadge,
 } from '@/components/ui/primitives';
 import { OrderLifecycleStatus, OrderRecord, PODEvidenceRecord } from '@/types/domain/bos';
+import { calculateInvoiceEligibility } from '@/lib/services/business-rules';
 
 interface StageDefinition {
   status: OrderLifecycleStatus;
@@ -106,10 +107,12 @@ const STAGES: StageDefinition[] = [
 ];
 
 export default function FulfillmentPage() {
-  const { orders, deliveries, podRecords, can, advanceOrderStatus, verifyPOD } = useBos();
+  const { orders, deliveries, podRecords, can, advanceOrderStatus, verifyPOD, reconcilePODDiscrepancy } = useBos();
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
   const [activeStageFilter, setActiveStageFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
+  const [reconcileModalPod, setReconcileModalPod] = useState<PODEvidenceRecord | null>(null);
+  const [reconciliationNotes, setReconciliationNotes] = useState('');
   const [feedback, setFeedback] = useState<{
     msg: string;
     type: 'success' | 'error';
@@ -139,6 +142,11 @@ export default function FulfillmentPage() {
     [activeOrders]
   );
 
+  const discrepancyCount = useMemo(
+    () => podRecords.filter((p) => p.hasDiscrepancies && p.reconciliationStatus !== 'Fully Reconciled').length,
+    [podRecords]
+  );
+
   const handleAdvanceStage = async (orderId: string, nextStatus: OrderLifecycleStatus) => {
     const res = await advanceOrderStatus(orderId, nextStatus);
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
@@ -147,22 +155,59 @@ export default function FulfillmentPage() {
     }
   };
 
-  const handleQuickVerifyPod = async (order: OrderRecord) => {
-    const targetPod = podRecords.find((p) => p.orderId === order.id || p.orderNumber === order.orderNumber);
-    if (!targetPod) {
-      setFeedback({
-        msg: `No submitted electronic POD evidence found for ${order.orderNumber}. Capture POD from the Deliveries workbench first.`,
-        type: 'error',
-      });
-      return;
-    }
-
-    const res = await verifyPOD(targetPod.id, {
-      notes: 'Verified by Warehouse Operations Supervisor',
+  const handleVerifyPodWithInvoice = async (podId: string) => {
+    const res = await verifyPOD(podId, {
+      createInvoice: true,
+      notes: 'Verified by Warehouse Supervisor with automated customer invoice creation',
     });
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok && selectedOrder?.id === order.id) {
+    if (res.ok && selectedOrder) {
       setSelectedOrder((prev) => (prev ? { ...prev, podStatus: 'Verified', status: 'Closed' } : null));
+    }
+  };
+
+  const handleVerifyPodWithoutInvoice = async (podId: string) => {
+    const res = await verifyPOD(podId, {
+      createInvoice: false,
+      notes: 'Verified arrival only (invoicing deferred for consolidation)',
+    });
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+    if (res.ok && selectedOrder) {
+      setSelectedOrder((prev) => (prev ? { ...prev, podStatus: 'Verified' } : null));
+    }
+  };
+
+  const handleRejectPod = async (podId: string) => {
+    const res = await verifyPOD(podId, {
+      reject: true,
+      notes: 'Rejected POD sign-off due to unresolved produce spoilage or missing stamp',
+    });
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+  };
+
+  const handleConfirmReconciliation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reconcileModalPod) return;
+    const res = await reconcilePODDiscrepancy(
+      reconcileModalPod.id,
+      {
+        action: 'Accept Shortage',
+        notes: reconciliationNotes.trim() || 'Credit note adjustment authorized after QC inspection.',
+      }
+    );
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+    if (res.ok) {
+      setReconcileModalPod(null);
+      setReconciliationNotes('');
+    }
+  };
+
+  const handleQuickVerifyPod = async (ord: OrderRecord) => {
+    const podId = ord.podEvidenceId || podRecords.find((p) => p.orderId === ord.id || p.orderNumber === ord.orderNumber)?.id;
+    if (podId) {
+      await handleVerifyPodWithInvoice(podId);
+    } else {
+      setSelectedOrder(ord);
     }
   };
 
@@ -213,7 +258,7 @@ export default function FulfillmentPage() {
       />
 
       {/* Decision Summary KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KPI
           label="Active Pipeline Orders"
           value={`${activeOrders.length} Orders`}
@@ -221,7 +266,7 @@ export default function FulfillmentPage() {
           tone="positive"
         />
         <KPI
-          label="In Warehouse Picking / Packing"
+          label="Warehouse Picking / Packing"
           value={`${(stageCounts['Confirmed'] || 0) + (stageCounts['Picking'] || 0) + (stageCounts['Packed'] || 0)}`}
           sublabel="Staging & FEFO fulfillment"
           tone="neutral"
@@ -235,8 +280,14 @@ export default function FulfillmentPage() {
         <KPI
           label="Delivered (POD Pending)"
           value={`${pendingVerificationCount}`}
-          sublabel="Awaiting supervisor POD sign-off"
+          sublabel="Awaiting supervisor sign-off"
           tone={pendingVerificationCount > 0 ? 'warning' : 'positive'}
+        />
+        <KPI
+          label="Discrepancy / Disputes"
+          value={`${discrepancyCount} Flagged`}
+          sublabel="Requires quantity reconciliation"
+          tone={discrepancyCount > 0 ? 'danger' : 'neutral'}
         />
       </div>
 
@@ -596,36 +647,202 @@ export default function FulfillmentPage() {
             </div>
 
             {/* Proof of Delivery and Invoice Status Section */}
-            {inspectedPod && (
-              <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="font-semibold text-xs text-[var(--text-primary)] inline-flex items-center gap-1.5">
-                    <FileCheck2 className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
-                    <span>Electronic Proof of Delivery (POD)</span>
+            {inspectedPod && (() => {
+              const billableCalc = calculateInvoiceEligibility(inspectedPod);
+              const totalDispatchedKes = (inspectedPod.deliveredItems || []).reduce(
+                (sum, it) => sum + (it.dispatchedQty || it.requestedQty || 0) * (it.unitPriceKes || 0),
+                0
+              );
+              const discrepancyDeductionKes = Math.max(0, totalDispatchedKes - billableCalc.totalInvoiceKes);
+
+              return (
+                <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2.5">
+                    <div>
+                      <div className="font-semibold text-xs text-[var(--text-primary)] inline-flex items-center gap-1.5">
+                        <FileCheck2 className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
+                        <span>Electronic Proof of Delivery (POD) Evidence</span>
+                      </div>
+                      <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                        Recipient: <strong className="text-[var(--text-primary)]">{inspectedPod.recipientName}</strong>
+                        {inspectedPod.recipientRole ? ` (${inspectedPod.recipientRole})` : ''} · Dept: {inspectedPod.receivingDepartment || 'Receiving Dock'} · {inspectedPod.submittedAt}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                          inspectedPod.status === 'Verified'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            : inspectedPod.status === 'Rejected'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300'
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                        }`}
+                      >
+                        POD: {inspectedPod.status}
+                      </span>
+
+                      {inspectedPod.hasDiscrepancies && (
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                            inspectedPod.reconciliationStatus === 'Fully Reconciled'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                          }`}
+                        >
+                          {inspectedPod.reconciliationStatus || 'Discrepancy Flagged'}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-[11px] font-medium text-[#1F6A37] dark:text-[#4EB462]">
-                    Status: {inspectedPod.status}
-                  </span>
-                </div>
-                <div className="text-[var(--text-secondary)] text-[11px]">
-                  Recipient: <span className="font-medium text-[var(--text-primary)]">{inspectedPod.recipientName}</span> (Submitted {inspectedPod.submittedAt})
-                </div>
-                {inspectedPod.status === 'Verified' && inspectedPod.invoiceCreated && (
-                  <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between">
-                    <span className="text-[11px] text-[#1F6A37] dark:text-[#4EB462] font-semibold">
-                      Tax Invoice Created ({inspectedPod.invoiceNumber || 'Linked'})
-                    </span>
-                    <Link
-                      href="/invoices"
-                      className="text-xs text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
-                    >
-                      <span>View Invoices Ledger</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </Link>
+
+                  {/* Line Items Discrepancy Breakdown Table */}
+                  <div className="border border-[var(--border-subtle)] rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-[var(--bg-card)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                        <tr>
+                          <th className="py-2 px-2.5">Produce Item</th>
+                          <th className="py-2 px-2 text-right">Dispatched</th>
+                          <th className="py-2 px-2 text-right">Received</th>
+                          <th className="py-2 px-2 text-right text-emerald-700 dark:text-emerald-400 font-bold">Accepted</th>
+                          <th className="py-2 px-2 text-right text-red-600 dark:text-red-400">Rejected</th>
+                          <th className="py-2 px-2.5">Discrepancy Note / Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border-subtle)]">
+                        {(inspectedPod.deliveredItems || []).map((it, idx) => (
+                          <tr key={it.productId || idx} className="hover:bg-[var(--bg-card)]/50">
+                            <td className="py-2 px-2.5 font-medium text-[var(--text-primary)]">
+                              {it.productName}
+                              <div className="text-[10px] text-[var(--text-secondary)] font-mono">{it.sku}</div>
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono">
+                              {it.dispatchedQty || it.requestedQty} {it.unit}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono">
+                              {it.receivedQty ?? it.deliveredQty} {it.unit}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                              {it.acceptedQty ?? it.deliveredQty} {it.unit}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono text-red-600 dark:text-red-400">
+                              {it.rejectedQty > 0 ? `${it.rejectedQty} ${it.unit}` : '—'}
+                            </td>
+                            <td className="py-2 px-2.5 text-[11px]">
+                              {it.discrepancyReason ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                                  {it.discrepancyReason}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-600 dark:text-emerald-400 text-[10px]">Fully Accepted</span>
+                              )}
+                              {it.discrepancyExplanation && (
+                                <div className="text-[10px] text-[var(--text-secondary)] italic">
+                                  {it.discrepancyExplanation}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                )}
-              </div>
-            )}
+
+                  {/* Financial Billable Summary */}
+                  <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs">
+                    <div>
+                      <span className="text-[10px] text-[var(--text-secondary)]">Dispatched Total Value</span>
+                      <div className="font-mono font-semibold text-[var(--text-primary)] mt-0.5">
+                        KES {totalDispatchedKes.toLocaleString()}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-[var(--text-secondary)]">Deducted Discrepancies</span>
+                      <div className="font-mono font-semibold text-red-600 dark:text-red-400 mt-0.5">
+                        - KES {discrepancyDeductionKes.toLocaleString()}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-[var(--text-secondary)]">Billable Verified Total</span>
+                      <div className="font-mono font-bold text-emerald-700 dark:text-emerald-400 mt-0.5 text-sm">
+                        KES {billableCalc.totalInvoiceKes.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Linked Invoice status or Reconciliation Action */}
+                  {inspectedPod.status === 'Verified' && inspectedPod.invoiceCreated ? (
+                    <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between">
+                      <span className="text-xs text-[#1F6A37] dark:text-[#4EB462] font-semibold inline-flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Commercial Tax Invoice Created ({inspectedPod.invoiceNumber || 'Linked'})</span>
+                      </span>
+                      <Link
+                        href="/invoices"
+                        className="text-xs text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>View Invoices Ledger</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--border-subtle)]">
+                      <div className="text-[11px] text-[var(--text-secondary)]">
+                        {inspectedPod.hasDiscrepancies && inspectedPod.reconciliationStatus !== 'Fully Reconciled' ? (
+                          <span className="text-amber-700 dark:text-amber-400 font-medium">
+                            Discrepancies recorded. You can reconcile disputes or verify billable accepted quantity.
+                          </span>
+                        ) : (
+                          <span>Quantities fully verified against receiving sign-off.</span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {inspectedPod.hasDiscrepancies && inspectedPod.reconciliationStatus !== 'Fully Reconciled' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReconcileModalPod(inspectedPod);
+                              setReconciliationNotes('');
+                            }}
+                            className="h-8 px-3 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-xs font-semibold cursor-pointer"
+                          >
+                            Resolve Discrepancy
+                          </button>
+                        )}
+
+                        {inspectedPod.status !== 'Verified' && can('fulfillment.manage') && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectPod(inspectedPod.id)}
+                              className="h-8 px-3 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium cursor-pointer"
+                            >
+                              Reject POD
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleVerifyPodWithoutInvoice(inspectedPod.id)}
+                              className="h-8 px-3 rounded-md border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-card)] cursor-pointer"
+                            >
+                              Verify without Invoicing
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleVerifyPodWithInvoice(inspectedPod.id)}
+                              className="h-8 px-4 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Verify & Generate Invoice (KES {billableCalc.totalInvoiceKes.toLocaleString()})</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Contextual Operational Action Buttons */}
             <div className="pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2">
@@ -638,7 +855,7 @@ export default function FulfillmentPage() {
                   <button
                     type="button"
                     onClick={() => handleAdvanceStage(selectedOrder.id, 'Picking')}
-                    className="h-9 px-4 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    className="h-9 px-4 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <span>Start Warehouse Picking</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -648,7 +865,7 @@ export default function FulfillmentPage() {
                   <button
                     type="button"
                     onClick={() => handleAdvanceStage(selectedOrder.id, 'Packed')}
-                    className="h-9 px-4 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    className="h-9 px-4 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <span>Confirm Packing & Staging</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -658,7 +875,7 @@ export default function FulfillmentPage() {
                   <button
                     type="button"
                     onClick={() => handleAdvanceStage(selectedOrder.id, 'Dispatched')}
-                    className="h-9 px-4 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    className="h-9 px-4 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <span>Dispatch to Delivery Fleet</span>
                     <Truck className="w-3.5 h-3.5" />
@@ -667,25 +884,62 @@ export default function FulfillmentPage() {
                 {selectedOrder.status === 'Dispatched' && (
                   <Link
                     href="/deliveries"
-                    className="h-9 px-4 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    className="h-9 px-4 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <span>Record Arrival & Capture POD</span>
                     <FileCheck2 className="w-3.5 h-3.5" />
                   </Link>
                 )}
-                {selectedOrder.status === 'Delivered' && selectedOrder.podStatus !== 'Verified' && can('fulfillment.manage') && (
-                  <button
-                    type="button"
-                    onClick={() => handleQuickVerifyPod(selectedOrder)}
-                    className="h-9 px-4 rounded-lg bg-[#12512C] hover:bg-[#1F6A37] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Verify Receiving POD Sign-off</span>
-                  </button>
-                )}
               </div>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* Discrepancy Dispute & Reconciliation Modal */}
+      <Modal
+        open={Boolean(reconcileModalPod)}
+        onClose={() => setReconcileModalPod(null)}
+        title={reconcileModalPod ? `Reconcile POD Discrepancy · Order ${reconcileModalPod.orderNumber}` : ''}
+        subtitle="Authorize credit note deductions, damaged produce write-offs, or customer acceptance sign-off."
+      >
+        {reconcileModalPod && (
+          <form onSubmit={handleConfirmReconciliation} className="space-y-4">
+            <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/25 text-xs text-amber-800 dark:text-amber-300">
+              <strong>Audit Ledger Update:</strong> Reconciling marks this delivery evidence as <strong>Fully Reconciled</strong> and releases the order for accurate invoicing of accepted produce quantities.
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                Supervisor Reconciliation & Resolution Note *
+              </label>
+              <textarea
+                required
+                rows={3}
+                value={reconciliationNotes}
+                onChange={(e) => setReconciliationNotes(e.target.value)}
+                placeholder="e.g. 5kg damaged spinach inspected and written off. Credit note CN-2026-042 issued to St. Jude Hospital. Invoicing authorized for accepted 95kg."
+                className="w-full p-2.5 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+              />
+            </div>
+
+            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setReconcileModalPod(null)}
+                className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Confirm Dispute Reconciliation</span>
+              </button>
+            </div>
+          </form>
         )}
       </Modal>
     </div>

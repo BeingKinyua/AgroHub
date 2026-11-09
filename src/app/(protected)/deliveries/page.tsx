@@ -27,7 +27,23 @@ import {
   WorkQueue,
   WorkQueueItem,
 } from '@/components/ui/primitives';
-import { DeliveryRunRecord } from '@/types/domain/bos';
+import { DeliveryRunRecord, DiscrepancyReason, UnitOfMeasure } from '@/types/domain/bos';
+import { calculatePODLineQuantities, classifyPODDiscrepancy } from '@/lib/services/business-rules';
+
+interface PodLineFormItem {
+  productId: string;
+  productName: string;
+  sku: string;
+  unit: UnitOfMeasure;
+  orderedQty: number;
+  dispatchedQty: number;
+  receivedQty: number;
+  acceptedQty: number;
+  rejectedQty: number;
+  unitPriceKes: number;
+  discrepancyReason?: DiscrepancyReason;
+  discrepancyExplanation?: string;
+}
 
 function DeliveriesContent() {
   const searchParams = useSearchParams();
@@ -39,19 +55,54 @@ function DeliveriesContent() {
     can,
     updateDeliveryStatus,
     recordDeliveryArrival,
+    reassignDeliveryRun,
   } = useBos();
 
   const [filterMode, setFilterMode] = useState<'all' | 'exceptions' | 'in-transit' | 'pending' | 'delivered'>('all');
   const [podRun, setPodRun] = useState<DeliveryRunRecord | null>(null);
+  const [selectedOrderNum, setSelectedOrderNum] = useState<string>('');
   const [reassignRun, setReassignRun] = useState<DeliveryRunRecord | null>(null);
   const [selectedVehicleReg, setSelectedVehicleReg] = useState('');
   const [selectedDriverName, setSelectedDriverName] = useState('');
   const [transportCostInput, setTransportCostInput] = useState<number>(4500);
   const [recipientName, setRecipientName] = useState('');
+  const [recipientRole, setRecipientRole] = useState('Stores Receiving Officer / Head Cateress');
+  const [receivingDepartment, setReceivingDepartment] = useState('Main Stores & Central Kitchen');
+  const [podLineItems, setPodLineItems] = useState<PodLineFormItem[]>([]);
   const [feedback, setFeedback] = useState<{
     msg: string;
     type: 'success' | 'error';
   } | null>(null);
+
+  // Sync selected order and pre-populate POD items when opening POD modal
+  useEffect(() => {
+    if (!podRun) {
+      setSelectedOrderNum('');
+      setPodLineItems([]);
+      return;
+    }
+    const orderToInspect = selectedOrderNum || podRun.ordersIncluded[0] || '';
+    setSelectedOrderNum(orderToInspect);
+    const ord = orders.find((o) => o.orderNumber === orderToInspect || o.id === orderToInspect);
+    if (ord) {
+      setPodLineItems(
+        ord.items.map((it) => ({
+          productId: it.productId,
+          productName: it.productName,
+          sku: it.sku,
+          unit: it.unit,
+          orderedQty: it.quantity,
+          dispatchedQty: it.quantity,
+          receivedQty: it.quantity,
+          acceptedQty: it.quantity,
+          rejectedQty: 0,
+          unitPriceKes: it.unitPriceKes,
+          discrepancyReason: undefined,
+          discrepancyExplanation: '',
+        }))
+      );
+    }
+  }, [podRun, selectedOrderNum, orders]);
 
   // Read search parameters for drill-down support (Section 14 & 26)
   useEffect(() => {
@@ -81,41 +132,108 @@ function DeliveriesContent() {
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
   };
 
+  const handleReceivedQtyChange = (idx: number, newReceived: number) => {
+    setPodLineItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== idx) return item;
+        const clampedReceived = Math.max(0, newReceived);
+        const accepted = Math.min(item.acceptedQty, clampedReceived);
+        const rejected = Math.max(0, clampedReceived - accepted);
+        return {
+          ...item,
+          receivedQty: clampedReceived,
+          acceptedQty: accepted,
+          rejectedQty: rejected,
+        };
+      })
+    );
+  };
+
+  const handleAcceptedQtyChange = (idx: number, newAccepted: number) => {
+    setPodLineItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== idx) return item;
+        const clampedAccepted = Math.max(0, Math.min(newAccepted, item.receivedQty));
+        const rejected = Math.max(0, item.receivedQty - clampedAccepted);
+        return {
+          ...item,
+          acceptedQty: clampedAccepted,
+          rejectedQty: rejected,
+        };
+      })
+    );
+  };
+
+  const handleReassignSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reassignRun) return;
+
+    const foundDriver = drivers.find((d) => d.fullName === selectedDriverName);
+    const foundVehicle = vehicles.find((v) => v.registration === selectedVehicleReg);
+
+    const res = await reassignDeliveryRun(reassignRun.id, {
+      vehicleId: foundVehicle?.id,
+      vehicleReg: selectedVehicleReg,
+      driverId: foundDriver?.id,
+      driverName: selectedDriverName,
+      driverPhone: foundDriver?.phone || reassignRun.driverPhone,
+      transportCostKes: Number(transportCostInput),
+    });
+
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+    if (res.ok) {
+      setReassignRun(null);
+    }
+  };
+
   const handlePodSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!podRun) return;
+    if (!podRun || !selectedOrderNum) return;
+
+    const ord = orders.find((o) => o.orderNumber === selectedOrderNum || o.id === selectedOrderNum);
+    if (!ord) return;
 
     const signOffRecipient = recipientName.trim() || 'Institutional Receiving Officer';
 
-    // Record formal electronic POD for each order on this run
-    for (const orderNum of podRun.ordersIncluded) {
-      const ord = orders.find((o) => o.orderNumber === orderNum || o.id === orderNum);
-      if (ord) {
-        await recordDeliveryArrival(ord.id, {
-          recipientName: signOffRecipient,
-          recipientRole: 'Stores Receiving Officer / Head Cateress',
-          deliveredItems: ord.items.map((it) => ({
-            productId: it.productId,
-            productName: it.productName,
-            sku: it.sku,
-            unit: it.unit,
-            requestedQty: it.quantity,
-            deliveredQty: it.quantity,
-            rejectedQty: 0,
-            unitPriceKes: it.unitPriceKes,
-          })),
-          notes: `Delivered via Run ${podRun.runNumber} (${podRun.vehiclePlate || podRun.vehicleReg})`,
-        });
-      }
-    }
+    const res = await recordDeliveryArrival(ord.id, {
+      recipientName: signOffRecipient,
+      recipientRole,
+      receivingDepartment,
+      deliveredItems: podLineItems.map((it) => ({
+        productId: it.productId,
+        productName: it.productName,
+        sku: it.sku,
+        unit: it.unit,
+        orderedQty: it.orderedQty,
+        dispatchedQty: it.dispatchedQty,
+        receivedQty: it.receivedQty,
+        acceptedQty: it.acceptedQty,
+        rejectedQty: it.rejectedQty,
+        unitPriceKes: it.unitPriceKes,
+        discrepancyReason: it.rejectedQty > 0 || it.receivedQty < it.dispatchedQty ? it.discrepancyReason : undefined,
+        discrepancyExplanation: it.discrepancyExplanation,
+      })),
+      notes: `Captured via Run ${podRun.runNumber} (${podRun.vehiclePlate || podRun.vehicleReg})`,
+    });
 
-    await handleStatusChange(
-      podRun.id,
-      'Delivered',
-      `${signOffRecipient} · Signed Electronic POD`
-    );
-    setPodRun(null);
-    setRecipientName('');
+    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+
+    if (res.ok) {
+      // Check if all orders in this run have now been recorded
+      const otherOrders = podRun.ordersIncluded.filter((oNum) => oNum !== selectedOrderNum);
+      const remainingUnfulfilled = otherOrders.filter(
+        (oNum) => orders.find((o) => (o.orderNumber === oNum || o.id === oNum) && o.status !== 'Delivered' && o.status !== 'Closed')
+      );
+      if (remainingUnfulfilled.length === 0) {
+        await handleStatusChange(
+          podRun.id,
+          'Delivered',
+          `${signOffRecipient} (${recipientRole}) · Signed Electronic POD`
+        );
+      }
+      setPodRun(null);
+      setRecipientName('');
+    }
   };
 
   const filteredRuns = useMemo(() => {
@@ -378,31 +496,13 @@ function DeliveriesContent() {
         subtitle="Select from registered AgroHub fleet vehicles and certified driver roster"
       >
         {reassignRun && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const foundDriver = drivers.find((d) => d.fullName === selectedDriverName);
-              const foundVehicle = vehicles.find((v) => v.registration === selectedVehicleReg);
-              reassignRun.vehicleReg = selectedVehicleReg;
-              reassignRun.driverName = selectedDriverName;
-              reassignRun.driverPhone = foundDriver?.phone || reassignRun.driverPhone;
-              reassignRun.transportCostKes = Number(transportCostInput);
-              reassignRun.assignedVehicleId = foundVehicle?.id;
-              reassignRun.assignedDriverId = foundDriver?.id;
-              setFeedback({
-                msg: `Route ${reassignRun.runNumber} assigned to ${selectedVehicleReg} (${selectedDriverName}). Transport cost: KES ${Number(transportCostInput).toLocaleString()}`,
-                type: 'success',
-              });
-              setReassignRun(null);
-            }}
-            className="space-y-4"
-          >
+          <form onSubmit={handleReassignSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium mb-1">Select Fleet Vehicle</label>
+              <label className="block text-xs font-medium mb-1">Select Fleet Vehicle *</label>
               <select
                 value={selectedVehicleReg}
                 onChange={(e) => setSelectedVehicleReg(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                className="w-full h-10 px-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs cursor-pointer"
               >
                 {vehicles.map((v) => (
                   <option key={v.id} value={v.registration}>
@@ -413,11 +513,11 @@ function DeliveriesContent() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium mb-1">Select Assigned Driver</label>
+              <label className="block text-xs font-medium mb-1">Select Assigned Driver *</label>
               <select
                 value={selectedDriverName}
                 onChange={(e) => setSelectedDriverName(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                className="w-full h-10 px-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs cursor-pointer"
               >
                 {drivers.map((d) => (
                   <option key={d.id} value={d.fullName}>
@@ -433,7 +533,7 @@ function DeliveriesContent() {
                 type="number"
                 value={transportCostInput}
                 onChange={(e) => setTransportCostInput(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                className="w-full h-10 px-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
               />
             </div>
 
@@ -447,7 +547,7 @@ function DeliveriesContent() {
               </button>
               <button
                 type="submit"
-                className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
+                className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs"
               >
                 Save Assignment
               </button>
@@ -456,48 +556,223 @@ function DeliveriesContent() {
         )}
       </Modal>
 
-      {/* Electronic Proof of Delivery Modal */}
+      {/* Electronic Proof of Delivery Modal with Line-Item Discrepancy Reconciliation */}
       <Modal
         open={Boolean(podRun)}
         onClose={() => setPodRun(null)}
-        title={`Capture Electronic POD · ${podRun?.runNumber}`}
-        subtitle={`Verify receiving officer sign-off for ${podRun?.institutionsServed.join(', ')}`}
+        title={podRun ? `Capture Electronic POD · Route ${podRun.runNumber}` : ''}
+        subtitle={podRun ? `Record physical offload, verify actual received produce, and document any shortages or rejections.` : ''}
       >
-        <form onSubmit={handlePodSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium mb-1.5">
-              Receiving Officer / Cateress Name & Stamp
-            </label>
-            <input
-              type="text"
-              required
-              value={recipientName}
-              onChange={(e) => setRecipientName(e.target.value)}
-              placeholder="e.g. Mrs. Esther Wambui · Stores Cateress (Stamp #402)"
-              className="w-full h-10 px-3.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-            />
-          </div>
+        {podRun && (
+          <form onSubmit={handlePodSubmit} className="space-y-4">
+            {/* Multi-Order Selection Header (if multiple stops) */}
+            {podRun.ordersIncluded.length > 1 && (
+              <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between gap-3">
+                <label className="text-xs font-semibold text-[var(--text-primary)]">
+                  Select Delivery Stop Order:
+                </label>
+                <select
+                  value={selectedOrderNum}
+                  onChange={(e) => setSelectedOrderNum(e.target.value)}
+                  className="h-8 px-3 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-mono font-semibold cursor-pointer"
+                >
+                  {podRun.ordersIncluded.map((oNum) => {
+                    const matched = orders.find((o) => o.orderNumber === oNum || o.id === oNum);
+                    return (
+                      <option key={oNum} value={oNum}>
+                        {oNum} · {matched?.customerName || 'Customer Order'}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
 
-          <p className="text-[11px] text-[var(--text-secondary)]">
-            Submitting this electronic POD posts verification to the customer invoice and audit ledger.
-          </p>
+            {/* Receiving Officer & Department Credentials */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs">
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Receiving Officer Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
+                  placeholder="e.g. Mrs. Esther Wambui"
+                  className="w-full h-8 px-2.5 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
 
-          <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setPodRun(null)}
-              className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
-            >
-              Verify POD & Complete
-            </button>
-          </div>
-        </form>
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Designation / Role *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={recipientRole}
+                  onChange={(e) => setRecipientRole(e.target.value)}
+                  placeholder="e.g. Stores In-Charge / Cateress"
+                  className="w-full h-8 px-2.5 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  Department / Section
+                </label>
+                <input
+                  type="text"
+                  value={receivingDepartment}
+                  onChange={(e) => setReceivingDepartment(e.target.value)}
+                  placeholder="e.g. Main Central Kitchen / Dock"
+                  className="w-full h-8 px-2.5 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+            </div>
+
+            {/* Line Items Quantity Reconciliation Table */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-[var(--text-primary)]">
+                  Line Items Received & Quality Acceptance ({podLineItems.length})
+                </span>
+                <span className="text-[11px] text-[var(--text-secondary)]">
+                  Edit actual received and accepted quantities if discrepancies exist.
+                </span>
+              </div>
+
+              <div className="border border-[var(--border-subtle)] rounded-md overflow-hidden max-h-60 overflow-y-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)] sticky top-0">
+                    <tr>
+                      <th className="py-2 px-2.5">Produce Item</th>
+                      <th className="py-2 px-2 text-right">Dispatched</th>
+                      <th className="py-2 px-2 text-center w-20">Received</th>
+                      <th className="py-2 px-2 text-center w-20">Accepted</th>
+                      <th className="py-2 px-2 text-right">Rejected</th>
+                      <th className="py-2 px-2 text-right">Shortage</th>
+                      <th className="py-2 px-2.5">Reason / Discrepancy</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
+                    {podLineItems.map((item, idx) => {
+                      const shortage = Math.max(0, item.dispatchedQty - item.receivedQty);
+                      const rejected = item.rejectedQty;
+                      const hasDiscrepancy = shortage > 0 || rejected > 0 || item.receivedQty > item.dispatchedQty;
+                      const classification = classifyPODDiscrepancy(
+                        item.orderedQty,
+                        item.dispatchedQty,
+                        item.receivedQty,
+                        item.acceptedQty
+                      );
+
+                      return (
+                        <tr key={item.productId || idx} className="hover:bg-[var(--bg-canvas)]/50">
+                          <td className="py-2 px-2.5">
+                            <div className="font-medium text-[var(--text-primary)]">{item.productName}</div>
+                            <div className="text-[10px] text-[var(--text-secondary)] font-mono">{item.sku}</div>
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono font-medium">
+                            {item.dispatchedQty} {item.unit}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.receivedQty}
+                              onChange={(e) => handleReceivedQtyChange(idx, Number(e.target.value))}
+                              className="w-16 h-7 px-1.5 text-center font-mono font-semibold rounded text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max={item.receivedQty}
+                              value={item.acceptedQty}
+                              onChange={(e) => handleAcceptedQtyChange(idx, Number(e.target.value))}
+                              className="w-16 h-7 px-1.5 text-center font-mono font-bold rounded text-xs bg-[var(--bg-card)] border border-[#1F6A37]/50 text-[#1F6A37] dark:text-[#4EB462]"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono font-semibold text-red-600 dark:text-red-400">
+                            {rejected > 0 ? `${rejected} ${item.unit}` : '0'}
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono text-amber-600 dark:text-amber-400">
+                            {shortage > 0 ? `${shortage} ${item.unit}` : '0'}
+                          </td>
+                          <td className="py-2 px-2.5">
+                            {hasDiscrepancy ? (
+                              <div className="space-y-1">
+                                <select
+                                  value={item.discrepancyReason || 'Dispatch Shortage'}
+                                  onChange={(e) => {
+                                    const val = e.target.value as DiscrepancyReason;
+                                    setPodLineItems((prev) =>
+                                      prev.map((it, i) => (i === idx ? { ...it, discrepancyReason: val } : it))
+                                    );
+                                  }}
+                                  className="h-6 px-1 rounded text-[10px] bg-[var(--bg-card)] border border-amber-500/50 text-amber-800 dark:text-amber-300"
+                                >
+                                  <option value="Damaged in Transit">Damaged in Transit</option>
+                                  <option value="Quality / Spoilage">Quality / Spoilage</option>
+                                  <option value="Packaging Defect">Packaging Defect</option>
+                                  <option value="Incorrect Produce / Spec">Incorrect Produce / Spec</option>
+                                  <option value="Dispatch Shortage">Dispatch Shortage</option>
+                                  <option value="Customer Refusal">Customer Refusal</option>
+                                  <option value="Other">Other</option>
+                                </select>
+                                <input
+                                  type="text"
+                                  placeholder="Specific note"
+                                  value={item.discrepancyExplanation || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setPodLineItems((prev) =>
+                                      prev.map((it, i) => (i === idx ? { ...it, discrepancyExplanation: val } : it))
+                                    );
+                                  }}
+                                  className="w-full h-5 px-1 rounded text-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                                />
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>{classification}</span>
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+              <strong>Invoice Policy:</strong> Customer invoice is strictly generated against verified <strong>accepted quantities</strong>. Discrepancies and rejected goods are documented in the audit log and exempted from billing.
+            </div>
+
+            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPodRun(null)}
+                className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Submit Verified POD Sign-off</span>
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );

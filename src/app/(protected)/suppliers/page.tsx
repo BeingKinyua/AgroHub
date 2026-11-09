@@ -8,10 +8,13 @@ import {
   Award,
   Ban,
   Calendar,
+  Check,
   CheckCircle2,
+  ChevronRight,
   Clock,
   DollarSign,
   Edit2,
+  ExternalLink,
   FileCheck,
   FileText,
   Filter,
@@ -25,6 +28,7 @@ import {
   TrendingUp,
   Truck,
   Upload,
+  User,
   X,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
@@ -47,10 +51,23 @@ import {
   UnitOfMeasure,
 } from '@/types/domain/bos';
 
+interface FormSuppliedItem {
+  productId: string;
+  productName: string;
+  unit: UnitOfMeasure;
+  currentCostKes: number;
+  minOrderQty: number;
+  leadTimeDays: number;
+  availability: 'Available' | 'Seasonal' | 'Unavailable';
+  preferredSupplier: boolean;
+  notes: string;
+}
+
 export default function SuppliersPage() {
   const {
     suppliers,
     products,
+    procurementOrders,
     can,
     currentUser,
     createSupplier,
@@ -93,6 +110,14 @@ export default function SuppliersPage() {
   const setActiveSupplier = (sup: SupplierRecord | null) => {
     setActiveSupplierId(sup?.id || null);
   };
+
+  // 6-Tab Supplier Profile Modal State
+  const [profileSupplierId, setProfileSupplierId] = useState<string | null>(null);
+  const [profileTab, setProfileTab] = useState<'overview' | 'products' | 'procurement' | 'payables' | 'contracts' | 'performance'>('overview');
+  const profileSupplier = useMemo(
+    () => (profileSupplierId ? suppliers.find((s) => s.id === profileSupplierId) || null : null),
+    [profileSupplierId, suppliers]
+  );
 
   // Modals visibility
   const [createOpen, setCreateOpen] = useState(false);
@@ -185,6 +210,8 @@ export default function SuppliersPage() {
   const [newEmail, setNewEmail] = useState('');
   const [newLeadTime, setNewLeadTime] = useState(1);
   const [newTerms, setNewTerms] = useState('Net 14');
+  const [newPaymentNotes, setNewPaymentNotes] = useState('');
+  const [newSuppliedProducts, setNewSuppliedProducts] = useState<FormSuppliedItem[]>([]);
 
   // 2. Edit Supplier Form State
   const [editName, setEditName] = useState('');
@@ -195,6 +222,46 @@ export default function SuppliersPage() {
   const [editEmail, setEditEmail] = useState('');
   const [editLeadTime, setEditLeadTime] = useState(1);
   const [editTerms, setEditTerms] = useState('');
+  const [editPaymentNotes, setEditPaymentNotes] = useState('');
+  const [editSuppliedProducts, setEditSuppliedProducts] = useState<FormSuppliedItem[]>([]);
+
+  const handleAddProductToNewSupplier = () => {
+    const firstProd = products[0];
+    if (!firstProd) return;
+    setNewSuppliedProducts((prev) => [
+      ...prev,
+      {
+        productId: firstProd.id,
+        productName: firstProd.name,
+        unit: firstProd.unit,
+        currentCostKes: firstProd.pricing?.supplierCostKes || 70,
+        minOrderQty: 10,
+        leadTimeDays: 1,
+        availability: 'Available',
+        preferredSupplier: false,
+        notes: '',
+      },
+    ]);
+  };
+
+  const handleAddProductToEditSupplier = () => {
+    const firstProd = products[0];
+    if (!firstProd) return;
+    setEditSuppliedProducts((prev) => [
+      ...prev,
+      {
+        productId: firstProd.id,
+        productName: firstProd.name,
+        unit: firstProd.unit,
+        currentCostKes: firstProd.pricing?.supplierCostKes || 70,
+        minOrderQty: 10,
+        leadTimeDays: 1,
+        availability: 'Available',
+        preferredSupplier: false,
+        notes: '',
+      },
+    ]);
+  };
 
   // 3. Approve Supplier State
   const [approveComment, setApproveComment] = useState('Satisfactory farm inspection and compliance sign-off.');
@@ -281,6 +348,20 @@ export default function SuppliersPage() {
     setEditEmail(sup.email);
     setEditLeadTime(sup.leadTimeDays);
     setEditTerms(sup.paymentTerms);
+    setEditPaymentNotes(sup.paymentDetails || '');
+    setEditSuppliedProducts(
+      (sup.suppliedProducts || []).map((sp) => ({
+        productId: sp.productId,
+        productName: sp.productName,
+        unit: sp.unit,
+        currentCostKes: sp.currentCostKes,
+        minOrderQty: sp.minOrderQty ?? sp.moq ?? 1,
+        leadTimeDays: sp.leadTimeDays ?? sup.leadTimeDays,
+        availability: (sp.availability as any) || 'Available',
+        preferredSupplier: sp.preferredSupplier ?? false,
+        notes: sp.notes || '',
+      }))
+    );
     setEditOpen(true);
   };
 
@@ -340,6 +421,17 @@ export default function SuppliersPage() {
       email: newEmail.trim(),
       leadTimeDays: Number(newLeadTime),
       paymentTerms: newTerms,
+      suppliedProducts: newSuppliedProducts.map((sp) => ({
+        productId: sp.productId,
+        productName: sp.productName,
+        unit: sp.unit,
+        currentCostKes: Number(sp.currentCostKes),
+        minOrderQty: Number(sp.minOrderQty),
+        leadTimeDays: Number(sp.leadTimeDays),
+        availability: sp.availability,
+        preferredSupplier: sp.preferredSupplier,
+        notes: sp.notes,
+      })),
     });
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
     if (res.ok) {
@@ -348,6 +440,8 @@ export default function SuppliersPage() {
       setNewContact('');
       setNewPhone('');
       setNewEmail('');
+      setNewPaymentNotes('');
+      setNewSuppliedProducts([]);
     }
   };
 
@@ -363,6 +457,26 @@ export default function SuppliersPage() {
       email: editEmail.trim(),
       leadTimeDays: Number(editLeadTime),
       paymentTerms: editTerms,
+      paymentDetails: editPaymentNotes.trim(),
+      suppliedProducts: editSuppliedProducts.map((sp) => ({
+        id: sp.productId,
+        productId: sp.productId,
+        productName: sp.productName,
+        unit: sp.unit,
+        currentCostKes: Number(sp.currentCostKes),
+        priceKes: Number(sp.currentCostKes),
+        previousCostKes:
+          activeSupplier.suppliedProducts?.find((p) => p.productId === sp.productId)?.currentCostKes ??
+          Number(sp.currentCostKes),
+        lastUpdated: new Date().toISOString().split('T')[0],
+        lastPriceUpdate: new Date().toISOString().split('T')[0],
+        leadTimeDays: Number(sp.leadTimeDays),
+        moq: Number(sp.minOrderQty),
+        minOrderQty: Number(sp.minOrderQty),
+        availability: sp.availability,
+        preferredSupplier: sp.preferredSupplier,
+        notes: sp.notes,
+      })),
     });
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
     if (res.ok) setEditOpen(false);
@@ -731,16 +845,32 @@ export default function SuppliersPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono-tabular text-xs font-bold text-[#1F6A37] dark:text-[#4EB462]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileSupplierId(sup.id);
+                            setProfileTab('overview');
+                          }}
+                          className="font-mono-tabular text-xs font-bold text-[#1F6A37] dark:text-[#4EB462] hover:underline cursor-pointer"
+                          title="Open 6-tab Supplier Profile"
+                        >
                           {sup.code}
-                        </span>
+                        </button>
                         <span className="text-[11px] text-[var(--text-secondary)]">
                           · {sup.region}
                         </span>
                       </div>
-                      <h3 className="font-heading text-lg font-semibold mt-0.5 text-[var(--text-primary)]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileSupplierId(sup.id);
+                          setProfileTab('overview');
+                        }}
+                        className="text-left font-heading text-lg font-semibold mt-0.5 text-[var(--text-primary)] hover:text-[#1F6A37] dark:hover:text-[#4EB462] transition-colors cursor-pointer block"
+                        title="View comprehensive supplier profile & performance"
+                      >
                         {sup.name}
-                      </h3>
+                      </button>
                       <div className="text-xs text-[var(--text-secondary)] mt-0.5">
                         {sup.category} · Contact: <strong>{sup.contactPerson}</strong> ({sup.phone})
                       </div>
@@ -773,7 +903,7 @@ export default function SuppliersPage() {
                         <button
                           type="button"
                           onClick={() => handleOpenApprove(sup)}
-                          className="h-7 px-3 rounded-full bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs inline-flex items-center gap-1 cursor-pointer shrink-0"
+                          className="h-7 px-3 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs inline-flex items-center gap-1 cursor-pointer shrink-0"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Approve Supplier</span>
@@ -794,7 +924,7 @@ export default function SuppliersPage() {
                         <button
                           type="button"
                           onClick={() => handleReactivate(sup)}
-                          className="h-7 px-3 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white font-semibold text-xs inline-flex items-center gap-1 cursor-pointer shrink-0"
+                          className="h-7 px-3 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white font-semibold text-xs inline-flex items-center gap-1 cursor-pointer shrink-0"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                           <span>Reactivate</span>
@@ -868,16 +998,30 @@ export default function SuppliersPage() {
                   </div>
                 </div>
 
-                {/* Card Action Footer with All 8 Features */}
+                {/* Card Action Footer with All Features */}
                 <div className="pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-1.5">
+                    {/* 0. 6-Tab Profile Modal Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileSupplierId(sup.id);
+                        setProfileTab('overview');
+                      }}
+                      className="h-7 px-2.5 rounded-md bg-[#1F6A37]/10 hover:bg-[#1F6A37]/20 text-[#1F6A37] dark:text-[#4EB462] border border-[#1F6A37]/30 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Open comprehensive 6-tab profile"
+                    >
+                      <User className="w-3 h-3" />
+                      <span>Profile</span>
+                    </button>
+
                     {/* 1. Edit */}
                     {canEdit && (
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(sup)}
-                        className="h-7 px-2.5 rounded-full bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Edit vendor profile"
+                        className="h-7 px-2.5 rounded-md bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Edit vendor profile & supplied products"
                       >
                         <Edit2 className="w-3 h-3 text-[var(--text-secondary)]" />
                         <span>Edit</span>
@@ -888,7 +1032,7 @@ export default function SuppliersPage() {
                     <button
                       type="button"
                       onClick={() => handleOpenContracts(sup)}
-                      className="h-7 px-2.5 rounded-full bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                      className="h-7 px-2.5 rounded-md bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
                       title="Manage agreements"
                     >
                       <FileText className="w-3 h-3 text-[var(--text-secondary)]" />
@@ -1087,154 +1231,375 @@ export default function SuppliersPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 1. CREATE SUPPLIER MODAL */}
+      {/* 1. CREATE SUPPLIER MODAL (SECTIONS A, B, C) */}
       {/* ========================================================================= */}
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Register Farm Cooperative / Vendor"
-        subtitle="Onboard a new agricultural cooperative or miller into the Agro-Deliveries supply directory."
+        title="Register Agricultural Supplier / Cooperative"
+        subtitle="Onboard a new supplier with direct produce catalog, farmgate pricing tiers, and commercial settlement terms."
       >
-        <form onSubmit={handleCreateSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-              Cooperative / Company Legal Name *
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Nyandarua Potato Growers Society"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Produce Category *
-              </label>
-              <select
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              >
-                <option value="Fresh Vegetables & Tubers">Fresh Vegetables & Tubers</option>
-                <option value="Dry Grains & Cereals">Dry Grains & Cereals</option>
-                <option value="Fruits & Orchard">Fruits & Orchard</option>
-                <option value="Leafy Greens">Leafy Greens</option>
-                <option value="Dairy & Cold Chain">Dairy & Cold Chain</option>
-                <option value="Herbs & Spices">Herbs & Spices</option>
-              </select>
+        <form onSubmit={handleCreateSubmit} className="space-y-6">
+          {/* SECTION A: Identity & Contact */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-1 border-b border-[var(--border-subtle)]">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
+                A
+              </span>
+              <h4 className="text-xs font-semibold text-[var(--text-primary)]">
+                Identity & Contact Information
+              </h4>
             </div>
 
             <div>
               <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                County / Region *
+                Cooperative / Company Legal Name *
               </label>
               <input
                 type="text"
                 required
-                placeholder="e.g. Nyandarua County"
-                value={newRegion}
-                onChange={(e) => setNewRegion(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+                placeholder="e.g. Nyandarua Potato Growers Society"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Produce Category *
+                </label>
+                <select
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+                >
+                  <option value="Fresh Vegetables & Tubers">Fresh Vegetables & Tubers</option>
+                  <option value="Dry Grains & Cereals">Dry Grains & Cereals</option>
+                  <option value="Fruits & Orchard">Fruits & Orchard</option>
+                  <option value="Leafy Greens">Leafy Greens</option>
+                  <option value="Dairy & Cold Chain">Dairy & Cold Chain</option>
+                  <option value="Herbs & Spices">Herbs & Spices</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  County / Region *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Nyandarua County"
+                  value={newRegion}
+                  onChange={(e) => setNewRegion(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Contact Person *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Stephen Njuguna"
+                  value={newContact}
+                  onChange={(e) => setNewContact(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="+254 7XX XXX XXX"
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  placeholder="orders@coop.co.ke"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Baseline Lead Time (Days) *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="30"
+                  required
+                  value={newLeadTime}
+                  onChange={(e) => setNewLeadTime(Number(e.target.value))}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Payment Terms *
+                </label>
+                <select
+                  value={newTerms}
+                  onChange={(e) => setNewTerms(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+                >
+                  <option value="Net 7">Net 7</option>
+                  <option value="Net 14">Net 14</option>
+                  <option value="Net 30">Net 30</option>
+                  <option value="COD / M-Pesa">COD / M-Pesa</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* SECTION B: Products Supplied Repeatable Table */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between pb-1 border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
+                  B
+                </span>
+                <h4 className="text-xs font-semibold text-[var(--text-primary)]">
+                  Products Supplied & Quoted Farmgate Costs ({newSuppliedProducts.length})
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddProductToNewSupplier}
+                className="h-7 px-2.5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Product</span>
+              </button>
+            </div>
+
+            {newSuppliedProducts.length === 0 ? (
+              <div className="p-3 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+                No products linked yet. Click &quot;Add Product&quot; to configure produce items, unit costs, and minimum order quantities.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {newSuppliedProducts.map((sp, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1">
+                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Produce Product *</label>
+                        <select
+                          value={sp.productId}
+                          onChange={(e) => {
+                            const found = products.find((p) => p.id === e.target.value);
+                            if (found) {
+                              setNewSuppliedProducts((prev) =>
+                                prev.map((item, i) =>
+                                  i === idx
+                                    ? {
+                                        ...item,
+                                        productId: found.id,
+                                        productName: found.name,
+                                        unit: found.unit,
+                                        currentCostKes: found.pricing?.supplierCostKes || item.currentCostKes,
+                                      }
+                                    : item
+                                )
+                              );
+                            }
+                          }}
+                          className="w-full h-8 px-2 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                        >
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.sku}) · {p.unit}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="w-28">
+                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Cost / Unit (KES) *</label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={sp.currentCostKes}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setNewSuppliedProducts((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, currentCostKes: val } : item))
+                            );
+                          }}
+                          className="w-full h-8 px-2 rounded-md text-xs font-mono font-semibold bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                        />
+                      </div>
+
+                      <div className="w-20">
+                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">MOQ</label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={sp.minOrderQty}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setNewSuppliedProducts((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, minOrderQty: val } : item))
+                            );
+                          }}
+                          className="w-full h-8 px-2 rounded-md text-xs font-mono bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                        />
+                      </div>
+
+                      <div className="w-20">
+                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Lead (d)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="30"
+                          required
+                          value={sp.leadTimeDays}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setNewSuppliedProducts((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, leadTimeDays: val } : item))
+                            );
+                          }}
+                          className="w-full h-8 px-2 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewSuppliedProducts((prev) => prev.filter((_, i) => i !== idx))}
+                        className="mt-4 p-1.5 rounded-md hover:bg-red-500/10 text-red-600 transition-colors"
+                        title="Remove product"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-[var(--text-secondary)]">
+                          <input
+                            type="checkbox"
+                            checked={sp.preferredSupplier}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setNewSuppliedProducts((prev) =>
+                                prev.map((item, i) => (i === idx ? { ...item, preferredSupplier: checked } : item))
+                              );
+                            }}
+                            className="rounded border-[var(--border-subtle)] text-[#1F6A37]"
+                          />
+                          <span>Preferred Supplier</span>
+                        </label>
+
+                        <div className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+                          <span>Availability:</span>
+                          <select
+                            value={sp.availability}
+                            onChange={(e) => {
+                              const val = e.target.value as FormSuppliedItem['availability'];
+                              setNewSuppliedProducts((prev) =>
+                                prev.map((item, i) => (i === idx ? { ...item, availability: val } : item))
+                              );
+                            }}
+                            className="h-6 px-1.5 rounded text-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                          >
+                            <option value="Available">Available</option>
+                            <option value="Seasonal">Seasonal</option>
+                            <option value="Unavailable">Unavailable</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 max-w-xs">
+                        <input
+                          type="text"
+                          placeholder="Notes e.g. Grade 1 washed only"
+                          value={sp.notes}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setNewSuppliedProducts((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, notes: val } : item))
+                            );
+                          }}
+                          className="w-full h-7 px-2 rounded text-[11px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* SECTION C: Commercial Terms, Banking & Notes */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-2 pb-1 border-b border-[var(--border-subtle)]">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
+                C
+              </span>
+              <h4 className="text-xs font-semibold text-[var(--text-primary)]">
+                Payment Details & Banking Remittance
+              </h4>
+            </div>
+
             <div>
               <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Contact Person *
+                Settlement Details (M-Pesa Paybill / Till Number / Bank Account)
               </label>
               <input
                 type="text"
-                required
-                placeholder="e.g. Stephen Njuguna"
-                value={newContact}
-                onChange={(e) => setNewContact(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Phone Number *
-              </label>
-              <input
-                type="tel"
-                required
-                placeholder="+254 7XX XXX XXX"
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Email Address
-              </label>
-              <input
-                type="email"
-                placeholder="orders@coop.co.ke"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+                placeholder="e.g. M-Pesa Paybill 247247, Acc: 0110928371 or Equity Bank 0410..."
+                value={newPaymentNotes}
+                onChange={(e) => setNewPaymentNotes(e.target.value)}
+                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Lead Time (Days) *
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="14"
-                required
-                value={newLeadTime}
-                onChange={(e) => setNewLeadTime(Number(e.target.value))}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Payment Terms *
-              </label>
-              <select
-                value={newTerms}
-                onChange={(e) => setNewTerms(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              >
-                <option value="Net 7">Net 7</option>
-                <option value="Net 14">Net 14</option>
-                <option value="Net 30">Net 30</option>
-                <option value="COD / M-Pesa">COD / M-Pesa</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-800 dark:text-amber-300">
+          <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-800 dark:text-amber-300">
             <strong>Governance Note:</strong> Newly created suppliers enter the system with <strong>Under Review</strong> status until authorized by a Procurement Officer or Operations Manager.
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
             <button
               type="button"
               onClick={() => setCreateOpen(false)}
-              className="h-9 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-9 px-5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-sm"
+              className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs"
             >
               Register & Route for Approval
             </button>
@@ -1243,136 +1608,785 @@ export default function SuppliersPage() {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* 2. EDIT SUPPLIER MODAL */}
+      {/* 2. EDIT SUPPLIER MODAL (SECTIONS A, B, C) */}
       {/* ========================================================================= */}
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
         title={`Edit Supplier · ${activeSupplier?.name}`}
-        subtitle="Update contact credentials, contracted lead times, and payment terms."
+        subtitle="Update contact credentials, contracted produce lines, lead times, and payment terms."
       >
-        <form onSubmit={handleEditSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-              Cooperative / Vendor Name *
-            </label>
-            <input
-              type="text"
-              required
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-            />
-          </div>
+        <form onSubmit={handleEditSubmit} className="space-y-6">
+          {/* SECTION A */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-1 border-b border-[var(--border-subtle)]">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
+                A
+              </span>
+              <h4 className="text-xs font-semibold text-[var(--text-primary)]">
+                Identity & Contact Credentials
+              </h4>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Produce Category
+                Cooperative / Vendor Name *
               </label>
               <input
                 type="text"
-                value={editCategory}
-                onChange={(e) => setEditCategory(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+                required
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Region / County
-              </label>
-              <input
-                type="text"
-                value={editRegion}
-                onChange={(e) => setEditRegion(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Produce Category
+                </label>
+                <input
+                  type="text"
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Region / County
+                </label>
+                <input
+                  type="text"
+                  value={editRegion}
+                  onChange={(e) => setEditRegion(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Contact Person
+                </label>
+                <input
+                  type="text"
+                  value={editContact}
+                  onChange={(e) => setEditContact(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Phone
+                </label>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Lead Time (Days)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={editLeadTime}
+                  onChange={(e) => setEditLeadTime(Number(e.target.value))}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  Payment Terms
+                </label>
+                <select
+                  value={editTerms}
+                  onChange={(e) => setEditTerms(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                >
+                  <option value="Net 7">Net 7</option>
+                  <option value="Net 14">Net 14</option>
+                  <option value="Net 30">Net 30</option>
+                  <option value="COD / M-Pesa">COD / M-Pesa</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Contact Person
-              </label>
-              <input
-                type="text"
-                value={editContact}
-                onChange={(e) => setEditContact(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Phone
-              </label>
-              <input
-                type="tel"
-                value={editPhone}
-                onChange={(e) => setEditPhone(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Lead Time (Days)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="14"
-                value={editLeadTime}
-                onChange={(e) => setEditLeadTime(Number(e.target.value))}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Payment Terms
-              </label>
-              <select
-                value={editTerms}
-                onChange={(e) => setEditTerms(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+          {/* SECTION B: Products Supplied Repeatable Table */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between pb-1 border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
+                  B
+                </span>
+                <h4 className="text-xs font-semibold text-[var(--text-primary)]">
+                  Supplied Products & Contracted Costs ({editSuppliedProducts.length})
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddProductToEditSupplier}
+                className="h-7 px-2.5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shadow-xs"
               >
-                <option value="Net 7">Net 7</option>
-                <option value="Net 14">Net 14</option>
-                <option value="Net 30">Net 30</option>
-                <option value="COD / M-Pesa">COD / M-Pesa</option>
-              </select>
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Product</span>
+              </button>
+            </div>
+
+            {editSuppliedProducts.length === 0 ? (
+              <div className="p-3 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+                No products linked yet. Click &quot;Add Product&quot; to configure produce items.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {editSuppliedProducts.map((sp, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1">
+                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Produce Product</label>
+                        <select
+                          value={sp.productId}
+                          onChange={(e) => {
+                            const found = products.find((p) => p.id === e.target.value);
+                            if (found) {
+                              setEditSuppliedProducts((prev) =>
+                                prev.map((item, i) =>
+                                  i === idx
+                                    ? {
+                                        ...item,
+                                        productId: found.id,
+                                        productName: found.name,
+                                        unit: found.unit,
+                                        currentCostKes: found.pricing?.supplierCostKes || item.currentCostKes,
+                                      }
+                                    : item
+                                )
+                              );
+                            }
+                          }}
+                          className="w-full h-8 px-2 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                        >
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.sku}) · {p.unit}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="w-28">
+                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Cost / Unit (KES)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={sp.currentCostKes}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setEditSuppliedProducts((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, currentCostKes: val } : item))
+                            );
+                          }}
+                          className="w-full h-8 px-2 rounded-md text-xs font-mono font-semibold bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                        />
+                      </div>
+
+                      <div className="w-20">
+                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">MOQ</label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={sp.minOrderQty}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setEditSuppliedProducts((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, minOrderQty: val } : item))
+                            );
+                          }}
+                          className="w-full h-8 px-2 rounded-md text-xs font-mono bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                        />
+                      </div>
+
+                      <div className="w-20">
+                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Lead (d)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="30"
+                          required
+                          value={sp.leadTimeDays}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setEditSuppliedProducts((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, leadTimeDays: val } : item))
+                            );
+                          }}
+                          className="w-full h-8 px-2 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setEditSuppliedProducts((prev) => prev.filter((_, i) => i !== idx))}
+                        className="mt-4 p-1.5 rounded-md hover:bg-red-500/10 text-red-600 transition-colors"
+                        title="Remove product"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-[var(--text-secondary)]">
+                          <input
+                            type="checkbox"
+                            checked={sp.preferredSupplier}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setEditSuppliedProducts((prev) =>
+                                prev.map((item, i) => (i === idx ? { ...item, preferredSupplier: checked } : item))
+                              );
+                            }}
+                            className="rounded border-[var(--border-subtle)] text-[#1F6A37]"
+                          />
+                          <span>Preferred Supplier</span>
+                        </label>
+
+                        <div className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+                          <span>Availability:</span>
+                          <select
+                            value={sp.availability}
+                            onChange={(e) => {
+                              const val = e.target.value as FormSuppliedItem['availability'];
+                              setEditSuppliedProducts((prev) =>
+                                prev.map((item, i) => (i === idx ? { ...item, availability: val } : item))
+                              );
+                            }}
+                            className="h-6 px-1.5 rounded text-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                          >
+                            <option value="Available">Available</option>
+                            <option value="Seasonal">Seasonal</option>
+                            <option value="Unavailable">Unavailable</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 max-w-xs">
+                        <input
+                          type="text"
+                          placeholder="Notes e.g. Contracted Grade 1"
+                          value={sp.notes}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditSuppliedProducts((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, notes: val } : item))
+                            );
+                          }}
+                          className="w-full h-7 px-2 rounded text-[11px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* SECTION C: Commercial Terms, Banking & Notes */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-2 pb-1 border-b border-[var(--border-subtle)]">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
+                C
+              </span>
+              <h4 className="text-xs font-semibold text-[var(--text-primary)]">
+                Payment Details & Banking Remittance
+              </h4>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                Settlement Details (M-Pesa Paybill / Till Number / Bank Account)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. M-Pesa Paybill 247247, Acc: 0110928371"
+                value={editPaymentNotes}
+                onChange={(e) => setEditPaymentNotes(e.target.value)}
+                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+              />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
             <button
               type="button"
               onClick={() => setEditOpen(false)}
-              className="h-9 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-9 px-5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
+              className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs"
             >
               Save Profile Changes
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* 6-TAB SUPPLIER PROFILE MODAL */}
+      {/* ========================================================================= */}
+      <Modal
+        open={Boolean(profileSupplier)}
+        onClose={() => setProfileSupplierId(null)}
+        title={profileSupplier ? `${profileSupplier.name} (${profileSupplier.code})` : ''}
+        subtitle={profileSupplier ? `${profileSupplier.region} · ${profileSupplier.category} · Contact: ${profileSupplier.contactPerson} (${profileSupplier.phone})` : ''}
+      >
+        {profileSupplier && (
+          <div className="space-y-4">
+            {/* 6 Tab Buttons */}
+            <div className="flex items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2 overflow-x-auto">
+              {[
+                { id: 'overview', label: 'Overview' },
+                { id: 'products', label: `Products (${profileSupplier.suppliedProducts?.length || 0})` },
+                {
+                  id: 'procurement',
+                  label: `PO History (${procurementOrders.filter((po) => po.supplierId === profileSupplier.id).length})`,
+                },
+                {
+                  id: 'payables',
+                  label: `Payables (${supplierPayables.filter((sp) => sp.supplierId === profileSupplier.id).length})`,
+                },
+                {
+                  id: 'contracts',
+                  label: `Contracts & Docs (${(profileSupplier.contracts?.length || 0) + (profileSupplier.documents?.length || 0)})`,
+                },
+                { id: 'performance', label: `Audit (${profileSupplier.qualityScorePct}%)` },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setProfileTab(t.id as any)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    profileTab === t.id
+                      ? 'bg-[#1F6A37] text-white shadow-xs'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-canvas)]'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* TAB 1: OVERVIEW */}
+            {profileTab === 'overview' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                    <span className="text-[10px] text-[var(--text-secondary)]">Governance Status</span>
+                    <div className="mt-1">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                          profileSupplier.status === 'Active'
+                            ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300'
+                            : profileSupplier.status === 'Under Review'
+                            ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'
+                            : 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400'
+                        }`}
+                      >
+                        {profileSupplier.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                    <span className="text-[10px] text-[var(--text-secondary)]">AP Obligation</span>
+                    <div className="font-mono font-bold text-sm text-[var(--text-primary)] mt-1">
+                      KES {profileSupplier.payableBalanceKes.toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                    <span className="text-[10px] text-[var(--text-secondary)]">Quality Pass Score</span>
+                    <div className="font-mono font-bold text-sm text-[#1F6A37] dark:text-[#4EB462] mt-1">
+                      {profileSupplier.qualityScorePct}%
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                    <span className="text-[10px] text-[var(--text-secondary)]">Lead Time & Terms</span>
+                    <div className="font-semibold text-xs text-[var(--text-primary)] mt-1">
+                      {profileSupplier.leadTimeDays}d · {profileSupplier.paymentTerms}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2 text-xs">
+                  <h5 className="font-semibold text-[var(--text-primary)]">Contact & Settlement Profile</h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[var(--text-secondary)]">
+                    <div>
+                      Contact Person: <strong className="text-[var(--text-primary)]">{profileSupplier.contactPerson}</strong>
+                    </div>
+                    <div>
+                      Phone: <strong className="text-[var(--text-primary)]">{profileSupplier.phone}</strong>
+                    </div>
+                    <div>
+                      Email: <strong className="text-[var(--text-primary)]">{profileSupplier.email || 'None on record'}</strong>
+                    </div>
+                    <div>
+                      Region / County: <strong className="text-[var(--text-primary)]">{profileSupplier.region}</strong>
+                    </div>
+                    <div>
+                      Payment Terms: <strong className="text-[var(--text-primary)]">{profileSupplier.paymentTerms}</strong>
+                    </div>
+                    <div>
+                      Banking / Remittance: <strong className="text-[var(--text-primary)]">{profileSupplier.paymentDetails || 'Default M-Pesa / EFT'}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: PRODUCTS SUPPLIED */}
+            {profileTab === 'products' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">
+                    Configured Produce Lines ({profileSupplier.suppliedProducts?.length || 0})
+                  </span>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileSupplierId(null);
+                        handleOpenEdit(profileSupplier);
+                      }}
+                      className="text-xs text-[#1F6A37] dark:text-[#4EB462] font-semibold hover:underline cursor-pointer"
+                    >
+                      + Manage Products & Pricing
+                    </button>
+                  )}
+                </div>
+
+                <div className="border border-[var(--border-subtle)] rounded-md overflow-hidden">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                      <tr>
+                        <th className="py-2 px-3">Product</th>
+                        <th className="py-2 px-3 text-right">Quoted Cost</th>
+                        <th className="py-2 px-3 text-right">Prior Cost</th>
+                        <th className="py-2 px-3 text-center">MOQ</th>
+                        <th className="py-2 px-3 text-center">Lead (d)</th>
+                        <th className="py-2 px-3 text-center">Status</th>
+                        <th className="py-2 px-3 text-center">Tier</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border-subtle)]">
+                      {(profileSupplier.suppliedProducts || []).map((sp) => (
+                        <tr key={sp.productId} className="hover:bg-[var(--bg-canvas)]/50">
+                          <td className="py-2.5 px-3">
+                            <div className="font-medium text-[var(--text-primary)]">{sp.productName}</div>
+                            <div className="text-[10px] text-[var(--text-secondary)]">Updated {sp.lastUpdated}</div>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-semibold text-[var(--text-primary)]">
+                            KES {sp.currentCostKes.toLocaleString()} / {sp.unit}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono text-[var(--text-secondary)]">
+                            KES {sp.previousCostKes.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono">{sp.minOrderQty ?? sp.moq ?? 1}</td>
+                          <td className="py-2.5 px-3 text-center">{sp.leadTimeDays ?? profileSupplier.leadTimeDays}d</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                              {sp.availability || 'Available'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {sp.preferredSupplier ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300">
+                                Preferred
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-[var(--text-secondary)]">Standard</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: PURCHASE HISTORY */}
+            {profileTab === 'procurement' && (
+              <div className="space-y-3">
+                <span className="text-xs font-semibold text-[var(--text-primary)]">
+                  Purchase Orders Issued to {profileSupplier.name}
+                </span>
+
+                {procurementOrders.filter((po) => po.supplierId === profileSupplier.id).length === 0 ? (
+                  <div className="p-4 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+                    No purchase orders recorded yet for this supplier.
+                  </div>
+                ) : (
+                  <div className="border border-[var(--border-subtle)] rounded-md overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                        <tr>
+                          <th className="py-2 px-3">PO Number</th>
+                          <th className="py-2 px-3">Purpose</th>
+                          <th className="py-2 px-3">Items Summary</th>
+                          <th className="py-2 px-3 text-right">Total (KES)</th>
+                          <th className="py-2 px-3 text-center">Stage</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border-subtle)]">
+                        {procurementOrders
+                          .filter((po) => po.supplierId === profileSupplier.id)
+                          .map((po) => (
+                            <tr key={po.id} className="hover:bg-[var(--bg-canvas)]/50">
+                              <td className="py-2.5 px-3 font-mono font-semibold text-[var(--text-primary)]">
+                                {po.poNumber}
+                              </td>
+                              <td className="py-2.5 px-3 text-[11px] text-[var(--text-secondary)]">
+                                {po.purpose || 'Direct Sourcing'}
+                              </td>
+                              <td className="py-2.5 px-3">{po.itemsSummary}</td>
+                              <td className="py-2.5 px-3 text-right font-mono font-bold text-[var(--text-primary)]">
+                                KES {po.totalKes.toLocaleString()}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200">
+                                  {po.stage}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 4: ACCOUNTS PAYABLE */}
+            {profileTab === 'payables' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">
+                    Payables & Commercial Settlement Ledger
+                  </span>
+                  <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400">
+                    Outstanding: KES {profileSupplier.payableBalanceKes.toLocaleString()}
+                  </span>
+                </div>
+
+                {supplierPayables.filter((sp) => sp.supplierId === profileSupplier.id).length === 0 ? (
+                  <div className="p-4 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+                    No open or past payables for this vendor.
+                  </div>
+                ) : (
+                  <div className="border border-[var(--border-subtle)] rounded-md overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                        <tr>
+                          <th className="py-2 px-3">Payable Ref / PO</th>
+                          <th className="py-2 px-3">Due Date</th>
+                          <th className="py-2 px-3 text-right">Total Invoiced</th>
+                          <th className="py-2 px-3 text-right">Settled</th>
+                          <th className="py-2 px-3 text-right">Balance</th>
+                          <th className="py-2 px-3 text-center">Status</th>
+                          <th className="py-2 px-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border-subtle)]">
+                        {supplierPayables
+                          .filter((sp) => sp.supplierId === profileSupplier.id)
+                          .map((p) => (
+                            <tr key={p.id} className="hover:bg-[var(--bg-canvas)]/50">
+                              <td className="py-2.5 px-3">
+                                <div className="font-mono font-semibold text-[var(--text-primary)]">{p.id}</div>
+                                <div className="text-[10px] text-[var(--text-secondary)] font-mono">{p.poNumber}</div>
+                              </td>
+                              <td className="py-2.5 px-3 text-[var(--text-secondary)]">{p.dueDate}</td>
+                              <td className="py-2.5 px-3 text-right font-mono font-medium">
+                                KES {(p.totalAmountKes ?? p.amountKes ?? 0).toLocaleString()}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400">
+                                KES {p.paidAmountKes.toLocaleString()}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
+                                KES {p.balanceKes.toLocaleString()}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200">
+                                  {p.status}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                {p.balanceKes > 0 && can('finance.record_payment') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenRecordPayment(p)}
+                                    className="px-2.5 py-1 rounded bg-[#1F6A37] text-white text-[11px] font-semibold hover:bg-[#12512C]"
+                                  >
+                                    Pay
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 5: CONTRACTS & DOCUMENTS */}
+            {profileTab === 'contracts' && (
+              <div className="space-y-4 text-xs">
+                <div>
+                  <h5 className="font-semibold text-[var(--text-primary)] mb-2">
+                    Master Supply Agreements ({profileSupplier.contracts?.length || 0})
+                  </h5>
+                  {(profileSupplier.contracts || []).length === 0 ? (
+                    <div className="p-3 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                      No formal supply contracts uploaded.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {profileSupplier.contracts.map((c) => (
+                        <div key={c.id} className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between">
+                          <div>
+                            <div className="font-semibold text-[var(--text-primary)]">{c.title} ({c.contractRef})</div>
+                            <div className="text-[10px] text-[var(--text-secondary)]">Validity: {c.startDate} to {c.endDate} · {c.deliveryCadence}</div>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-mono font-bold text-[var(--text-primary)]">KES {c.valueKes.toLocaleString()}</span>
+                            <div><span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">{c.status}</span></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h5 className="font-semibold text-[var(--text-primary)] mb-2">
+                    Compliance & Standardization Documents ({profileSupplier.documents?.length || 0})
+                  </h5>
+                  {(profileSupplier.documents || []).length === 0 ? (
+                    <div className="p-3 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                      No compliance documents on record.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {profileSupplier.documents.map((d) => (
+                        <div key={d.id} className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between">
+                          <div>
+                            <div className="font-semibold text-[var(--text-primary)]">{d.title} ({d.docNumber})</div>
+                            <div className="text-[10px] text-[var(--text-secondary)]">{d.category} · Valid through {d.expiryDate}</div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            {d.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 6: PERFORMANCE */}
+            {profileTab === 'performance' && (
+              <div className="space-y-4 text-xs">
+                <div className="grid grid-cols-3 gap-3 p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-center">
+                  <div>
+                    <span className="text-[10px] text-[var(--text-secondary)]">Quality Compliance</span>
+                    <div className="font-mono font-bold text-base text-[#1F6A37] dark:text-[#4EB462] mt-0.5">
+                      {profileSupplier.qualityScorePct}%
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-[var(--text-secondary)]">On-Time Farm Dispatch</span>
+                    <div className="font-mono font-bold text-base text-[var(--text-primary)] mt-0.5">
+                      96%
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-[var(--text-secondary)]">Commercial Tier</span>
+                    <div className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      Grade A Verified
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h5 className="font-semibold text-[var(--text-primary)] mb-2">Performance Audit Log History</h5>
+                  {(profileSupplier.evaluations || []).length === 0 ? (
+                    <div className="p-3 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                      No performance audits logged yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {profileSupplier.evaluations.map((ev) => (
+                        <div key={ev.id} className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-[var(--text-primary)]">{ev.evaluationDate} · Grade: {ev.packagingGrade || ev.grade || 'Grade A'}</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold">{ev.recommendation}</span>
+                          </div>
+                          <p className="text-[11px] text-[var(--text-secondary)]">{ev.notes}</p>
+                          <div className="text-[10px] text-[var(--text-secondary)]">Auditor: {ev.evaluator || ev.evaluatedBy || 'Operations Lead'} · Quality {ev.qualityScorePct ?? ev.qualityScore ?? 100}% · Timeliness {ev.timelinessScorePct ?? ev.timelinessScore ?? 100}% · Pricing {ev.pricingCompliancePct ?? ev.pricingScore ?? 100}%</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setProfileSupplierId(null)}
+                className="h-8 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-semibold cursor-pointer hover:bg-[var(--bg-canvas)]"
+              >
+                Close Profile
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* ========================================================================= */}

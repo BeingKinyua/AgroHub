@@ -40,6 +40,15 @@ import {
   WarehouseRecord,
 } from '@/types/domain/bos';
 import {
+  calculatePODLineQuantities,
+  classifyPODDiscrepancy,
+  calculateInvoiceEligibility,
+  isSupplierEligibleForPurchasing,
+  calculateSupplierBalances,
+  validateSupplierPayment,
+  generateNextSku,
+} from '@/lib/services/business-rules';
+import {
   DEFAULT_ROLES,
   getRolePermissions,
   hasPermission,
@@ -170,6 +179,8 @@ interface BosContextValue {
       recipientName: string;
       recipientRole?: string;
       recipientPhone?: string;
+      receivingDepartment?: string;
+      deliveryRunId?: string;
       deliveredItems: PODDeliveredItem[];
       notes?: string;
       exceptions?: string;
@@ -184,11 +195,18 @@ interface BosContextValue {
   ) => Promise<{ ok: boolean; message: string; podId?: string }>;
   verifyPOD: (
     podId: string,
-    options?: { autoGenerateInvoice?: boolean; notes?: string }
+    options?: { autoGenerateInvoice?: boolean; createInvoice?: boolean; reject?: boolean; notes?: string }
   ) => Promise<{ ok: boolean; message: string; invoiceNumber?: string }>;
   rejectPOD: (
     podId: string,
     reason: string
+  ) => Promise<{ ok: boolean; message: string }>;
+  reconcilePODDiscrepancy: (
+    podId: string,
+    resolution: {
+      action: 'Accept Shortage' | 'Schedule Re-delivery' | 'Issue Credit Note';
+      notes: string;
+    }
   ) => Promise<{ ok: boolean; message: string }>;
   generateDraftInvoice: (
     orderId: string
@@ -305,6 +323,18 @@ interface BosContextValue {
     email: string;
     leadTimeDays: number;
     paymentTerms: string;
+    paymentDetails?: string;
+    suppliedProducts?: Array<{
+      productId: string;
+      productName: string;
+      unit: UnitOfMeasure;
+      currentCostKes: number;
+      minOrderQty?: number;
+      leadTimeDays?: number;
+      availability?: 'Available' | 'Seasonal' | 'Unavailable';
+      preferredSupplier?: boolean;
+      notes?: string;
+    }>;
   }) => Promise<{ ok: boolean; message: string; supplier?: SupplierRecord }>;
   updateSupplier: (
     id: string,
@@ -404,6 +434,20 @@ interface BosContextValue {
   updateVehicle: (id: string, updates: Partial<VehicleRecord>) => Promise<{ ok: boolean; message: string }>;
   createDriver: (input: Omit<DriverRecord, 'id' | 'deliveriesCompleted' | 'rating'>) => Promise<{ ok: boolean; message: string }>;
   updateDriver: (id: string, updates: Partial<DriverRecord>) => Promise<{ ok: boolean; message: string }>;
+  reassignDeliveryRun: (
+    runId: string,
+    vehicleIdOrDetails:
+      | string
+      | {
+          vehicleId?: string;
+          vehicleReg?: string;
+          driverId?: string;
+          driverName?: string;
+          driverPhone?: string;
+          transportCostKes?: number;
+        },
+    driverId?: string
+  ) => Promise<{ ok: boolean; message: string }>;
 }
 
 const DEFAULT_WIDGETS = [
@@ -1143,58 +1187,146 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     const podId = `POD-2026-${String(podRecords.length + 1).padStart(3, '0')}`;
     const todayStr = new Date().toISOString().split('T')[0];
 
+    // Quantity calculations and discrepancy detection per line item
+    let hasDiscrepancies = false;
+    let anyOutstanding = false;
+
+    const reconciledItems: PODDeliveredItem[] = details.deliveredItems.map((it) => {
+      const orderItem = order.items.find(
+        (oi) => oi.productId === it.productId || oi.sku === it.sku
+      );
+      const orderedQty = it.orderedQty ?? it.requestedQty ?? orderItem?.quantity ?? 0;
+      const dispatchedQty = it.dispatchedQty ?? it.requestedQty ?? it.deliveredQty ?? orderedQty;
+      const receivedQty = it.receivedQty ?? it.deliveredQty ?? dispatchedQty;
+      const acceptedQty = it.acceptedQty ?? it.deliveredQty ?? receivedQty;
+      const previousAcceptedQty = it.previousAcceptedQty ?? 0;
+
+      const calc = calculatePODLineQuantities({
+        orderedQty,
+        dispatchedQty,
+        receivedQty,
+        acceptedQty,
+        previousAcceptedQty,
+      });
+
+      if (calc.hasDiscrepancy) {
+        hasDiscrepancies = true;
+      }
+      if (calc.outstandingQty > 0) {
+        anyOutstanding = true;
+      }
+
+      const defaultDiscrepancyReason =
+        it.discrepancyReason ||
+        (calc.rejectedQty > 0
+          ? 'Damaged goods'
+          : calc.currentDeliveryShortage > 0
+          ? 'Short supplied'
+          : calc.isOverDelivery
+          ? 'Incorrect quantity'
+          : undefined);
+
+      return {
+        ...it,
+        orderedQty: calc.orderedQty,
+        dispatchedQty: calc.dispatchedQty,
+        receivedQty: calc.receivedQty,
+        acceptedQty: calc.acceptedQty,
+        rejectedQty: calc.rejectedQty,
+        currentDeliveryShortage: calc.currentDeliveryShortage,
+        cumulativeAcceptedQty: calc.cumulativeAcceptedQty,
+        outstandingQty: calc.outstandingQty,
+        classification: it.classification || calc.classification,
+        discrepancyReason: defaultDiscrepancyReason,
+        rejectionReason: it.rejectionReason || (calc.rejectedQty > 0 ? defaultDiscrepancyReason : undefined),
+        deliveredQty: calc.acceptedQty,
+        requestedQty: calc.orderedQty,
+      };
+    });
+
     const newPod: PODEvidenceRecord = {
       id: podId,
       orderId: order.id,
       orderNumber: order.orderNumber,
+      deliveryRunId: details.deliveryRunId,
       customerName: order.customerName,
       recipientName: details.recipientName,
       recipientRole: details.recipientRole || 'Receiving Staff',
       recipientPhone: details.recipientPhone,
+      receivingDepartment: details.receivingDepartment,
       deliveryDate: todayStr,
       submittedAt: `${todayStr} ${new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })} EAT`,
       submittedBy: currentUser ? `${currentUser.fullName} (${currentUser.roleName})` : 'Delivery Driver',
       status: 'Pending Verification',
-      deliveredItems: details.deliveredItems,
+      reconciliationStatus: hasDiscrepancies ? 'Disputed' : 'Fully Reconciled',
+      deliveredItems: reconciledItems,
       evidenceFiles: details.files || [],
       deliveryNotes: details.notes,
       deliveryExceptions: details.exceptions,
+      hasDiscrepancies,
     };
 
     setPodRecords((prev) => [newPod, ...prev]);
 
+    // Update order lifecycle status reflecting delivery outcome
     setOrders((prev) =>
       prev.map((o) =>
         o.id === order.id
           ? {
               ...o,
-              status: 'Delivered',
+              status: anyOutstanding ? 'Partially Fulfilled' : 'Delivered',
               podStatus: 'Pending Verification',
               podEvidenceId: podId,
-              nextStepLabel: 'Awaiting POD Verification by Operations / Finance',
+              nextStepLabel: hasDiscrepancies
+                ? 'Delivery Recorded with Discrepancy · Awaiting Verification & Reconciliation'
+                : 'Awaiting POD Verification by Operations / Finance',
             }
           : o
       )
     );
 
+    if (hasDiscrepancies) {
+      setNotifications((prev) => [
+        {
+          id: `NOTIF-${Date.now()}`,
+          severity: 'Warning',
+          title: `Delivery Discrepancy: ${order.orderNumber}`,
+          description: `${details.recipientName} recorded shortages or rejected produce for ${order.customerName}. Verification and review required.`,
+          timestamp: new Date().toISOString(),
+          href: '/fulfillment',
+          permissionRequired: 'fulfillment.manage',
+          read: false,
+        },
+        ...prev,
+      ]);
+    }
+
     appendAudit(
       'Deliveries',
       order.orderNumber,
-      'Recorded Physical Delivery Arrival & Submitted POD',
+      hasDiscrepancies
+        ? 'Recorded Delivery Arrival with Discrepancies (Shortage/Rejection)'
+        : 'Recorded Physical Delivery Arrival & Submitted POD',
       'Dispatched',
-      `Delivered · POD ${podId} Pending Verification`
+      `${hasDiscrepancies ? 'Disputed' : 'Delivered'} · POD ${podId} Pending Verification`
     );
 
     pushToast({
-      title: 'Delivery Arrival Recorded',
-      description: `Delivery documented for ${order.customerName}. POD submitted for verification.`,
-      tone: 'success',
+      title: hasDiscrepancies ? 'Delivery Recorded (Discrepancy Noted)' : 'Delivery Arrival Recorded',
+      description: hasDiscrepancies
+        ? `Delivery for ${order.customerName} submitted with discrepancies. POD queued for supervisor verification.`
+        : `Delivery documented for ${order.customerName}. POD submitted for verification.`,
+      tone: hasDiscrepancies ? 'warning' : 'success',
     });
 
     return { ok: true, message: `Delivery recorded. POD ${podId} awaiting verification.`, podId };
   };
 
   const verifyPOD: BosContextValue['verifyPOD'] = async (podId, options) => {
+    if (options?.reject) {
+      return rejectPOD(podId, options.notes || 'Rejected POD sign-off');
+    }
+
     const auth = await verifyServerAction('orders.approve', 'Verify Proof of Delivery');
     if (!auth.ok) return { ok: false, message: auth.error! };
 
@@ -1209,33 +1341,33 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     const customer = customers.find((c) => c.name === pod.customerName || (order && c.id === order.customerId));
 
     const todayStr = new Date().toISOString().split('T')[0];
+
+    // Compute billable items strictly from verified accepted quantities
+    const existingInvoice = invoices.find((inv) => inv.orderNumber === pod.orderNumber);
+    const invoiceEligibility = calculateInvoiceEligibility(
+      pod.deliveredItems,
+      existingInvoice?.invoiceNumber
+    );
+
     const updatedPod: PODEvidenceRecord = {
       ...pod,
       status: 'Verified',
       verifiedBy: currentUser ? `${currentUser.fullName} (${currentUser.roleName})` : 'Operations Manager',
       verifiedAt: `${todayStr} ${new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })} EAT`,
-      verificationNotes: options?.notes || 'POD sign-off and delivered quantities verified.',
+      verificationNotes: options?.notes || 'POD sign-off and accepted quantities verified.',
     };
 
     let generatedInvoiceNumber: string | undefined;
 
-    // Check customer billing policy: if institutional customer on credit terms (Net 15/30/45) and no invoice exists
+    // Invoicing policy: only institutional credit customers, no existing invoice, and billable items exist
     const shouldInvoice =
       options?.autoGenerateInvoice !== false &&
       customer &&
       customer.isInstitutional &&
-      customer.paymentTerms !== 'Prepaid / M-Pesa';
-
-    const existingInvoice = invoices.find(
-      (inv) => inv.orderNumber === pod.orderNumber
-    );
+      customer.paymentTerms !== 'Prepaid / M-Pesa' &&
+      invoiceEligibility.eligible;
 
     if (shouldInvoice && !existingInvoice && order) {
-      const billableTotal = pod.deliveredItems.reduce(
-        (sum, item) => sum + Math.round(item.deliveredQty * item.unitPriceKes),
-        0
-      );
-
       const invNum = `INV-2026-${8890 + invoices.length}`;
       generatedInvoiceNumber = invNum;
 
@@ -1243,8 +1375,6 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       if (customer.paymentTerms === 'Net 15') dueDate.setDate(dueDate.getDate() + 15);
       else if (customer.paymentTerms === 'Net 45') dueDate.setDate(dueDate.getDate() + 45);
       else dueDate.setDate(dueDate.getDate() + 30); // Net 30 default
-
-      const finalAmount = billableTotal > 0 ? billableTotal : order.totalKes;
 
       const newInvoice: InvoiceRecord = {
         id: `INV-00${invoices.length + 1}`,
@@ -1254,12 +1384,22 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         customerName: customer.name,
         issueDate: todayStr,
         dueDate: dueDate.toISOString().split('T')[0],
-        amountKes: finalAmount,
+        amountKes: invoiceEligibility.billableTotalKes,
         paidAmountKes: 0,
-        balanceKes: finalAmount,
+        balanceKes: invoiceEligibility.billableTotalKes,
         status: 'Issued',
         agingBucket: 'Current (0-15d)',
-        lineItems: order.items,
+        lineItems: invoiceEligibility.billableLines.map((bl) => ({
+          productId: bl.productId,
+          productName: bl.productName,
+          sku: bl.sku,
+          unit: bl.unit as UnitOfMeasure,
+          quantity: bl.acceptedQty,
+          allocatedBatch: 'Delivered-Verified',
+          unitPriceKes: bl.unitPriceKes,
+          pricingTier: 'Institutional',
+          lineTotalKes: bl.lineTotalKes,
+        })),
         podRef: pod.id,
         paymentTerms: customer.paymentTerms,
       };
@@ -1268,11 +1408,11 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       updatedPod.invoiceCreated = true;
       updatedPod.invoiceNumber = invNum;
 
-      // Update customer balance in state
+      // Update customer balance accurately with billable accepted total
       setCustomers((prev) =>
         prev.map((c) =>
           c.id === customer.id
-            ? { ...c, outstandingBalanceKes: c.outstandingBalanceKes + finalAmount }
+            ? { ...c, outstandingBalanceKes: c.outstandingBalanceKes + invoiceEligibility.billableTotalKes }
             : c
         )
       );
@@ -1285,11 +1425,14 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         o.orderNumber === pod.orderNumber
           ? {
               ...o,
+              status: invoiceEligibility.hasOutstandingShortages ? 'Partially Fulfilled' : 'Delivered',
               podStatus: 'Verified',
               invoiceStatus: generatedInvoiceNumber ? 'Draft Created' : o.invoiceStatus,
               invoiceNumber: generatedInvoiceNumber || o.invoiceNumber,
               nextStepLabel: generatedInvoiceNumber
-                ? `Invoice ${generatedInvoiceNumber} Issued · Track Net Receivables`
+                ? `Invoice ${generatedInvoiceNumber} Issued (Accepted: KES ${invoiceEligibility.billableTotalKes.toLocaleString()})${invoiceEligibility.hasOutstandingShortages ? ' · Outstanding Shortage Remains' : ''}`
+                : invoiceEligibility.hasOutstandingShortages
+                ? 'POD Verified · Outstanding Sourcing Shortages Remain'
                 : 'Order Verified · Ready for Invoicing / Closure',
             }
           : o
@@ -1302,12 +1445,12 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       'Verified Electronic POD & Validated Delivered Quantities',
       'POD Pending Verification',
       generatedInvoiceNumber
-        ? `POD Verified · Auto-generated Commercial Tax Invoice ${generatedInvoiceNumber}`
+        ? `POD Verified · Auto-generated Tax Invoice ${generatedInvoiceNumber} (KES ${invoiceEligibility.billableTotalKes.toLocaleString()})`
         : 'POD Verified'
     );
 
     const successMsg = generatedInvoiceNumber
-      ? `Proof of Delivery verified for ${pod.customerName}. Draft Invoice ${generatedInvoiceNumber} generated.`
+      ? `Proof of Delivery verified for ${pod.customerName}. Draft Invoice ${generatedInvoiceNumber} generated for accepted goods (KES ${invoiceEligibility.billableTotalKes.toLocaleString()}).`
       : `Proof of Delivery verified for ${pod.customerName}.`;
 
     pushToast({
@@ -1317,6 +1460,38 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     });
 
     return { ok: true, message: successMsg, invoiceNumber: generatedInvoiceNumber };
+  };
+
+  const reconcilePODDiscrepancy: BosContextValue['reconcilePODDiscrepancy'] = async (
+    podId,
+    resolution
+  ) => {
+    const pod = podRecords.find((p) => p.id === podId);
+    if (!pod) return { ok: false, message: 'POD record not found.' };
+
+    const updatedPod: PODEvidenceRecord = {
+      ...pod,
+      reconciliationStatus: 'Fully Reconciled',
+      discrepancyNotes: `${pod.discrepancyNotes ? pod.discrepancyNotes + ' | ' : ''}Resolution: ${resolution.action} (${resolution.notes}) by ${currentUser?.fullName || 'Operations'}`,
+    };
+
+    setPodRecords((prev) => prev.map((p) => (p.id === podId ? updatedPod : p)));
+
+    appendAudit(
+      'Fulfillment',
+      pod.orderNumber,
+      'Reconciled Delivery Discrepancy',
+      pod.reconciliationStatus || 'Disputed',
+      `Reconciled: ${resolution.action} · ${resolution.notes}`
+    );
+
+    pushToast({
+      title: 'Discrepancy Reconciled',
+      description: `Delivery discrepancy for ${pod.orderNumber} resolved with action '${resolution.action}'.`,
+      tone: 'success',
+    });
+
+    return { ok: true, message: 'Discrepancy reconciled successfully.' };
   };
 
   const rejectPOD: BosContextValue['rejectPOD'] = async (podId, reason) => {
@@ -1738,6 +1913,12 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
 
     const supplier = suppliers.find((s) => s.id === input.supplierId);
     if (!supplier) return { ok: false, message: 'Supplier not found.' };
+
+    const eligibility = isSupplierEligibleForPurchasing(supplier);
+    if (!eligibility.eligible) {
+      pushToast({ title: 'Supplier Ineligible', description: eligibility.reason!, tone: 'warning' });
+      return { ok: false, message: eligibility.reason! };
+    }
 
     const poNumber = `PO-2026-${517 + procurementOrders.length}`;
     const prNumber = `PR-2026-${312 + procurementOrders.length}`;
@@ -2386,6 +2567,28 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     }
     const nextNum = suppliers.length + 1;
     const code = `VND-${input.name.slice(0, 3).toUpperCase()}-${String(nextNum).padStart(3, '0')}`;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const suppliedProducts = input.suppliedProducts
+      ? input.suppliedProducts.map((p, idx) => ({
+          id: `SPI-${Date.now().toString().slice(-4)}-${idx}`,
+          productId: p.productId,
+          productName: p.productName,
+          unit: p.unit,
+          currentCostKes: p.currentCostKes,
+          priceKes: p.currentCostKes,
+          previousCostKes: p.currentCostKes,
+          lastUpdated: todayStr,
+          lastPriceUpdate: todayStr,
+          leadTimeDays: p.leadTimeDays ?? input.leadTimeDays,
+          moq: p.minOrderQty ?? (p as { moq?: number }).moq ?? 1,
+          minOrderQty: p.minOrderQty ?? (p as { moq?: number }).moq ?? 1,
+          availability: p.availability || 'Available',
+          preferredSupplier: p.preferredSupplier || false,
+          notes: p.notes,
+        }))
+      : [];
+
     const newSupplier: SupplierRecord = {
       id: `SUP-${String(nextNum).padStart(2, '0')}`,
       code,
@@ -2397,11 +2600,12 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       email: input.email,
       leadTimeDays: input.leadTimeDays,
       paymentTerms: input.paymentTerms,
+      paymentDetails: input.paymentDetails,
       payableBalanceKes: 0,
       qualityScorePct: 95.0,
       recentPriceTrend: 'Stable',
       status: 'Under Review',
-      suppliedProducts: [],
+      suppliedProducts,
       contracts: [],
       documents: [],
       evaluations: [],
@@ -2412,11 +2616,11 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       code,
       'Registered New Vendor (Under Review)',
       'None',
-      `${newSupplier.name} (${newSupplier.region}) · Contact: ${newSupplier.contactPerson}`
+      `${newSupplier.name} (${newSupplier.region}) · Linked Products: ${suppliedProducts.length}`
     );
     pushToast({
       title: 'Supplier Registered',
-      description: `${newSupplier.name} registered and routed for governance onboarding review.`,
+      description: `${newSupplier.name} registered with ${suppliedProducts.length} supplied product(s).`,
       tone: 'success',
     });
     return { ok: true, message: `Supplier ${newSupplier.name} registered successfully.`, supplier: newSupplier };
@@ -2431,7 +2635,11 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     const target = suppliers.find((s) => s.id === id);
     if (!target) return { ok: false, message: 'Supplier not found.' };
 
-    const updated: SupplierRecord = { ...target, ...updates };
+    const updated: SupplierRecord = {
+      ...target,
+      ...updates,
+      suppliedProducts: updates.suppliedProducts ?? target.suppliedProducts,
+    };
     setSuppliers((prev) => prev.map((s) => (s.id === id ? updated : s)));
     appendAudit(
       'Suppliers',
@@ -2967,7 +3175,6 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
 
     const updated: SupplierRecord = {
       ...target,
-      status: 'Suspended',
       isArchived: true,
       archivedAt: new Date().toISOString(),
     };
@@ -2977,7 +3184,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       target.code,
       'Archived Supplier',
       target.status,
-      'Archived'
+      `${target.status} (Archived)`
     );
     pushToast({
       title: 'Supplier Archived',
@@ -2996,9 +3203,10 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     const target = suppliers.find((s) => s.id === supplierId);
     if (!target) return { ok: false, message: 'Supplier not found.' };
 
+    // Preserving governance status: Restoring an archived supplier must not automatically approve
+    // or reactivate a supplier who was previously suspended or under review.
     const updated: SupplierRecord = {
       ...target,
-      status: 'Active',
       isArchived: false,
       archivedAt: undefined,
     };
@@ -3006,13 +3214,13 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     appendAudit(
       'Suppliers',
       target.code,
-      'Restored Supplier',
+      'Restored Supplier from Archive',
       'Archived',
-      'Active'
+      target.status
     );
     pushToast({
       title: 'Supplier Restored',
-      description: `${target.name} is now restored to Active status.`,
+      description: `${target.name} restored from archive (Status: ${target.status}).`,
       tone: 'success',
     });
     return { ok: true, message: `${target.name} restored.` };
@@ -3113,8 +3321,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
   const getSuppliersForProduct: BosContextValue['getSuppliersForProduct'] = (productId: string) => {
     return suppliers.filter(
       (s) =>
-        s.status !== 'Suspended' &&
-        !s.isArchived &&
+        isSupplierEligibleForPurchasing(s).eligible &&
         s.suppliedProducts?.some((p) => p.productId === productId)
     );
   };
@@ -3131,6 +3338,18 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     }
     const target = procurementOrders.find((p) => p.id === poId);
     if (!target) return { ok: false, message: 'Purchase order not found.' };
+
+    // Idempotency protection: Prevent duplicate payable creation if collection was already confirmed
+    const existingPayable = supplierPayables.find(
+      (p) => p.purchaseOrderId === target.id || p.poNumber === target.poNumber
+    );
+    if (target.goodsCollected || target.supplierPayableCreated || existingPayable) {
+      return {
+        ok: true,
+        message: `Goods collection already confirmed for ${target.poNumber}. Existing payable referenced.`,
+        payableId: existingPayable?.id,
+      };
+    }
 
     const todayStr = new Date().toISOString().split('T')[0];
     const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
@@ -3172,14 +3391,27 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       )
     );
 
+    // Multi-supplier sourcing check: do not set customer order to Packed if other POs remain uncollected
     if (target.customerOrderId) {
+      const remainingUncollectedPos = procurementOrders.filter(
+        (po) =>
+          po.id !== target.id &&
+          po.customerOrderId === target.customerOrderId &&
+          !po.goodsCollected &&
+          po.stage !== 'Goods Collected'
+      );
+
+      const allSuppliersCollected = remainingUncollectedPos.length === 0;
+
       setOrders((prev) =>
         prev.map((o) =>
           o.id === target.customerOrderId
             ? {
                 ...o,
-                status: 'Packed',
-                nextStepLabel: 'Direct Procured Goods Collected · Ready for Dispatch',
+                status: allSuppliersCollected ? 'Packed' : o.status,
+                nextStepLabel: allSuppliersCollected
+                  ? 'All Direct Procured Goods Collected · Ready for Dispatch'
+                  : `Goods Collected from ${target.supplierName} · Awaiting ${remainingUncollectedPos.length} Remaining Supplier(s)`,
               }
             : o
         )
@@ -3381,6 +3613,81 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     return { ok: true, message: 'Driver updated.' };
   };
 
+  const reassignDeliveryRun: BosContextValue['reassignDeliveryRun'] = async (
+    runId,
+    vehicleIdOrDetails,
+    driverIdArg
+  ) => {
+    if (!can('fleet.manage') && !can('deliveries.dispatch')) {
+      const msg = 'Access Denied: Your role lacks permission to reassign delivery fleet.';
+      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
+      return { ok: false, message: msg };
+    }
+    const run = deliveries.find((d) => d.id === runId);
+    if (!run) return { ok: false, message: 'Delivery run not found.' };
+
+    let targetVehicleId = '';
+    let targetDriverId = '';
+    let newTransportCost: number | undefined;
+
+    if (typeof vehicleIdOrDetails === 'object' && vehicleIdOrDetails !== null) {
+      targetVehicleId =
+        vehicleIdOrDetails.vehicleId ||
+        vehicles.find((v) => v.registration === vehicleIdOrDetails.vehicleReg)?.id ||
+        '';
+      targetDriverId =
+        vehicleIdOrDetails.driverId ||
+        drivers.find((d) => d.fullName === vehicleIdOrDetails.driverName)?.id ||
+        '';
+      newTransportCost = vehicleIdOrDetails.transportCostKes;
+    } else {
+      targetVehicleId = typeof vehicleIdOrDetails === 'string' ? vehicleIdOrDetails : '';
+      targetDriverId = driverIdArg || '';
+    }
+
+    const veh = vehicles.find((v) => v.id === targetVehicleId || v.registration === targetVehicleId);
+    if (!veh) return { ok: false, message: 'Selected vehicle not found.' };
+    if (veh.status === 'Maintenance' || veh.status === 'Out of Service') {
+      return { ok: false, message: `Vehicle ${veh.registration} is in ${veh.status} and cannot be assigned.` };
+    }
+
+    const drv = drivers.find((d) => d.id === targetDriverId || d.fullName === targetDriverId);
+    if (!drv) return { ok: false, message: 'Selected driver not found.' };
+    if (drv.status === 'Leave' || drv.status === 'Off Duty') {
+      return { ok: false, message: `Driver ${drv.fullName} is ${drv.status} and cannot be assigned.` };
+    }
+
+    const updatedRun: DeliveryRunRecord = {
+      ...run,
+      vehicleId: veh.id,
+      assignedVehicleId: veh.id,
+      vehiclePlate: veh.registration,
+      vehicleReg: veh.registration,
+      driverName: drv.fullName,
+      assignedDriverId: drv.id,
+      driverPhone: drv.phone || run.driverPhone,
+      transportCostKes: newTransportCost !== undefined && !isNaN(newTransportCost) ? newTransportCost : run.transportCostKes,
+    };
+
+    setDeliveries((prev) => prev.map((r) => (r.id === runId ? updatedRun : r)));
+
+    appendAudit(
+      'Deliveries',
+      run.runNumber,
+      'Reassigned Fleet & Driver to Delivery Route',
+      `${run.vehiclePlate || run.vehicleReg} / ${run.driverName}`,
+      `${veh.registration} / ${drv.fullName}`
+    );
+
+    pushToast({
+      title: 'Delivery Run Reassigned',
+      description: `Run ${run.runNumber} assigned to ${veh.registration} (${drv.fullName}).`,
+      tone: 'success',
+    });
+
+    return { ok: true, message: `Delivery run reassigned to ${veh.registration} and ${drv.fullName}.` };
+  };
+
   return (
     <BosContext.Provider
       value={{
@@ -3433,6 +3740,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         recordDeliveryArrival,
         verifyPOD,
         rejectPOD,
+        reconcilePODDiscrepancy,
         generateDraftInvoice,
         createProduct,
         updateProduct,
@@ -3483,6 +3791,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         updateVehicle,
         createDriver,
         updateDriver,
+        reassignDeliveryRun,
       }}
     >
       {children}

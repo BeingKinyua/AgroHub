@@ -437,7 +437,7 @@ function InventoryContent() {
                               {item.supplierName || linkedPo?.supplierName || 'Kinangop Farmers Co-op'}
                             </div>
                             <div className="text-[11px] text-[var(--text-secondary)]">
-                              Farmgate Sourcing Cost: KES {(item.purchaseCostKes || 65).toLocaleString()}/{item.unit}
+                              Farmgate Sourcing Cost: {item.purchaseCostKes ? `KES ${item.purchaseCostKes.toLocaleString()}/${item.unit}` : 'Awaiting Sourcing Quote'}
                             </div>
                           </td>
                           <td className="py-3.5 px-4">
@@ -458,7 +458,7 @@ function InventoryContent() {
                               KES {item.lineTotalKes.toLocaleString()}
                             </div>
                             <div className="text-[10px] text-[var(--text-secondary)] font-mono-tabular">
-                              Est. Sourcing: KES {Math.round((item.purchaseCostKes || 65) * item.quantity).toLocaleString()}
+                              {item.purchaseCostKes ? `Est. Sourcing: KES ${Math.round(item.purchaseCostKes * item.quantity).toLocaleString()}` : 'Cost TBD'}
                             </div>
                           </td>
                         </tr>
