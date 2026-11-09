@@ -642,14 +642,36 @@ export function Breadcrumbs({
   );
 }
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({
+  status,
+  tone,
+}: {
+  status: string;
+  tone?: 'success' | 'warning' | 'error' | 'info' | 'neutral' | string;
+}) {
   const normalized = status.toLowerCase();
 
   let icon = <Clock className="w-3.5 h-3.5 shrink-0" />;
   let classes =
     'bg-[#E5EFE6] text-[#12512C] dark:bg-[#122719] dark:text-[#A9BEAE]';
 
-  if (
+  if (tone === 'success') {
+    icon = <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />;
+    classes =
+      'bg-[#E5EFE6] text-[#1F6A37] dark:bg-[#1F6A37]/25 dark:text-[#4EB462]';
+  } else if (tone === 'warning') {
+    icon = <AlertTriangle className="w-3.5 h-3.5 shrink-0" />;
+    classes =
+      'bg-amber-500/12 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300';
+  } else if (tone === 'error') {
+    icon = <XCircle className="w-3.5 h-3.5 shrink-0" />;
+    classes =
+      'bg-red-500/12 text-red-800 dark:bg-red-500/20 dark:text-red-300';
+  } else if (tone === 'info') {
+    icon = <Truck className="w-3.5 h-3.5 shrink-0" />;
+    classes =
+      'bg-[#1F6A37]/12 text-[#12512C] dark:bg-[#4EB462]/20 dark:text-[#4EB462]';
+  } else if (
     normalized.includes('approved') ||
     normalized.includes('delivered') ||
     normalized.includes('paid') ||

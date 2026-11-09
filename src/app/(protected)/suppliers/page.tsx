@@ -102,6 +102,7 @@ export default function SuppliersPage() {
   const [contractsOpen, setContractsOpen] = useState(false);
   const [priceListOpen, setPriceListOpen] = useState(false);
   const [documentsOpen, setDocumentsOpen] = useState(false);
+  const [evaluationOpen, setEvaluationOpen] = useState(false);
   // View mode tab: directory or accounts payable ledger
   const [viewTab, setViewTab] = useState<'directory' | 'payables'>('directory');
 
@@ -924,7 +925,7 @@ export default function SuppliersPage() {
                       title="Link and manage products supplied by this vendor"
                     >
                       <Truck className="w-3 h-3" />
-                      <span>Sourcing ({productsCount})</span>
+                      <span>Sourcing ({(sup.suppliedProducts?.length || 0)})</span>
                     </button>
                   </div>
 
@@ -1037,7 +1038,9 @@ export default function SuppliersPage() {
                     <tr key={p.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30">
                       <td className="px-4 py-3 text-xs">
                         <div className="font-semibold text-neutral-900 dark:text-white font-mono">{p.id}</div>
-                        <div className="text-neutral-500 font-mono">{p.poNumber} · {p.invoiceRef}</div>
+                        <div className="text-neutral-500 font-mono">
+                          {p.poNumber}{p.invoiceRef ? ` · ${p.invoiceRef}` : ''}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-xs font-medium text-neutral-900 dark:text-white">
                         {p.supplierName}
@@ -1046,7 +1049,7 @@ export default function SuppliersPage() {
                         {p.dueDate}
                       </td>
                       <td className="px-4 py-3 text-xs text-right font-mono font-medium text-neutral-900 dark:text-white">
-                        KES {p.amountKes.toLocaleString()}
+                        KES {(p.totalAmountKes ?? p.amountKes ?? 0).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-xs text-right font-mono text-emerald-600 dark:text-emerald-400">
                         KES {p.paidAmountKes.toLocaleString()}
@@ -2200,7 +2203,7 @@ export default function SuppliersPage() {
               <div>
                 <span className="text-[var(--text-secondary)]">Total Invoiced:</span>
                 <p className="font-mono font-semibold text-neutral-900 dark:text-white">
-                  KES {paymentPayable.amountKes.toLocaleString()}
+                  KES {(paymentPayable.totalAmountKes ?? paymentPayable.amountKes ?? 0).toLocaleString()}
                 </p>
               </div>
               <div>

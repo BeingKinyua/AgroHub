@@ -194,11 +194,22 @@ function OrdersWorkbenchContent() {
         item.overridePriceKes > 0 &&
         item.overridePriceKes < defaultPrice;
 
-      const quotingSuppliers = prod ? getSuppliersForProduct(prod.id) : [];
+      const quotingSuppliers = prod
+        ? getSuppliersForProduct(prod.id).map((s) => {
+            const productSupply = s.suppliedProducts?.find((p) => p.productId === prod.id);
+            return {
+              supplierId: s.id,
+              supplierName: s.name,
+              quotingPriceKes: productSupply?.currentCostKes || prod.pricing.supplierCostKes,
+              leadTimeDays: productSupply?.leadTimeDays ?? s.leadTimeDays,
+              minOrderQty: productSupply?.moq ?? 10,
+            };
+          })
+        : [];
       const activeSupplier = quotingSuppliers.find((s) => s.supplierId === item.supplierId) || quotingSuppliers[0];
       const purchaseCost = item.purchaseCostKes !== undefined
         ? item.purchaseCostKes
-        : (activeSupplier?.quotingPriceKes || prod?.costPriceKes || 0);
+        : (activeSupplier?.quotingPriceKes || prod?.pricing.supplierCostKes || 0);
 
       return {
         ...item,
@@ -747,8 +758,12 @@ function OrdersWorkbenchContent() {
               </div>
               <div className="space-y-2">
                 {selectedOrder.items.map((item, idx) => {
-                  const isDirect = item.sourcingMode === 'direct_procurement';
-                  const isMixed = item.sourcingMode === 'mixed';
+                  const isDirect =
+                    item.sourcingMode === 'direct_procurement' ||
+                    item.sourcingMode === 'Direct Procurement';
+                  const isMixed =
+                    item.sourcingMode === 'mixed' ||
+                    item.sourcingMode === 'Mixed Sourcing';
 
                   return (
                     <div
@@ -1161,13 +1176,13 @@ function OrdersWorkbenchContent() {
                                 className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px] cursor-pointer"
                               >
                                 {item.quotingSuppliers && item.quotingSuppliers.length > 0 ? (
-                                  item.quotingSuppliers.map((qs) => (
-                                    <option key={qs.supplierId} value={qs.supplierId}>
+                                  item.quotingSuppliers.map((qs, qsIdx) => (
+                                    <option key={qs.supplierId || `sup-${qsIdx}`} value={qs.supplierId}>
                                       {qs.supplierName} (KES {qs.quotingPriceKes}/{prod?.unit} · {qs.leadTimeDays}d lead · Min {qs.minOrderQty})
                                     </option>
                                   ))
                                 ) : (
-                                  <option value="">No quoting supplier configured (General Sourcing)</option>
+                                  <option key="none" value="">No quoting supplier configured (General Sourcing)</option>
                                 )}
                               </select>
                             </div>

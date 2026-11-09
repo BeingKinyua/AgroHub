@@ -257,7 +257,13 @@ export interface CreateOrderItemInput {
   quantity: number;
   overridePriceKes?: number;
   allocatedBatch?: string;
-  sourcingMode?: 'Direct Procurement' | 'Existing Stock' | 'Mixed Sourcing';
+  sourcingMode?:
+    | 'Direct Procurement'
+    | 'Existing Stock'
+    | 'Mixed Sourcing'
+    | 'direct_procurement'
+    | 'existing_stock'
+    | 'mixed';
   stockAllocatedQty?: number;
   directProcuredQty?: number;
   supplierId?: string;
@@ -287,7 +293,13 @@ export interface OrderLineItem {
   unitPriceKes: number;
   pricingTier: 'Institutional' | 'Contract' | 'Wholesale' | 'Retail' | 'Online';
   lineTotalKes: number;
-  sourcingMode?: 'Direct Procurement' | 'Existing Stock' | 'Mixed Sourcing';
+  sourcingMode?:
+    | 'Direct Procurement'
+    | 'Existing Stock'
+    | 'Mixed Sourcing'
+    | 'direct_procurement'
+    | 'existing_stock'
+    | 'mixed';
   stockAllocatedQty?: number;
   directProcuredQty?: number;
   supplierId?: string;
@@ -539,31 +551,41 @@ export interface DriverRecord {
 
 export interface SupplierPayableRecord {
   id: string;
-  payableNumber: string;
+  payableNumber?: string;
   supplierId: string;
   supplierName: string;
   purchaseOrderId: string;
   poNumber: string;
   customerOrderNumber?: string;
-  issueDate: string;
+  invoiceRef?: string;
+  issueDate?: string;
   dueDate: string;
-  totalAmountKes: number;
+  totalAmountKes?: number;
+  amountKes?: number;
   paidAmountKes: number;
   balanceKes: number;
-  status: 'Pending' | 'Partially Paid' | 'Paid' | 'Overdue';
+  status: 'Pending' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Unpaid';
   goodsCollectedDate?: string;
-  lineItemsSummary: string;
+  lineItemsSummary?: string;
+  createdAt?: string;
 }
 
 export interface SupplierPaymentRecord {
   id: string;
-  paymentNumber: string;
-  supplierPayableId: string;
-  payableNumber: string;
+  paymentNumber?: string;
+  supplierPayableId?: string;
+  payableId?: string;
+  payableNumber?: string;
   supplierId: string;
   supplierName: string;
   amountKes: number;
-  paymentMethod: 'M-Pesa Business' | 'Bank EFT' | 'Cheque' | 'Cash';
+  paymentMethod:
+    | 'M-Pesa Business'
+    | 'M-Pesa Paybill'
+    | 'Bank EFT'
+    | 'EFT / Bank Transfer'
+    | 'Cheque'
+    | 'Cash';
   referenceNumber: string;
   paymentDate: string;
   recordedBy: string;
