@@ -102,17 +102,33 @@ export interface PriceHistoryEntry {
   changedBy: string;
 }
 
+export type ProductCategory =
+  | 'Fresh Vegetables'
+  | 'Fruits & Orchard'
+  | 'Dry Grains & Cereals'
+  | 'Root & Tubers'
+  | 'Dairy & Cold Chain'
+  | 'Herbs & Greens'
+  | 'Vegetables'
+  | 'Fruits'
+  | 'Cereals & Grains'
+  | 'Legumes & Pulses'
+  | 'Dairy & Eggs'
+  | 'Poultry & Meat'
+  | 'Tubers & Roots'
+  | 'Herbs & Greens'
+  | 'Fresh Vegetables & Tubers'
+  | 'Dry Grains & Cereals'
+  | 'Fresh Herbs & Aromatics'
+  | 'Fruits & Berries'
+  | 'Animal & Dairy Products'
+  | string;
+
 export interface ProductRecord {
   id: string;
   sku: string;
   name: string;
-  category:
-    | 'Fresh Vegetables'
-    | 'Fruits & Orchard'
-    | 'Dry Grains & Cereals'
-    | 'Root & Tubers'
-    | 'Dairy & Cold Chain'
-    | 'Herbs & Greens';
+  category: ProductCategory;
   unit: UnitOfMeasure;
   description: string;
   imageUrl: string;
@@ -197,7 +213,26 @@ export type PODStatus =
   | 'Not Submitted'
   | 'Pending Verification'
   | 'Verified'
-  | 'Rejected';
+  | 'Rejected'
+  | 'Submitted';
+
+export type DiscrepancyClassification =
+  | 'Fully Received'
+  | 'Short Received'
+  | 'Over Received'
+  | 'Partially Accepted'
+  | 'Damaged / Rejected'
+  | 'Not Received';
+
+export type DiscrepancyReason =
+  | 'Short supplied'
+  | 'Damaged goods'
+  | 'Poor quality'
+  | 'Wrong product'
+  | 'Incorrect quantity'
+  | 'Customer rejection'
+  | 'Missing package'
+  | 'Other';
 
 export type InvoiceGenerationStatus =
   | 'Not Ready'
@@ -211,11 +246,21 @@ export interface PODDeliveredItem {
   productName: string;
   sku: string;
   unit: UnitOfMeasure | string;
-  requestedQty: number;
-  deliveredQty: number;
+  orderedQty?: number;
+  dispatchedQty?: number;
+  previousAcceptedQty?: number;
+  receivedQty?: number;
+  acceptedQty?: number;
   rejectedQty: number;
+  outstandingQty?: number;
+  currentDeliveryShortage?: number;
+  classification?: DiscrepancyClassification;
   rejectionReason?: string;
+  discrepancyReason?: DiscrepancyReason | string;
+  discrepancyExplanation?: string;
   unitPriceKes: number;
+  requestedQty?: number;
+  deliveredQty?: number;
   orderedQuantity?: number;
   deliveredQuantity?: number;
   rejectedQuantity?: number;
@@ -230,10 +275,16 @@ export interface PODEvidenceRecord {
   recipientName: string;
   recipientRole?: string;
   recipientPhone?: string;
+  receivingDepartment?: string;
   deliveryDate: string;
   submittedAt: string;
   submittedBy: string;
   status: PODStatus;
+  reconciliationStatus?:
+    | 'Fully Reconciled'
+    | 'Partially Reconciled'
+    | 'Disputed'
+    | 'Pending Resolution';
   deliveredItems: PODDeliveredItem[];
   evidenceFiles: {
     name: string;
@@ -250,6 +301,8 @@ export interface PODEvidenceRecord {
   rejectionReason?: string;
   invoiceCreated?: boolean;
   invoiceNumber?: string;
+  hasDiscrepancies?: boolean;
+  discrepancyNotes?: string;
 }
 
 export interface CreateOrderItemInput {
@@ -401,17 +454,30 @@ export interface SupplierEvaluationRecord {
   packagingGrade: 'Grade A' | 'Grade B' | 'Grade C';
   notes: string;
   recommendation: 'Preferred Cooperative' | 'Standard Approved' | 'Performance Watch' | 'Suspended';
+  grade?: string;
+  evaluatedBy?: string;
+  qualityScore?: number;
+  timelinessScore?: number;
+  pricingScore?: number;
 }
 
 export interface SupplierProductItem {
+  id?: string;
   productId: string;
   productName: string;
   unit: UnitOfMeasure;
   currentCostKes: number;
-  previousCostKes: number;
-  lastUpdated: string;
+  priceKes?: number;
+  previousCostKes?: number;
+  lastUpdated?: string;
+  lastPriceUpdate?: string;
+  priceChangeReason?: string;
   leadTimeDays?: number;
   moq?: number;
+  minOrderQty?: number;
+  availability?: 'Available' | 'Seasonal' | 'Unavailable';
+  preferredSupplier?: boolean;
+  notes?: string;
 }
 
 export interface SupplierRecord {
@@ -436,6 +502,7 @@ export interface SupplierRecord {
   contracts?: SupplierContract[];
   documents?: SupplierDocumentItem[];
   evaluations?: SupplierEvaluationRecord[];
+  paymentDetails?: string;
 }
 
 export interface PurchaseOrderLineItem {
@@ -469,9 +536,11 @@ export interface ProcurementOrderRecord {
     | 'Stock Posted'
     | 'Goods Collected'
     | 'Completed';
+  status?: string;
   expectedDate: string;
   totalKes: number;
   itemsSummary: string;
+  createdAt?: string;
   qualityCheckPassPct?: number;
   requestedBy: string;
   goodsCollected?: boolean;
@@ -520,6 +589,7 @@ export interface DeliveryRunRecord {
   transportCostKes?: number;
   fuelExpensesKes?: number;
   stops?: DeliveryRunStop[];
+  vehicleId?: string;
 }
 
 export interface VehicleRecord {
@@ -554,7 +624,8 @@ export interface SupplierPayableRecord {
   payableNumber?: string;
   supplierId: string;
   supplierName: string;
-  purchaseOrderId: string;
+  purchaseOrderId?: string;
+  poId?: string;
   poNumber: string;
   customerOrderNumber?: string;
   invoiceRef?: string;
@@ -564,7 +635,7 @@ export interface SupplierPayableRecord {
   amountKes?: number;
   paidAmountKes: number;
   balanceKes: number;
-  status: 'Pending' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Unpaid';
+  status: 'Pending' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Unpaid' | 'Open';
   goodsCollectedDate?: string;
   lineItemsSummary?: string;
   createdAt?: string;
