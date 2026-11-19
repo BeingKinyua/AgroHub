@@ -3,6 +3,10 @@
  * Validating Scenarios A through J
  */
 
+import './supplier-offerings.test';
+import './procurement-rules.test';
+import './workspace-metrics.test';
+
 import {
   calculatePODLineQuantities,
   classifyPODDiscrepancy,
@@ -14,13 +18,18 @@ import {
   generateNextSku,
   CATEGORY_CODE_MAP,
 } from '../business-rules';
+import { allocateInvoicePayment, getDeliveryRunStops, getExistingPODInvoice, getPODExpectedLines, getUnassignedPackedOrders, isDeliveryPlanDate, permitsManualOrderStage, planReplacementLoad, preparePODReceipt, replacementPicksCoverDemand } from '../delivery-workflow';
 import {
+  DeliveryRunRecord,
+  InvoiceRecord,
   SupplierRecord,
   PODEvidenceRecord,
   PODDeliveredItem,
   SupplierPayableRecord,
   OrderRecord,
   ProcurementOrderRecord,
+  ProductRecord,
+  StockBatchRecord,
 } from '@/types/domain/bos';
 
 let passedTests = 0;
@@ -40,6 +49,105 @@ function assert(condition: boolean, testName: string, detail?: string) {
 console.log('====================================================');
 console.log(' AgroHub BOS — Running Automated Business Rules Tests');
 console.log('====================================================\n');
+
+assert(!permitsManualOrderStage('On Hold', 'Packed'), 'An order on hold cannot be packed');
+assert(!permitsManualOrderStage('Packed', 'Dispatched'), 'Dispatch must be recorded on a delivery run');
+assert(permitsManualOrderStage('Picking', 'Packed'), 'Picking can progress to packing');
+
+{
+  const item: PODDeliveredItem = {
+    productId: 'POT', productName: 'Potatoes', sku: 'POT', unit: 'kilograms',
+    orderedQty: 100, dispatchedQty: 40, receivedQty: 45, acceptedQty: 45,
+    rejectedQty: 0, outstandingQty: 60, unitPriceKes: 32.5,
+  };
+  const eligibility = calculateInvoiceEligibility([item]);
+  assert(eligibility.billableLines[0]?.billableQty === 40, 'Excess delivery quantities are excluded from billing');
+  const zeroAccepted = calculateInvoiceEligibility([{ ...item, acceptedQty: 0, rejectedQty: 40, outstandingQty: 100 }]);
+  assert(zeroAccepted.hasOutstandingShortages && !zeroAccepted.eligible, 'A zero-acceptance receipt still leaves an order outstanding');
+}
+
+{
+  const line: OrderRecord['items'][number] = {
+    id: 'potatoes-a', productId: 'POT', productName: 'Potatoes', sku: 'POT', unit: 'kilograms',
+    quantity: 50, allocatedBatch: 'B-01', unitPriceKes: 50, pricingTier: 'Institutional', lineTotalKes: 2500,
+  };
+  const order: OrderRecord = {
+    id: 'O-1', orderNumber: 'ORD-1', customerId: 'C-1', customerName: 'School', customerSegment: 'School',
+    channel: 'Institutional Contract', status: 'Packed', paymentStatus: 'Pending Payment', orderDate: '2026-11-17',
+    deliveryDate: '2026-11-18', warehouseName: 'Hub', assignedActor: 'Packing', nextStepLabel: 'Dispatch',
+    totalKes: 5500, itemsCount: 2, items: [line, { ...line, id: 'potatoes-b', unitPriceKes: 60, lineTotalKes: 3000 }],
+  };
+  const inputs = [
+    { orderLineId: 'potatoes-a', receivedQty: 45, acceptedQty: 40, discrepancyReason: 'Damaged goods' },
+    { orderLineId: 'potatoes-b', receivedQty: 55, acceptedQty: 50, discrepancyReason: 'Incorrect quantity' },
+  ];
+  const expected = getPODExpectedLines(order, []);
+  assert(!preparePODReceipt(expected, inputs.slice(0, 1)).ok, 'Every dispatched line needs explicit quantities');
+  assert(!preparePODReceipt(expected, [inputs[0], inputs[0]]).ok, 'Repeated products cannot substitute another order line');
+  assert(!preparePODReceipt(expected, [{ ...inputs[0], acceptedQty: 50 }, inputs[1]]).ok, 'Acceptance cannot exceed actual receipt');
+  assert(!preparePODReceipt(expected, [inputs[0], { ...inputs[1], acceptedQty: 55 }]).ok, 'Excess above the dispatch quantity cannot be accepted');
+  assert(!preparePODReceipt(expected, [{ ...inputs[0], receivedQty: NaN }, inputs[1]]).ok, 'Blank received entries are invalid');
+  assert(!preparePODReceipt(expected, [{ ...inputs[0], discrepancyReason: undefined }, inputs[1]]).ok, 'Each discrepancy needs a reason');
+  const first = preparePODReceipt(expected, inputs);
+  if (first.ok === false) throw new Error(first.message);
+  assert(first.hasOutstanding && first.hasDiscrepancies, 'Short, rejected and excess quantities keep the receipt flagged');
+  assert(first.items[0].currentDeliveryShortage === 5 && first.items[0].rejectedQty === 5, 'Shortage and rejection are separate quantities');
+  assert(first.items[1].excessQty === 5 && first.items[1].rejectedQty === 0, 'Excess quantities are tracked independently of rejected expected goods');
+  assert(calculateInvoiceEligibility(first.items).billableTotalKes === 5000, 'Repeated products retain their original order-line prices');
+
+  const pod: PODEvidenceRecord = {
+    id: 'POD-1', orderId: order.id, orderNumber: order.orderNumber, deliveryRunId: 'RUN-1', customerName: order.customerName,
+    recipientName: 'Receiver', deliveryDate: '2026-11-18', submittedAt: '2026-11-18 09:00', submittedBy: 'Driver',
+    status: 'Verified', deliveredItems: first.items, evidenceFiles: [],
+  };
+  const expectedAgain = getPODExpectedLines(order, [pod]);
+  assert(expectedAgain[0].dispatchedQty === 10 && expectedAgain[1].dispatchedQty === 0, 'A replacement delivery expects only the verified outstanding quantity from each order line');
+  const second = preparePODReceipt(expectedAgain, [{ orderLineId: 'potatoes-a', receivedQty: 10, acceptedQty: 10 }]);
+  if (second.ok === false) throw new Error(second.message);
+  assert(!second.hasOutstanding && calculateInvoiceEligibility(second.items).billableTotalKes === 500, 'Verified replacement goods complete the order and retain their billable value');
+
+  const product = { id: 'POT', name: 'Potatoes', unit: 'kilograms', availableQty: 13, status: 'Active', expiryTracked: true } as ProductRecord;
+  const batch = { id: 'B-01', batchNumber: 'B-01', warehouseId: 'WH-A', productId: 'POT', unit: 'kilograms', availableQty: 8, expiryDate: '2026-11-25', status: 'Nominal' } as StockBatchRecord;
+  const batches = [batch, { ...batch, id: 'B-02', batchNumber: 'B-02', availableQty: 5 }];
+  const picks = [
+    { orderLineId: 'potatoes-a', batchId: 'B-01', quantity: 6 },
+    { orderLineId: 'potatoes-a', batchId: 'B-02', quantity: 4 },
+  ];
+  const load = (selections = picks, stock = batches, products = [product]) =>
+    planReplacementLoad(expectedAgain, 'WH-A', selections, stock, products, '2026-11-20');
+  const cargo = load();
+  if (cargo.ok === false) throw new Error(cargo.message);
+  assert(cargo.picks.length === 2 && cargo.batches[0].availableQty === 2 && cargo.batches[1].availableQty === 1 && cargo.products[0].availableQty === 3, 'Replacement loading deducts the exact confirmed picks from both stock levels');
+  assert(replacementPicksCoverDemand(expectedAgain, cargo.picks) && !replacementPicksCoverDemand(expectedAgain, cargo.picks.slice(0, 1)), 'Replacement dispatch requires exact loaded quantities for every outstanding line');
+  assert(load(picks.slice(0, 1)).ok === false && load([{ ...picks[0], quantity: 7 }, picks[1]]).ok === false, 'Replacement loading rejects incomplete or excess picks');
+  assert(load(picks, [{ ...batch, warehouseId: 'WH-B' }, batches[1]]).ok === false, 'Replacement loading rejects picks from a different warehouse');
+  assert(load(picks, [{ ...batch, status: 'Quarantined' }, batches[1]]).ok === false, 'Replacement loading rejects quarantined stock');
+  assert(load(picks, [{ ...batch, expiryDate: '2026-11-19' }, batches[1]]).ok === false, 'Replacement loading rejects batches that expire before delivery');
+  assert(load(picks, [{ ...batch, availableQty: 5 }, batches[1]]).ok === false && load(picks, batches, [{ ...product, availableQty: 9 }]).ok === false, 'Replacement loading checks both available batch and catalogue quantities');
+  const moreDemand = expectedAgain.map((item) => item.orderLineId === 'potatoes-b' ? { ...item, outstandingQty: 4 } : item);
+  assert(planReplacementLoad(moreDemand, 'WH-A', [...picks, { orderLineId: 'potatoes-b', batchId: 'B-01', quantity: 4 }], batches, [{ ...product, availableQty: 20 }], '2026-11-20').ok === false, 'The same batch cannot be overallocated across repeated lines');
+  const invoice = { invoiceNumber: 'I-1', orderNumber: order.orderNumber, podRef: pod.id } as InvoiceRecord;
+  assert(getExistingPODInvoice(pod, [invoice]) === invoice && !getExistingPODInvoice({ ...pod, id: 'POD-2' }, [invoice]), 'Invoice duplicate checks are scoped to the receipt');
+  assert(getExistingPODInvoice(pod, [{ ...invoice, podRef: undefined }])?.invoiceNumber === 'I-1', 'Legacy order-level invoices block ambiguous duplicate billing');
+
+  const run: DeliveryRunRecord = {
+    id: 'RUN-1', runNumber: 'RUN-1', routeZone: 'School route', vehicleReg: 'KZ 001', driverName: 'Driver', driverPhone: '',
+    departureTime: '08:00', status: 'Dispatched', ordersIncluded: [order.orderNumber], institutionsServed: [order.customerName],
+    totalWeightKg: 100, podCaptured: false,
+  };
+  assert(getDeliveryRunStops(run, [order], [pod])[0].receipt === pod, 'A verified receipt is linked to its exact delivery run and order');
+  assert(!getDeliveryRunStops({ ...run, id: 'RUN-2', runNumber: 'RUN-2' }, [order], [pod])[0].receipt, 'A previous run receipt cannot record another run’s arrival');
+  assert(getUnassignedPackedOrders([order], [run]).length === 0, 'A packed order can only be on one active run');
+  const now = new Date('2026-11-18T22:30:00.000Z');
+  assert(isDeliveryPlanDate('2026-11-19', now) && !isDeliveryPlanDate('2026-11-18', now), 'Delivery date validation uses the Nairobi business day');
+
+  const openInvoice = { ...invoice, amountKes: 200.1, paidAmountKes: 0, balanceKes: 200.1, status: 'Issued' } as InvoiceRecord;
+  const partPaid = allocateInvoicePayment(openInvoice, 80.08);
+  assert(partPaid?.balanceKes === 120.02 && partPaid.paidAmountKes === 80.08 && partPaid.status === 'Partially Paid', 'Customer receipts apply to an open invoice at precise currency amounts');
+  const paid = partPaid && allocateInvoicePayment(partPaid, 120.02);
+  assert(paid?.balanceKes === 0 && paid.status === 'Paid', 'Settling the exact invoice balance marks it paid');
+  assert(!allocateInvoicePayment(openInvoice, 201) && !allocateInvoicePayment(openInvoice, -1), 'Invoice allocations reject overpayments and non-positive receipts');
+}
 
 // -------------------------------------------------------------
 // SCENARIO A: POD Quantity Calculation & Reconciliation
@@ -316,6 +424,16 @@ console.log('\n--- SCENARIO G: Supplier Balances and Payment Reconciliation ---'
 
   const overPayment = validateSupplierPayment(payables[0], 7000);
   assert(overPayment.valid === false, 'Scenario G: Overpayment (7000 > 6000) is rejected');
+  assert(validateSupplierPayment(payables[0], Number.NaN).valid === false, 'Scenario G: Nonfinite supplier payment is rejected');
+  const postedPayment = {
+    id: 'SPAY-1', payableId: 'PAY-1', supplierId: 'SUP-10', supplierName: 'Kinangop Co-op',
+    paymentMethod: 'M-Pesa Paybill' as const, amountKes: 4000, referenceNumber: 'FIRST123',
+    paymentDate: '2026-11-13', recordedBy: 'Buyer',
+  };
+  const paymentReference = { method: postedPayment.paymentMethod, number: '  first123  ', existing: [postedPayment] };
+  assert(validateSupplierPayment(payables[0], 1000, paymentReference).valid === false, 'Scenario G: Retrying a supplier payment reference cannot debit the payable twice');
+  assert(validateSupplierPayment(payables[1], 1000, paymentReference).valid === true, 'Scenario G: One supplier disbursement can be allocated across different payables');
+  assert(validateSupplierPayment(payables[0], 1000, { ...paymentReference, number: ' ' }).valid === false, 'Scenario G: A supplier payment needs a transaction reference');
 }
 
 // -------------------------------------------------------------

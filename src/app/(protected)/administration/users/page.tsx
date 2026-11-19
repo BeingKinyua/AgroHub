@@ -114,9 +114,8 @@ export default function UsersAdministrationPage() {
           { label: 'Administration' },
           { label: 'Internal Operators' },
         ]}
-        kicker="ADMINISTRATOR-CONTROLLED IDENTITY GOVERNANCE"
-        title="Internal Employee Directory & Onboarding"
-        description="Public registration is disabled. Only authorized Administrators may invite internal operators, assign RBAC roles, or transition accounts between Active, Suspended, and Disabled states."
+        title="Workspace users"
+        description="Invite employees, assign roles, and manage account access."
         actions={
           can('administration.users.create') && (
             <button
@@ -142,7 +141,6 @@ export default function UsersAdministrationPage() {
         <KPI
           label="Total Provisioned Accounts"
           value={`${users.length} Operators`}
-          sublabel="Across 9 governed RBAC roles"
           tone="positive"
         />
         <KPI
@@ -164,7 +162,7 @@ export default function UsersAdministrationPage() {
               (u) => u.status === 'Suspended' || u.status === 'Disabled'
             ).length
           } Restricted`}
-          sublabel="Blocked at authentication & RLS layer"
+          sublabel="Cannot sign in to the workspace"
           tone="warning"
         />
       </div>
@@ -468,8 +466,8 @@ export default function UsersAdministrationPage() {
       <Modal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
-        title="Invite New Internal Operator"
-        subtitle="Dispatches an administrator-governed workspace invitation and assigns initial RBAC authority."
+        title="Invite user"
+        subtitle="Enter the employee’s work details and choose their starting role."
       >
         <form onSubmit={handleInviteSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

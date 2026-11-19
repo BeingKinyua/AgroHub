@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
@@ -22,6 +23,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
+import { getOrderSourcingLines } from '@/lib/services/procurement-rules';
 import {
   ActionableMetricCard,
   Card,
@@ -51,9 +53,11 @@ function OrdersWorkbenchContent() {
   const searchParams = useSearchParams();
   const {
     orders,
+    procurementOrders,
     customers,
     products,
     warehouses,
+    currentUser,
     can,
     createOrder,
     advanceOrderStatus,
@@ -103,8 +107,8 @@ function OrdersWorkbenchContent() {
   const [channel, setChannel] = useState<OrderRecord['channel']>('Institutional Contract');
   const [deliveryDate, setDeliveryDate] = useState(tomorrowStr);
   const [warehouseName, setWarehouseName] = useState(warehouses[0]?.name || 'Nairobi Cold Hub A');
-  const [orderReference, setOrderReference] = useState('');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [orderReference, setOrderReference] = useState(() => customers[0] ? `PO-${customers[0].code}-${new Date().getFullYear()}-01` : '');
+  const [deliveryAddress, setDeliveryAddress] = useState(() => customers[0] ? `${customers[0].deliveryZone}, ${customers[0].county} (Attn: ${customers[0].procurementContact})` : '');
   const [notes, setNotes] = useState('');
   const [composerStep, setComposerStep] = useState<'compose' | 'review'>('compose');
 
@@ -115,7 +119,6 @@ function OrdersWorkbenchContent() {
     overridePriceKes?: number;
     sourcingMode?: 'direct_procurement' | 'existing_stock' | 'mixed';
     stockAllocatedQty?: number;
-    directProcuredQty?: number;
     supplierId?: string;
     supplierName?: string;
     purchaseCostKes?: number;
@@ -130,9 +133,34 @@ function OrdersWorkbenchContent() {
     },
   ]);
 
-  // Synchronize customer details (segment, delivery zone, default PO ref)
+  type OrderDraft = {
+    customerId: string;
+    channel: OrderRecord['channel'];
+    deliveryDate: string;
+    warehouseName: string;
+    orderReference: string;
+    deliveryAddress: string;
+    notes: string;
+    items: FormLineItem[];
+  };
+  const draftKey = currentUser ? `agrohub.order-draft.${currentUser.id}` : '';
+  const [savedDraft, setSavedDraft] = useState<OrderDraft | null>(null);
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+  const [composerDirty, setComposerDirty] = useState(false);
+  const [composerError, setComposerError] = useState('');
+
   useEffect(() => {
-    const cust = customers.find((c) => c.id === customerId);
+    try {
+      const stored = draftKey ? localStorage.getItem(draftKey) : null;
+      setSavedDraft(stored ? JSON.parse(stored) as OrderDraft : null);
+    } catch {
+      setSavedDraft(null);
+    }
+  }, [draftKey]);
+
+  function selectCustomer(id: string) {
+    setCustomerId(id);
+    const cust = customers.find((c) => c.id === id);
     if (cust) {
       if (cust.isInstitutional) {
         setChannel('Institutional Contract');
@@ -140,7 +168,23 @@ function OrdersWorkbenchContent() {
       setDeliveryAddress(`${cust.deliveryZone}, ${cust.county} (Attn: ${cust.procurementContact})`);
       setOrderReference(`PO-${cust.code}-${new Date().getFullYear()}-01`);
     }
-  }, [customerId, customers]);
+  }
+
+  function resumeOrderDraft() {
+    if (!savedDraft) return;
+    setCustomerId(savedDraft.customerId);
+    setChannel(savedDraft.channel);
+    setDeliveryDate(savedDraft.deliveryDate);
+    setWarehouseName(savedDraft.warehouseName);
+    setOrderReference(savedDraft.orderReference);
+    setDeliveryAddress(savedDraft.deliveryAddress);
+    setNotes(savedDraft.notes);
+    setFormItems(savedDraft.items);
+    setComposerStep('compose');
+    setComposerDirty(false);
+    setComposerError('');
+    setCreateOpen(true);
+  }
 
   const selectedCustomer = useMemo(
     () => customers.find((c) => c.id === customerId),
@@ -149,6 +193,7 @@ function OrdersWorkbenchContent() {
 
   // Dynamic pricing & stock calculation per line item (Section 3.2, 3.3, 3.4)
   const computedLineItems = useMemo(() => {
+    const reserved = new Map<string, number>();
     return formItems.map((item) => {
       const prod = products.find((p) => p.id === item.productId);
       let tier: 'Institutional' | 'Wholesale' | 'Retail' | 'Online' = 'Retail';
@@ -169,26 +214,18 @@ function OrdersWorkbenchContent() {
 
       const qty = Number(item.quantity) || 0;
       const lineTotal = Math.round(unitPrice * qty);
-      const available = prod?.availableQty || 0;
+      const reservedInForm = reserved.get(item.productId) ?? 0;
+      const available = Math.max(0, (prod?.availableQty ?? 0) - reservedInForm);
 
       // Default sourcing mode: if direct is specified or stock is insufficient, direct procurement
       const mode = item.sourcingMode || (qty > available ? 'direct_procurement' : 'existing_stock');
       const isDirectOnly = mode === 'direct_procurement';
       const isStockOnly = mode === 'existing_stock';
 
-      const stockAllocated = item.stockAllocatedQty !== undefined
-        ? item.stockAllocatedQty
-        : isDirectOnly
-        ? 0
-        : Math.min(qty, available);
-
-      const directProcured = item.directProcuredQty !== undefined
-        ? item.directProcuredQty
-        : isDirectOnly
-        ? qty
-        : Math.max(0, qty - stockAllocated);
-
-      const hasShortage = isStockOnly && qty > available;
+      const stockAllocated = isDirectOnly ? 0 : isStockOnly ? qty : item.stockAllocatedQty ?? Math.min(qty, available);
+      const directProcured = Math.max(0, qty - stockAllocated);
+      const hasShortage = stockAllocated > available || stockAllocated > qty || stockAllocated < 0;
+      reserved.set(item.productId, reservedInForm + Math.max(0, stockAllocated));
       const isPriceBelowSchedule =
         item.overridePriceKes !== undefined &&
         item.overridePriceKes > 0 &&
@@ -200,24 +237,22 @@ function OrdersWorkbenchContent() {
             return {
               supplierId: s.id,
               supplierName: s.name,
-              quotingPriceKes: productSupply?.currentCostKes || prod.pricing.supplierCostKes,
+              quotingPriceKes: productSupply?.currentCostKes,
               leadTimeDays: productSupply?.leadTimeDays ?? s.leadTimeDays,
-              minOrderQty: productSupply?.moq ?? 10,
+              minOrderQty: productSupply?.moq ?? productSupply?.minOrderQty,
             };
           })
         : [];
-      const activeSupplier = quotingSuppliers.find((s) => s.supplierId === item.supplierId) || quotingSuppliers[0];
-      const purchaseCost = item.purchaseCostKes !== undefined
-        ? item.purchaseCostKes
-        : (activeSupplier?.quotingPriceKes || prod?.pricing.supplierCostKes || 0);
+      const activeSupplier = quotingSuppliers.find((s) => s.supplierId === item.supplierId);
+      const purchaseCost = isStockOnly ? undefined : item.purchaseCostKes ?? activeSupplier?.quotingPriceKes;
 
       return {
         ...item,
         sourcingMode: mode,
         stockAllocatedQty: stockAllocated,
         directProcuredQty: directProcured,
-        supplierId: item.supplierId || activeSupplier?.supplierId,
-        supplierName: item.supplierName || activeSupplier?.supplierName,
+        supplierId: isStockOnly ? undefined : activeSupplier?.supplierId,
+        supplierName: isStockOnly ? undefined : activeSupplier?.supplierName,
         purchaseCostKes: purchaseCost,
         quotingSuppliers,
         product: prod,
@@ -256,6 +291,7 @@ function OrdersWorkbenchContent() {
   const hasAnyApprovalRequired = computedLineItems.some((it) => it.isPriceBelowSchedule);
 
   const handleAddItem = () => {
+    setComposerDirty(true);
     // Pick the first product not yet added, or fallback to first product
     const existingIds = new Set(formItems.map((it) => it.productId));
     const nextProduct = products.find((p) => !existingIds.has(p.id)) || products[0];
@@ -272,6 +308,7 @@ function OrdersWorkbenchContent() {
 
   const handleRemoveItem = (id: string) => {
     if (formItems.length <= 1) return;
+    setComposerDirty(true);
     setFormItems((prev) => prev.filter((it) => it.id !== id));
   };
 
@@ -282,42 +319,69 @@ function OrdersWorkbenchContent() {
   };
 
   const handleCreateOrder = async (isDraft: boolean = false) => {
-    const validItems = computedLineItems.filter((it) => it.productId && Number(it.quantity) > 0);
-    if (validItems.length === 0) {
-      setFeedback({
-        msg: 'Order must contain at least one valid line item with quantity > 0.',
-        type: 'error',
-      });
+    setComposerError('');
+    if (isDraft) {
+      if (!draftKey) {
+        setComposerError('Sign in to save this draft.');
+        return;
+      }
+      const draft = { customerId, channel, deliveryDate, warehouseName, orderReference, deliveryAddress, notes, items: formItems };
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(draft));
+        setSavedDraft(draft);
+        setComposerDirty(false);
+        setCreateOpen(false);
+        setFeedback({ msg: 'Order draft saved in this browser.', type: 'success' });
+      } catch {
+        setComposerError('The browser could not save this draft. Keep this form open to retain your changes.');
+      }
+      return;
+    }
+    const validItems = computedLineItems.filter((it) => it.productId && Number.isFinite(it.quantity) && it.quantity > 0);
+    if (validItems.length !== computedLineItems.length || !validItems.length) {
+      setComposerError('Select a product and enter a quantity greater than zero on every line.');
       return;
     }
 
-    const res = await createOrder({
-      customerId,
-      channel,
-      deliveryDate,
-      warehouseName,
-      items: validItems.map((it) => ({
-        productId: it.productId,
-        quantity: Number(it.quantity),
-        overridePriceKes: it.overridePriceKes ? Number(it.overridePriceKes) : undefined,
-        sourcingMode: it.sourcingMode,
-        stockAllocatedQty: it.stockAllocatedQty,
-        directProcuredQty: it.directProcuredQty,
-        supplierId: it.supplierId,
-        supplierName: it.supplierName,
-        purchaseCostKes: it.purchaseCostKes,
-      })),
-      notes: notes.trim() || undefined,
-      orderReference: orderReference.trim() || undefined,
-      deliveryAddress: deliveryAddress.trim() || undefined,
-    });
+    setSubmittingOrder(true);
+    try {
+      const res = await createOrder({
+        customerId,
+        channel,
+        deliveryDate,
+        warehouseName,
+        items: validItems.map((it) => ({
+          productId: it.productId,
+          quantity: Number(it.quantity),
+          overridePriceKes: it.overridePriceKes ? Number(it.overridePriceKes) : undefined,
+          sourcingMode: it.sourcingMode,
+          stockAllocatedQty: it.stockAllocatedQty,
+          directProcuredQty: it.directProcuredQty,
+          supplierId: it.supplierId,
+          supplierName: it.supplierName,
+          purchaseCostKes: it.purchaseCostKes,
+        })),
+        notes: notes.trim() || undefined,
+        orderReference: orderReference.trim() || undefined,
+        deliveryAddress: deliveryAddress.trim() || undefined,
+      });
 
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) {
-      setCreateOpen(false);
-      setComposerStep('compose');
-      setFormItems([{ id: 'line-1', productId: products[0]?.id || '', quantity: 50, sourcingMode: 'direct_procurement' }]);
-      setNotes('');
+      if (res.ok) {
+        setFeedback({ msg: res.message, type: 'success' });
+        if (draftKey) {
+          try { localStorage.removeItem(draftKey); } catch { /* The order was created already. */ }
+        }
+        setSavedDraft(null);
+        setComposerDirty(false);
+        setCreateOpen(false);
+        setComposerStep('compose');
+        setFormItems([{ id: 'line-1', productId: products[0]?.id || '', quantity: 50, sourcingMode: 'direct_procurement' }]);
+        setNotes('');
+      } else {
+        setComposerError(res.message);
+      }
+    } finally {
+      setSubmittingOrder(false);
     }
   };
 
@@ -422,12 +486,6 @@ function OrdersWorkbenchContent() {
         return 'Start Picking';
       case 'Picking':
         return 'Complete Packing';
-      case 'Packed':
-        return 'Dispatch Fleet';
-      case 'Dispatched':
-        return 'Confirm Delivery';
-      case 'On Hold':
-        return 'Release Hold';
       default:
         return 'Inspect';
     }
@@ -439,12 +497,6 @@ function OrdersWorkbenchContent() {
         return 'Picking';
       case 'Picking':
         return 'Packed';
-      case 'Packed':
-        return 'Dispatched';
-      case 'Dispatched':
-        return 'Delivered';
-      case 'On Hold':
-        return 'Confirmed';
       default:
         return null;
     }
@@ -458,6 +510,7 @@ function OrdersWorkbenchContent() {
     }
     const res = await advanceOrderStatus(order.id, next);
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+    if (res.ok) setSelectedOrder((selected) => selected?.id === order.id ? { ...selected, status: next } : selected);
   };
 
   return (
@@ -478,6 +531,9 @@ function OrdersWorkbenchContent() {
                 <Download className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
                 <span className="hidden sm:inline">Export Manifest</span>
               </button>
+            )}
+            {can('orders.create') && savedDraft && (
+              <button type="button" onClick={resumeOrderDraft} className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border-subtle)] px-4 text-sm font-semibold hover:bg-[var(--bg-canvas)]">Resume draft</button>
             )}
             {can('orders.create') && (
               <button
@@ -643,7 +699,7 @@ function OrdersWorkbenchContent() {
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="inline-flex items-center justify-end gap-1.5">
-                        {ord.status !== 'Delivered' && ord.status !== 'Closed' && (
+                        {can('fulfillment.manage') && getNextStageStatus(ord.status) && (
                           <button
                             type="button"
                             onClick={() => handleQuickAdvance(ord)}
@@ -658,6 +714,7 @@ function OrdersWorkbenchContent() {
                           onClick={() => setSelectedOrder(ord)}
                           className="h-8 px-2.5 rounded-md border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] inline-flex items-center gap-1 cursor-pointer"
                           title="Inspect Details"
+                          aria-label={`Inspect order ${ord.orderNumber}`}
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
@@ -692,7 +749,7 @@ function OrdersWorkbenchContent() {
                     KES {ord.totalKes.toLocaleString()}
                   </span>
                   <div className="flex items-center gap-1.5">
-                    {ord.status !== 'Delivered' && (
+                    {can('fulfillment.manage') && getNextStageStatus(ord.status) && (
                       <button
                         type="button"
                         onClick={() => handleQuickAdvance(ord)}
@@ -757,7 +814,7 @@ function OrdersWorkbenchContent() {
                 Order Line Items & Sourcing Allocation
               </div>
               <div className="space-y-2">
-                {selectedOrder.items.map((item, idx) => {
+                {getOrderSourcingLines(selectedOrder, procurementOrders).map(({ item, id, outstanding }) => {
                   const isDirect =
                     item.sourcingMode === 'direct_procurement' ||
                     item.sourcingMode === 'Direct Procurement';
@@ -767,7 +824,7 @@ function OrdersWorkbenchContent() {
 
                   return (
                     <div
-                      key={idx}
+                      key={id}
                       className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between text-xs"
                     >
                       <div className="space-y-1">
@@ -792,12 +849,12 @@ function OrdersWorkbenchContent() {
                         <div className="text-[11px] text-[var(--text-secondary)]">
                           {isDirect ? (
                             <span>
-                              Farm Partner: <strong className="text-[var(--text-primary)]">{item.supplierName || 'Cooperative Partner'}</strong>
-                              {item.purchaseCostKes ? ` · Farmgate Cost: KES ${item.purchaseCostKes}/${item.unit}` : ''}
+                              {item.supplierName ? `Preferred supplier ${item.supplierName}` : 'Open supplier sourcing'}
+                              {item.purchaseCostKes ? ` · Estimated cost KES ${item.purchaseCostKes}/${item.unit}` : ''}
                             </span>
                           ) : isMixed ? (
                             <span>
-                              Allocated: <strong>{item.stockAllocatedQty || 0} {item.unit}</strong> stock · <strong>{item.directProcuredQty || 0} {item.unit}</strong> direct from {item.supplierName || 'Farm'}
+                              Allocated <strong>{item.stockAllocatedQty || 0} {item.unit}</strong> stock · <strong>{item.directProcuredQty || 0} {item.unit}</strong> direct
                             </span>
                           ) : (
                             <span>
@@ -805,6 +862,7 @@ function OrdersWorkbenchContent() {
                             </span>
                           )}
                           <span> · {item.quantity} {item.unit} @ KES {item.unitPriceKes} ({item.pricingTier})</span>
+                          {outstanding > 0 && <p className="mt-1 font-medium text-amber-800 dark:text-amber-300">{outstanding.toLocaleString()} {item.unit} still to collect</p>}
                         </div>
                       </div>
                       <div className="font-mono-tabular font-semibold">
@@ -816,46 +874,31 @@ function OrdersWorkbenchContent() {
               </div>
             </div>
 
-            {/* Contextual Actions (Section 22: View, Fulfill, Hold, Dispatch, Collect Payment) */}
-            <div className="pt-3 border-t border-[var(--border-subtle)] space-y-2">
-              <div className="text-xs font-semibold text-[var(--text-primary)]">
-                Workflow Decisions
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {(
-                  [
-                    'Confirmed',
-                    'Picking',
-                    'Packed',
-                    'Dispatched',
-                    'Delivered',
-                    'On Hold',
-                  ] as OrderLifecycleStatus[]
-                ).map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    disabled={selectedOrder.status === st}
-                    onClick={async () => {
-                      const res = await advanceOrderStatus(selectedOrder.id, st);
-                      setFeedback({
-                        msg: res.message,
-                        type: res.ok ? 'success' : 'error',
-                      });
-                      if (res.ok) setSelectedOrder({ ...selectedOrder, status: st });
-                    }}
-                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                      selectedOrder.status === st
-                        ? 'bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)] opacity-50 cursor-not-allowed'
-                        : st === 'On Hold'
-                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20'
-                        : 'bg-[#1F6A37] hover:bg-[#12512C] text-white'
-                    }`}
-                  >
-                    {st === 'On Hold' ? 'Place on Hold' : `Move to ${st}`}
-                  </button>
-                ))}
-              </div>
+            {can('procurement.view') && getOrderSourcingLines(selectedOrder, procurementOrders).some((line) => line.outstanding > 0) && (
+              <Link href={`/procurement?order=${encodeURIComponent(selectedOrder.id)}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-semibold hover:bg-[var(--bg-canvas)]">
+                View sourcing <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+            )}
+
+            <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
+              {can('fulfillment.manage') && getNextStageStatus(selectedOrder.status) && (
+                <button type="button" onClick={() => handleQuickAdvance(selectedOrder)}
+                  className="min-h-11 rounded-lg bg-[#1F6A37] px-3 text-sm font-semibold text-white hover:bg-[#12512C]">
+                  {getNextStageLabel(selectedOrder.status)}
+                </button>
+              )}
+              {can('deliveries.view') && ['Packed', 'Dispatched', 'Partially Fulfilled'].includes(selectedOrder.status) && (
+                <Link href={`/deliveries?order=${encodeURIComponent(selectedOrder.orderNumber)}`}
+                  className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-semibold">
+                  View delivery runs
+                </Link>
+              )}
+              {can('approvals.view') && selectedOrder.status === 'On Hold' && (
+                <Link href="/approvals?status=pending"
+                  className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-semibold">
+                  Review approvals
+                </Link>
+              )}
             </div>
           </div>
         )}
@@ -872,16 +915,21 @@ function OrdersWorkbenchContent() {
             ? 'Verify customer details, pricing tier schedules, and automated FEFO batch reservations.'
             : 'Compose institutional order lines with dynamic pricing schedules and FEFO stock verification.'
         }
-        hasUnsavedChanges={formItems.length > 1 || Boolean(notes) || Boolean(orderReference)}
+        hasUnsavedChanges={composerDirty && !submittingOrder}
+        allowEscapeClose={!submittingOrder}
+        allowBackdropClose={!submittingOrder}
         onConfirmDiscard={() => {
           setCreateOpen(false);
           setComposerStep('compose');
           setFormItems([{ id: 'line-1', productId: products[0]?.id || '', quantity: 50 }]);
           setNotes('');
+          setComposerDirty(false);
+          setComposerError('');
         }}
       >
         {composerStep === 'compose' ? (
           <form
+            onChange={() => setComposerDirty(true)}
             onSubmit={(e) => {
               e.preventDefault();
               setComposerStep('review');
@@ -909,7 +957,7 @@ function OrdersWorkbenchContent() {
                   </label>
                   <select
                     value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
+                    onChange={(e) => selectCustomer(e.target.value)}
                     className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
                   >
                     {customers.map((c) => (
@@ -1041,7 +1089,7 @@ function OrdersWorkbenchContent() {
                           <select
                             value={item.productId}
                             onChange={(e) =>
-                              handleUpdateItem(item.id, { productId: e.target.value })
+                              handleUpdateItem(item.id, { productId: e.target.value, stockAllocatedQty: undefined, supplierId: undefined, supplierName: undefined, purchaseCostKes: undefined })
                             }
                             className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
                           >
@@ -1055,10 +1103,10 @@ function OrdersWorkbenchContent() {
                             <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--text-secondary)]">
                               <span>SKU: {prod.sku}</span>
                               <span>·</span>
-                              <span>Hub Stock: {prod.availableQty} {prod.unit}</span>
+                              <span>Available for this line {item.availableStock} {prod.unit}</span>
                               {item.hasShortage && (
                                 <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                                  (Exceeds Stock — Switch to Direct Procurement)
+                                  Stock allocation exceeds this line’s limit
                                 </span>
                               )}
                             </div>
@@ -1146,6 +1194,7 @@ function OrdersWorkbenchContent() {
                             onChange={(e) =>
                               handleUpdateItem(item.id, {
                                 sourcingMode: e.target.value as FormLineItem['sourcingMode'],
+                                stockAllocatedQty: undefined,
                               })
                             }
                             className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px] font-medium cursor-pointer"
@@ -1175,14 +1224,13 @@ function OrdersWorkbenchContent() {
                                 }}
                                 className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px] cursor-pointer"
                               >
-                                {item.quotingSuppliers && item.quotingSuppliers.length > 0 ? (
+                                <option value="">No preferred supplier</option>
+                                {item.quotingSuppliers && item.quotingSuppliers.length > 0 && (
                                   item.quotingSuppliers.map((qs, qsIdx) => (
                                     <option key={qs.supplierId || `sup-${qsIdx}`} value={qs.supplierId}>
-                                      {qs.supplierName} (KES {qs.quotingPriceKes}/{prod?.unit} · {qs.leadTimeDays}d lead · Min {qs.minOrderQty})
+                                      {qs.supplierName}{qs.quotingPriceKes ? ` · KES ${qs.quotingPriceKes}/${prod?.unit}` : ''}
                                     </option>
                                   ))
-                                ) : (
-                                  <option key="none" value="">No quoting supplier configured (General Sourcing)</option>
                                 )}
                               </select>
                             </div>
@@ -1207,7 +1255,17 @@ function OrdersWorkbenchContent() {
                         ) : (
                           <div className="sm:col-span-8 flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
                             <span className="font-semibold text-[#1F6A37] dark:text-[#4EB462]">FEFO Warehouse Allocation:</span>
-                            <span>{item.quantity} {prod?.unit} reserved from cold hub inventory batch.</span>
+                            <span>{item.quantity} {prod?.unit} to reserve from available stock.</span>
+                          </div>
+                        )}
+                        {isMixed && (
+                          <div className="grid items-end gap-3 sm:col-span-12 sm:grid-cols-2">
+                            <label className="text-sm">Reserve from stock ({prod?.unit})
+                              <input type="number" min="0" step="any" max={Math.min(item.quantity, item.availableStock)}
+                                value={item.stockAllocatedQty} onChange={(e) => handleUpdateItem(item.id, { stockAllocatedQty: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                className="mt-1 block h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-sm" />
+                            </label>
+                            <p className="py-2 text-sm text-[var(--text-secondary)]">Source directly <strong className="text-[var(--text-primary)]">{item.directProcuredQty} {prod?.unit}</strong></p>
                           </div>
                         )}
                       </div>
@@ -1329,13 +1387,15 @@ function OrdersWorkbenchContent() {
               </div>
             </div>
 
+            {composerError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/30 dark:text-red-200">{composerError}</p>}
+
             {/* Warnings banner if shortage or overrides exist */}
             {(hasAnyShortage || hasAnyApprovalRequired) && (
               <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
                 {hasAnyShortage && (
                   <div className="text-amber-800 dark:text-amber-300 flex items-center gap-1.5 font-medium">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                    <span>One or more products exceed immediate hub stock. Stock override approval required.</span>
+                    <span>Adjust the stock quantities or switch the affected lines to mixed or direct sourcing.</span>
                   </div>
                 )}
                 {hasAnyApprovalRequired && (
@@ -1413,6 +1473,7 @@ function OrdersWorkbenchContent() {
                 <button
                   type="button"
                   onClick={() => handleCreateOrder(true)}
+                  disabled={submittingOrder}
                   className="h-10 px-4 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
                 >
                   Save as Draft
@@ -1420,10 +1481,11 @@ function OrdersWorkbenchContent() {
                 <button
                   type="button"
                   onClick={() => handleCreateOrder(false)}
+                  disabled={submittingOrder || hasAnyShortage}
                   className="h-10 px-5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Confirm & Create Order</span>
+                  <span>{submittingOrder ? 'Creating order…' : 'Confirm order'}</span>
                 </button>
               </div>
             </div>

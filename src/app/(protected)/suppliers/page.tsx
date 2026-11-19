@@ -1,42 +1,26 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  AlertCircle,
-  AlertTriangle,
-  Archive,
+  ArrowLeft,
   Award,
   Ban,
-  Calendar,
-  Check,
   CheckCircle2,
   ChevronRight,
-  Clock,
   DollarSign,
   Edit2,
-  ExternalLink,
-  FileCheck,
-  FileText,
-  Filter,
-  Lock,
   Plus,
-  RotateCcw,
   Search,
-  ShieldCheck,
-  Trash2,
-  TrendingDown,
-  TrendingUp,
-  Truck,
   Upload,
-  User,
-  X,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
+import { getSupplierQuoteHistory } from '@/lib/services/supplier-offerings';
 import {
   Card,
   EmptyState,
   FeedbackBanner,
-  KPI,
   Modal,
   PageHeader,
   StatusBadge,
@@ -47,39 +31,60 @@ import {
   SupplierEvaluationRecord,
   SupplierPayableRecord,
   SupplierPaymentRecord,
+  SupplierProductItem,
   SupplierRecord,
-  UnitOfMeasure,
 } from '@/types/domain/bos';
+import { SupplierForm } from './SupplierForm';
 
-interface FormSuppliedItem {
-  productId: string;
-  productName: string;
-  unit: UnitOfMeasure;
-  currentCostKes: number;
-  minOrderQty: number;
-  leadTimeDays: number;
-  availability: 'Available' | 'Seasonal' | 'Unavailable';
-  preferredSupplier: boolean;
-  notes: string;
+const statusOptions = ['All', 'Active', 'Under Review', 'Suspended', 'Archived'] as const;
+type DirectoryStatus = (typeof statusOptions)[number];
+type ProfileTab = 'overview' | 'products' | 'procurement' | 'payables' | 'contracts' | 'performance';
+
+const fieldClass = 'mt-1 min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-base text-[var(--text-primary)] sm:text-sm';
+const actionClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-semibold transition-colors hover:bg-[var(--bg-subtle)] cursor-pointer';
+
+const currency = new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 2 });
+
+function SupplierQuoteHistory({ offering }: { offering: SupplierProductItem }) {
+  const events = getSupplierQuoteHistory(offering);
+  if (!events.length) return null;
+
+  return (
+    <details className="mt-3 border-t border-[var(--border-subtle)] pt-1 text-sm">
+      <summary className="min-h-11 cursor-pointer py-3 font-semibold text-[var(--brand-accent)]">Quote history</summary>
+      <ul className="space-y-2 pb-2 text-[var(--text-secondary)]">
+        {[...events].reverse().map((event, index) => (
+          <li key={`${event.recordedAt}-${index}`}>
+            {event.recordedAt ? <time dateTime={event.recordedAt}>{event.recordedAt.slice(0, 10)}</time> : 'Date unavailable'} · {currency.format(event.priceKes)} / {event.unit}
+            {event.recordedBy && ` · ${event.recordedBy}`}{event.reason && ` · ${event.reason}`}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 export default function SuppliersPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-[var(--text-secondary)]" role="status">Loading suppliers…</p>}>
+      <SupplierWorkspace />
+    </Suspense>
+  );
+}
+
+function SupplierWorkspace() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     suppliers,
     products,
     procurementOrders,
     can,
-    currentUser,
-    createSupplier,
-    updateSupplier,
     approveSupplier,
     suspendSupplier,
     reactivateSupplier,
     addSupplierContract,
     updateSupplierContractStatus,
-    updateSupplierPriceList,
-    addSupplierPriceItem,
-    removeSupplierPriceItem,
     addSupplierDocument,
     verifySupplierDocument,
     evaluateSupplierPerformance,
@@ -88,13 +93,12 @@ export default function SuppliersPage() {
     archiveSupplier,
     restoreSupplier,
     deleteSupplier,
-    addSupplierProduct,
     recordSupplierPayment,
   } = useBos();
 
   // Search & Filter State
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Under Review' | 'Suspended'>('All');
+  const [statusFilter, setStatusFilter] = useState<DirectoryStatus>('All');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [feedback, setFeedback] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -111,62 +115,64 @@ export default function SuppliersPage() {
     setActiveSupplierId(sup?.id || null);
   };
 
-  // 6-Tab Supplier Profile Modal State
-  const [profileSupplierId, setProfileSupplierId] = useState<string | null>(null);
-  const [profileTab, setProfileTab] = useState<'overview' | 'products' | 'procurement' | 'payables' | 'contracts' | 'performance'>('overview');
+  const profileSupplierId = searchParams.get('supplier');
+  const [profileSelection, setProfileSelection] = useState<{ supplierId: string; tab: ProfileTab }>();
   const profileSupplier = useMemo(
     () => (profileSupplierId ? suppliers.find((s) => s.id === profileSupplierId) || null : null),
     [profileSupplierId, suppliers]
   );
+  const profileTab = profileSelection?.supplierId === profileSupplierId ? profileSelection.tab : 'overview';
 
-  // Modals visibility
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  const [supplierForm, setSupplierForm] = useState<'create' | 'edit' | null>(null);
   const [approveOpen, setApproveOpen] = useState(false);
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [contractsOpen, setContractsOpen] = useState(false);
-  const [priceListOpen, setPriceListOpen] = useState(false);
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const [evaluationOpen, setEvaluationOpen] = useState(false);
   // View mode tab: directory or accounts payable ledger
-  const [viewTab, setViewTab] = useState<'directory' | 'payables'>('directory');
+  const viewTab = searchParams.get('tab') === 'payables' ? 'payables' : 'directory';
 
   // Payment Recording State
   const [paymentPayable, setPaymentPayable] = useState<SupplierPayableRecord | null>(null);
-  const [payAmount, setPayAmount] = useState<number>(0);
+  const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState<SupplierPaymentRecord['paymentMethod']>('M-Pesa Paybill');
   const [payRef, setPayRef] = useState('');
   const [payNotes, setPayNotes] = useState('');
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
-
-  // Sourcing Product Link Modal State
-  const [sourcingSupplier, setSourcingSupplier] = useState<SupplierRecord | null>(null);
-  const [sourceProductId, setSourceProductId] = useState(products[0]?.id || '');
-  const [sourceCostKes, setSourceCostKes] = useState(70);
-  const [sourceLeadDays, setSourceLeadDays] = useState(1);
-  const [sourceMoq, setSourceMoq] = useState(10);
+  const [paymentError, setPaymentError] = useState('');
 
   const handleOpenRecordPayment = (payable: SupplierPayableRecord) => {
     setPaymentPayable(payable);
-    setPayAmount(payable.balanceKes);
+    setPayAmount(String(payable.balanceKes));
     setPayRef('');
-    setPayNotes(`Disbursement for ${payable.poNumber}`);
+    setPayNotes('');
+    setPaymentError('');
   };
 
   const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentPayable) return;
+    if (!paymentPayable || isSubmittingPayment) return;
+    setPaymentError('');
     setIsSubmittingPayment(true);
-    const res = await recordSupplierPayment({
-      payableId: paymentPayable.id,
-      amountKes: Number(payAmount),
-      paymentMethod: payMethod,
-      referenceNumber: payRef.trim() || `TX-${Date.now().toString().slice(-6)}`,
-      notes: payNotes.trim(),
-    });
-    setIsSubmittingPayment(false);
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) setPaymentPayable(null);
+    try {
+      const result = await recordSupplierPayment({
+        payableId: paymentPayable.id,
+        amountKes: Number(payAmount),
+        paymentMethod: payMethod,
+        referenceNumber: payRef.trim(),
+        notes: payNotes.trim(),
+      });
+      if (result.ok) {
+        setPaymentPayable(null);
+        setFeedback({ msg: result.message, type: 'success' });
+      } else {
+        setPaymentError(result.message);
+      }
+    } catch {
+      setPaymentError('Unable to record the payment. Try again.');
+    } finally {
+      setIsSubmittingPayment(false);
+    }
   };
 
   const handleArchiveSupplier = async (sup: SupplierRecord) => {
@@ -180,87 +186,10 @@ export default function SuppliersPage() {
   };
 
   const handleDeleteSupplier = async (sup: SupplierRecord) => {
+    if (!window.confirm(`Permanently delete ${sup.name}?`)) return;
     const res = await deleteSupplier(sup.id);
     setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-  };
-
-  const handleSaveSourcingProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sourcingSupplier || !sourceProductId) return;
-    const prod = products.find((p) => p.id === sourceProductId);
-    if (!prod) return;
-    const res = await addSupplierProduct(sourcingSupplier.id, {
-      productId: prod.id,
-      productName: prod.name,
-      unit: prod.unit,
-      currentCostKes: Number(sourceCostKes),
-      leadTimeDays: Number(sourceLeadDays),
-      moq: Number(sourceMoq),
-    });
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) setSourcingSupplier(null);
-  };
-
-  // 1. Create Supplier Form State
-  const [newName, setNewName] = useState('');
-  const [newCategory, setNewCategory] = useState('Fresh Vegetables & Tubers');
-  const [newRegion, setNewRegion] = useState('Nyandarua County');
-  const [newContact, setNewContact] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [newLeadTime, setNewLeadTime] = useState(1);
-  const [newTerms, setNewTerms] = useState('Net 14');
-  const [newPaymentNotes, setNewPaymentNotes] = useState('');
-  const [newSuppliedProducts, setNewSuppliedProducts] = useState<FormSuppliedItem[]>([]);
-
-  // 2. Edit Supplier Form State
-  const [editName, setEditName] = useState('');
-  const [editCategory, setEditCategory] = useState('');
-  const [editRegion, setEditRegion] = useState('');
-  const [editContact, setEditContact] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editLeadTime, setEditLeadTime] = useState(1);
-  const [editTerms, setEditTerms] = useState('');
-  const [editPaymentNotes, setEditPaymentNotes] = useState('');
-  const [editSuppliedProducts, setEditSuppliedProducts] = useState<FormSuppliedItem[]>([]);
-
-  const handleAddProductToNewSupplier = () => {
-    const firstProd = products[0];
-    if (!firstProd) return;
-    setNewSuppliedProducts((prev) => [
-      ...prev,
-      {
-        productId: firstProd.id,
-        productName: firstProd.name,
-        unit: firstProd.unit,
-        currentCostKes: firstProd.pricing?.supplierCostKes || 70,
-        minOrderQty: 10,
-        leadTimeDays: 1,
-        availability: 'Available',
-        preferredSupplier: false,
-        notes: '',
-      },
-    ]);
-  };
-
-  const handleAddProductToEditSupplier = () => {
-    const firstProd = products[0];
-    if (!firstProd) return;
-    setEditSuppliedProducts((prev) => [
-      ...prev,
-      {
-        productId: firstProd.id,
-        productName: firstProd.name,
-        unit: firstProd.unit,
-        currentCostKes: firstProd.pricing?.supplierCostKes || 70,
-        minOrderQty: 10,
-        leadTimeDays: 1,
-        availability: 'Available',
-        preferredSupplier: false,
-        notes: '',
-      },
-    ]);
+    if (res.ok) router.replace('/suppliers');
   };
 
   // 3. Approve Supplier State
@@ -278,13 +207,6 @@ export default function SuppliersPage() {
   const [contractTerms, setContractTerms] = useState('Net 14');
   const [contractCadence, setContractCadence] = useState('Bi-Weekly Scheduled Runs');
   const [contractNotes, setContractNotes] = useState('');
-
-  // 6. Price List Form State
-  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
-  const [newPriceCost, setNewPriceCost] = useState<number>(75);
-  const [editingPriceProductId, setEditingPriceProductId] = useState<string | null>(null);
-  const [editPriceCost, setEditPriceCost] = useState<number>(0);
-  const [editPriceReason, setEditPriceReason] = useState('Seasonal harvest adjustment');
 
   // 7. Documents Form State
   const [docNumber, setDocNumber] = useState('');
@@ -308,63 +230,42 @@ export default function SuppliersPage() {
     return ['All', ...Array.from(set)];
   }, [suppliers]);
 
-  // Filtered Suppliers
+  const normalizedSearch = search.trim().toLowerCase();
   const filteredSuppliers = useMemo(() => {
+    const matchingProductUnits = new Map(products.filter((product) =>
+      `${product.name} ${product.sku}`.toLowerCase().includes(normalizedSearch)
+    ).map((product) => [product.id, product.unit]));
     return suppliers.filter((s) => {
       const matchSearch =
-        !search.trim() ||
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.code.toLowerCase().includes(search.toLowerCase()) ||
-        s.region.toLowerCase().includes(search.toLowerCase()) ||
-        s.contactPerson.toLowerCase().includes(search.toLowerCase());
-
-      const matchStatus = statusFilter === 'All' || s.status === statusFilter;
+        !normalizedSearch ||
+        [s.name, s.code, s.region, s.contactPerson].some((value) => value.toLowerCase().includes(normalizedSearch)) ||
+        s.suppliedProducts.some((offering) => matchingProductUnits.get(offering.productId) === offering.unit || offering.productName.toLowerCase().includes(normalizedSearch));
+      const status = s.isArchived ? 'Archived' : s.status;
+      const matchStatus = statusFilter === 'All' || status === statusFilter;
       const matchCategory = categoryFilter === 'All' || s.category === categoryFilter;
 
       return matchSearch && matchStatus && matchCategory;
     });
-  }, [suppliers, search, statusFilter, categoryFilter]);
+  }, [suppliers, products, normalizedSearch, statusFilter, categoryFilter]);
 
-  // Counts for Header Badges
-  const activeCount = suppliers.filter((s) => s.status === 'Active').length;
-  const underReviewCount = suppliers.filter((s) => s.status === 'Under Review').length;
-  const suspendedCount = suppliers.filter((s) => s.status === 'Suspended').length;
-  const totalApKes = suppliers.reduce((sum, s) => sum + s.payableBalanceKes, 0);
+  const totalApKes = supplierPayables.reduce((sum, payable) => sum + payable.balanceKes, 0);
+  const profileBalance = supplierPayables.reduce((sum, payable) => payable.supplierId === profileSupplierId ? sum + payable.balanceKes : sum, 0);
 
   // Authorisation Checks
   const canCreate = can('suppliers.create');
   const canEdit = can('suppliers.edit');
   const canApprove = can('suppliers.approve') || can('procurement.approve') || can('approvals.approve') || can('suppliers.edit');
   const canSuspend = can('suppliers.suspend') || can('suppliers.edit') || can('procurement.approve') || can('approvals.approve');
+  const canArchive = canEdit || can('suppliers.suspend');
+  const canManageContracts = canEdit || can('procurement.create') || can('procurement.approve');
+  const canManageDocuments = canEdit || can('documents.manage') || can('procurement.approve');
+  const canEvaluate = canEdit || can('procurement.approve');
+  const latestEvaluation = profileSupplier?.evaluations?.reduce<SupplierEvaluationRecord | undefined>((latest, evaluation) =>
+    !latest || evaluation.evaluationDate > latest.evaluationDate ? evaluation : latest, undefined
+  );
+  const latestTimeliness = latestEvaluation?.timelinessScorePct ?? latestEvaluation?.timelinessScore;
 
   // Handlers
-  const handleOpenEdit = (sup: SupplierRecord) => {
-    setActiveSupplier(sup);
-    setEditName(sup.name);
-    setEditCategory(sup.category);
-    setEditRegion(sup.region);
-    setEditContact(sup.contactPerson);
-    setEditPhone(sup.phone);
-    setEditEmail(sup.email);
-    setEditLeadTime(sup.leadTimeDays);
-    setEditTerms(sup.paymentTerms);
-    setEditPaymentNotes(sup.paymentDetails || '');
-    setEditSuppliedProducts(
-      (sup.suppliedProducts || []).map((sp) => ({
-        productId: sp.productId,
-        productName: sp.productName,
-        unit: sp.unit,
-        currentCostKes: sp.currentCostKes,
-        minOrderQty: sp.minOrderQty ?? sp.moq ?? 1,
-        leadTimeDays: sp.leadTimeDays ?? sup.leadTimeDays,
-        availability: (sp.availability as any) || 'Available',
-        preferredSupplier: sp.preferredSupplier ?? false,
-        notes: sp.notes || '',
-      }))
-    );
-    setEditOpen(true);
-  };
-
   const handleOpenApprove = (sup: SupplierRecord) => {
     setActiveSupplier(sup);
     setApproveComment('Governance review completed. Compliance documents verified.');
@@ -384,12 +285,6 @@ export default function SuppliersPage() {
     setContractsOpen(true);
   };
 
-  const handleOpenPriceList = (sup: SupplierRecord) => {
-    setActiveSupplier(sup);
-    setEditingPriceProductId(null);
-    setPriceListOpen(true);
-  };
-
   const handleOpenDocuments = (sup: SupplierRecord) => {
     setActiveSupplier(sup);
     setDocNumber(`KEBS-${sup.code.slice(4, 7)}-${String(Math.floor(Math.random() * 9000) + 1000)}`);
@@ -406,80 +301,6 @@ export default function SuppliersPage() {
     setEvalNotes('Quarterly supplier review. Clean inspection record and compliant transport temperatures.');
     setEvalRec('Preferred Cooperative');
     setEvaluationOpen(true);
-  };
-
-  // Form Submit Handlers
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
-    const res = await createSupplier({
-      name: newName.trim(),
-      category: newCategory,
-      region: newRegion,
-      contactPerson: newContact.trim(),
-      phone: newPhone.trim(),
-      email: newEmail.trim(),
-      leadTimeDays: Number(newLeadTime),
-      paymentTerms: newTerms,
-      suppliedProducts: newSuppliedProducts.map((sp) => ({
-        productId: sp.productId,
-        productName: sp.productName,
-        unit: sp.unit,
-        currentCostKes: Number(sp.currentCostKes),
-        minOrderQty: Number(sp.minOrderQty),
-        leadTimeDays: Number(sp.leadTimeDays),
-        availability: sp.availability,
-        preferredSupplier: sp.preferredSupplier,
-        notes: sp.notes,
-      })),
-    });
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) {
-      setCreateOpen(false);
-      setNewName('');
-      setNewContact('');
-      setNewPhone('');
-      setNewEmail('');
-      setNewPaymentNotes('');
-      setNewSuppliedProducts([]);
-    }
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeSupplier || !editName.trim()) return;
-    const res = await updateSupplier(activeSupplier.id, {
-      name: editName.trim(),
-      category: editCategory,
-      region: editRegion,
-      contactPerson: editContact.trim(),
-      phone: editPhone.trim(),
-      email: editEmail.trim(),
-      leadTimeDays: Number(editLeadTime),
-      paymentTerms: editTerms,
-      paymentDetails: editPaymentNotes.trim(),
-      suppliedProducts: editSuppliedProducts.map((sp) => ({
-        id: sp.productId,
-        productId: sp.productId,
-        productName: sp.productName,
-        unit: sp.unit,
-        currentCostKes: Number(sp.currentCostKes),
-        priceKes: Number(sp.currentCostKes),
-        previousCostKes:
-          activeSupplier.suppliedProducts?.find((p) => p.productId === sp.productId)?.currentCostKes ??
-          Number(sp.currentCostKes),
-        lastUpdated: new Date().toISOString().split('T')[0],
-        lastPriceUpdate: new Date().toISOString().split('T')[0],
-        leadTimeDays: Number(sp.leadTimeDays),
-        moq: Number(sp.minOrderQty),
-        minOrderQty: Number(sp.minOrderQty),
-        availability: sp.availability,
-        preferredSupplier: sp.preferredSupplier,
-        notes: sp.notes,
-      })),
-    });
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) setEditOpen(false);
   };
 
   const handleApproveSubmit = async () => {
@@ -527,44 +348,6 @@ export default function SuppliersPage() {
     }
   };
 
-  const handleAddPriceItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeSupplier || !selectedProductId) return;
-    const prod = products.find((p) => p.id === selectedProductId);
-    if (!prod) return;
-    const res = await addSupplierPriceItem(activeSupplier.id, {
-      productId: prod.id,
-      productName: prod.name,
-      unit: prod.unit,
-      currentCostKes: Number(newPriceCost),
-    });
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-  };
-
-  const handleSavePriceEdit = async (productId: string) => {
-    if (!activeSupplier) return;
-    const res = await updateSupplierPriceList(
-      activeSupplier.id,
-      productId,
-      Number(editPriceCost),
-      editPriceReason
-    );
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) {
-      setEditingPriceProductId(null);
-      const sup = suppliers.find((s) => s.id === activeSupplier.id);
-      if (sup) {
-        // Also reflect the latest changes into activeSupplier
-        const updatedSupplied = sup.suppliedProducts.map((p) =>
-          p.productId === productId
-            ? { ...p, previousCostKes: p.currentCostKes, currentCostKes: Number(editPriceCost), lastUpdated: new Date().toISOString().split('T')[0] }
-            : p
-        );
-        setActiveSupplier({ ...sup, suppliedProducts: updatedSupplied });
-      }
-    }
-  };
-
   const handleAddDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSupplier || !docTitle.trim()) return;
@@ -609,554 +392,123 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header (RBAC-aware) */}
-      <PageHeader
-        kicker="DIRECT FARM SOURCING & COOPERATIVE NETWORK"
-        title="Suppliers & Governance Management"
-        description="Comprehensive management of agricultural cooperatives, contract milestones, multi-tier farmgate price lists, compliance documentation, and periodic vendor performance evaluations."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {canCreate ? (
+      {!profileSupplierId && (
+        <>
+          <PageHeader
+            title="Suppliers"
+            description="Find suppliers and manage your supply network."
+            actions={canCreate && (
               <button
                 type="button"
-                onClick={() => setCreateOpen(true)}
-                className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+                onClick={() => setSupplierForm('create')}
+                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[var(--brand-accent)] px-4 text-sm font-semibold text-white dark:text-[var(--bg-canvas)]"
               >
-                <Plus className="w-4 h-4" />
-                <span>Register Supplier</span>
+                <Plus aria-hidden="true" className="h-4 w-4" /> New supplier
               </button>
-            ) : (
-              <span className="h-10 px-3.5 rounded-[10px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-xs inline-flex items-center gap-1.5 opacity-80">
-                <Lock className="w-3.5 h-3.5" />
-                <span>Create Restricted</span>
-              </span>
             )}
-          </div>
-        }
-      />
-
-      {/* Feedback Banner */}
-      <FeedbackBanner
-        message={feedback?.msg || null}
-        type={feedback?.type}
-        onDismiss={() => setFeedback(null)}
-      />
-
-      {/* Authorisation Banner / Posture */}
-      <div className="p-3.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5">
-          <ShieldCheck className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462] shrink-0" />
-          <div>
-            <span className="font-semibold text-[var(--text-primary)]">
-              Operator Authorization Profile:
-            </span>{' '}
-            <span className="text-[var(--text-secondary)]">
-              {currentUser?.fullName} ({currentUser?.roleName})
-            </span>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-          <span
-            className={`px-2.5 py-0.5 rounded-full font-medium ${
-              canCreate
-                ? 'bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]'
-                : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)] line-through'
-            }`}
-          >
-            Create
-          </span>
-          <span
-            className={`px-2.5 py-0.5 rounded-full font-medium ${
-              canEdit
-                ? 'bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]'
-                : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)] line-through'
-            }`}
-          >
-            Edit & Price List
-          </span>
-          <span
-            className={`px-2.5 py-0.5 rounded-full font-medium ${
-              canApprove
-                ? 'bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]'
-                : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)] line-through'
-            }`}
-          >
-            Approve
-          </span>
-          <span
-            className={`px-2.5 py-0.5 rounded-full font-medium ${
-              canSuspend
-                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-                : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)] line-through'
-            }`}
-          >
-            Suspend
-          </span>
-        </div>
-      </div>
-
-      {/* Primary Module Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
-        <button
-          type="button"
-          onClick={() => setViewTab('directory')}
-          className={`px-4 py-2 text-xs font-semibold rounded-md transition-colors ${
-            viewTab === 'directory'
-              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-canvas)]'
-          }`}
-        >
-          Supplier Directory & Sourcing ({suppliers.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setViewTab('payables')}
-          className={`px-4 py-2 text-xs font-semibold rounded-md transition-colors ${
-            viewTab === 'payables'
-              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-canvas)]'
-          }`}
-        >
-          Accounts Payable (AP) Ledger ({supplierPayables.length})
-        </button>
-      </div>
-
-      {/* Decision KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI
-          label="Active Farm Vendors"
-          value={`${activeCount} Active`}
-          sublabel={`${suppliers.length} total registered · ${underReviewCount} under review`}
-          tone="positive"
-        />
-        <KPI
-          label="Outstanding AP Obligation"
-          value={`KES ${(totalApKes / 1000000).toFixed(2)}M`}
-          sublabel="Net 14 & Net 30 terms across cooperatives"
-          tone="neutral"
-        />
-        <KPI
-          label="Under Review / Approvals"
-          value={`${underReviewCount} Pending`}
-          sublabel="Require governance sign-off"
-          tone={underReviewCount > 0 ? 'warning' : 'neutral'}
-        />
-        <KPI
-          label="Operational Suspensions"
-          value={`${suspendedCount} Suspended`}
-          sublabel="Zero PO dispatch permitted"
-          tone={suspendedCount > 0 ? 'danger' : 'neutral'}
-        />
-      </div>
-
-      {/* Filter and Search Bar (Directory Mode) */}
-      {viewTab === 'directory' && (
-        <div className="space-y-6">
-          <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(['All', 'Active', 'Under Review', 'Suspended'] as const).map((st) => (
-              <button
-                key={st}
-                type="button"
-                onClick={() => setStatusFilter(st)}
-                className={`h-8 px-3.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                  statusFilter === st
-                    ? 'bg-[#1F6A37] text-white shadow-xs'
-                    : 'bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)]'
-                }`}
+          />
+          <FeedbackBanner message={feedback?.msg || null} type={feedback?.type} onDismiss={() => setFeedback(null)} />
+          <nav aria-label="Suppliers workspace" className="flex flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+            {([{ id: 'directory', label: 'Directory' }, { id: 'payables', label: 'Payables' }] as const).map((view) => (
+              <Link
+                key={view.id}
+                href={view.id === 'payables' ? '/suppliers?tab=payables' : '/suppliers'}
+                aria-current={viewTab === view.id ? 'page' : undefined}
+                className={`${actionClass} ${viewTab === view.id ? 'bg-[var(--bg-subtle)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'}`}
               >
-                <span>{st}</span>
-                {st === 'Under Review' && underReviewCount > 0 && (
-                  <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px]">
-                    {underReviewCount}
-                  </span>
-                )}
-                {st === 'Suspended' && suspendedCount > 0 && (
-                  <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px]">
-                    {suspendedCount}
-                  </span>
-                )}
-              </button>
+                {view.label}
+              </Link>
             ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-          {/* Category Dropdown */}
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="h-8 px-3 rounded-full text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] cursor-pointer"
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                Category: {c}
-              </option>
-            ))}
-          </select>
-
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
-            <input
-              type="text"
-              placeholder="Search vendor or county..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 pl-8 pr-3 rounded-full text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[#1F6A37] w-48 sm:w-56"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Supplier Grid */}
-      {filteredSuppliers.length === 0 ? (
-        <EmptyState
-          title="No Suppliers Found"
-          description="No vendor matched your current search and status filter criteria."
-          actionLabel="Reset Filters"
-          onAction={() => {
-            setSearch('');
-            setStatusFilter('All');
-            setCategoryFilter('All');
-          }}
-        />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredSuppliers.map((sup) => {
-            const isSuspended = sup.status === 'Suspended';
-            const isUnderReview = sup.status === 'Under Review';
-            const contractsCount = sup.contracts?.length || 0;
-            const docsCount = sup.documents?.length || 0;
-            const evalCount = sup.evaluations?.length || 0;
-
-            return (
-              <Card
-                key={sup.id}
-                className={`space-y-4 flex flex-col justify-between transition-all ${
-                  isSuspended
-                    ? 'border-red-500/40 bg-red-500/[0.02]'
-                    : isUnderReview
-                    ? 'border-amber-500/40 bg-amber-500/[0.02]'
-                    : ''
-                }`}
-              >
-                <div>
-                  {/* Card Header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProfileSupplierId(sup.id);
-                            setProfileTab('overview');
-                          }}
-                          className="font-mono-tabular text-xs font-bold text-[#1F6A37] dark:text-[#4EB462] hover:underline cursor-pointer"
-                          title="Open 6-tab Supplier Profile"
-                        >
-                          {sup.code}
-                        </button>
-                        <span className="text-[11px] text-[var(--text-secondary)]">
-                          · {sup.region}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProfileSupplierId(sup.id);
-                          setProfileTab('overview');
-                        }}
-                        className="text-left font-heading text-lg font-semibold mt-0.5 text-[var(--text-primary)] hover:text-[#1F6A37] dark:hover:text-[#4EB462] transition-colors cursor-pointer block"
-                        title="View comprehensive supplier profile & performance"
-                      >
-                        {sup.name}
-                      </button>
-                      <div className="text-xs text-[var(--text-secondary)] mt-0.5">
-                        {sup.category} · Contact: <strong>{sup.contactPerson}</strong> ({sup.phone})
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                          sup.status === 'Active'
-                            ? 'bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]'
-                            : sup.status === 'Under Review'
-                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-                            : 'bg-red-500/15 text-red-600 dark:text-red-400'
-                        }`}
-                      >
-                        {sup.status}
-                      </span>
-                      <StatusBadge status={sup.recentPriceTrend} />
-                    </div>
+          </nav>
+          {viewTab === 'directory' && (
+            <section aria-label="Supplier directory" className="space-y-4">
+              <div className="grid gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 text-sm sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                <label className="sm:col-span-2 lg:col-span-1">
+                  Search suppliers or products
+                  <span className="relative block">
+                    <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]" />
+                    <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, county, product, or SKU" className={`${fieldClass} pl-9`} />
+                  </span>
+                </label>
+                <label>
+                  Status
+                  <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DirectoryStatus)} className={fieldClass}>
+                    {statusOptions.map((status) => <option key={status} value={status}>{status === 'All' ? 'All statuses' : status}</option>)}
+                  </select>
+                </label>
+                <label>
+                  Category
+                  <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={fieldClass}>
+                    {categories.map((category) => <option key={category} value={category}>{category === 'All' ? 'All categories' : category}</option>)}
+                  </select>
+                </label>
+              </div>
+              {filteredSuppliers.length === 0 ? (
+                <EmptyState
+                  title="No suppliers found"
+                  description="Try a different supplier, product or status."
+                  actionLabel="Reset filters"
+                  onAction={() => { setSearch(''); setStatusFilter('All'); setCategoryFilter('All'); }}
+                />
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+                  <div aria-hidden="true" className="hidden gap-4 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-5 py-3 text-xs font-semibold text-[var(--text-secondary)] md:grid md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_8rem]">
+                    <span>Supplier</span><span>Products</span><span>Status</span>
                   </div>
-
-                  {/* Operational Status Callout if Under Review or Suspended */}
-                  {isUnderReview && (
-                    <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
-                        <Clock className="w-4 h-4 shrink-0" />
-                        <span>Awaiting governance authorization before issuing purchase orders.</span>
-                      </div>
-                      {canApprove && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenApprove(sup)}
-                          className="h-7 px-3 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs inline-flex items-center gap-1 cursor-pointer shrink-0"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Approve Supplier</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {isSuspended && (
-                    <div className="mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
-                        <Ban className="w-4 h-4 shrink-0" />
-                        <div>
-                          <strong>Account Suspended:</strong> {sup.suspendedReason || 'Governance freeze active.'}
-                        </div>
-                      </div>
-                      {canSuspend && (
-                        <button
-                          type="button"
-                          onClick={() => handleReactivate(sup)}
-                          className="h-7 px-3 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white font-semibold text-xs inline-flex items-center gap-1 cursor-pointer shrink-0"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Reactivate</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Core Metrics Grid */}
-                  <div className="grid grid-cols-3 gap-3 p-3 mt-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs">
-                    <div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">Lead Time & Terms</div>
-                      <div className="font-semibold mt-0.5 text-[var(--text-primary)]">
-                        {sup.leadTimeDays}d · {sup.paymentTerms}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">QC Pass Score</div>
-                      <div className="font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462] mt-0.5">
-                        {sup.qualityScorePct}%
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">Payable Balance</div>
-                      <div className="font-mono-tabular font-semibold text-[var(--text-primary)] mt-0.5">
-                        KES {sup.payableBalanceKes.toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Price List Preview & Contracted SKUs */}
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-[var(--text-primary)]">
-                        Contracted Produce SKUs ({sup.suppliedProducts.length})
-                      </span>
-                      {canEdit && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenPriceList(sup)}
-                          className="text-[11px] font-semibold text-[#1F6A37] dark:text-[#4EB462] hover:underline cursor-pointer"
-                        >
-                          Manage Price List →
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="space-y-1.5">
-                      {sup.suppliedProducts.slice(0, 2).map((sp) => (
-                        <div
-                          key={sp.productId}
-                          className="p-2.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between text-xs"
-                        >
-                          <div>
-                            <div className="font-medium text-[var(--text-primary)]">{sp.productName}</div>
-                            <div className="text-[10px] text-[var(--text-secondary)]">
-                              Prior: KES {sp.previousCostKes}/{sp.unit} · Updated {sp.lastUpdated}
-                            </div>
-                          </div>
-                          <div className="text-right font-mono-tabular font-semibold text-[var(--text-primary)]">
-                            KES {sp.currentCostKes.toLocaleString()} / {sp.unit}
-                          </div>
-                        </div>
-                      ))}
-                      {sup.suppliedProducts.length > 2 && (
-                        <div className="text-[11px] text-[var(--text-secondary)] text-center pt-1">
-                          +{sup.suppliedProducts.length - 2} additional SKUs on price schedule
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <ul className="divide-y divide-[var(--border-subtle)]">
+                    {filteredSuppliers.map((supplier) => {
+                      const offeringNames = supplier.suppliedProducts.map((offering) => offering.productName);
+                      const matchingNames = normalizedSearch ? offeringNames.filter((name) => name.toLowerCase().includes(normalizedSearch)) : [];
+                      const previews = (matchingNames.length ? matchingNames : offeringNames).slice(0, 2);
+                      const remaining = offeringNames.length - previews.length;
+                      return (
+                        <li key={supplier.id}>
+                          <Link
+                            href={`/suppliers?supplier=${encodeURIComponent(supplier.id)}`}
+                            className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3.5 transition-colors hover:bg-[var(--bg-canvas)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--brand-accent)] md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_8rem] md:gap-x-4 md:px-5"
+                          >
+                            <span className="min-w-0">
+                              <span className="block wrap-break-word text-sm font-semibold text-[var(--text-primary)]">{supplier.name}</span>
+                              <span className="mt-0.5 block text-xs text-[var(--text-secondary)]">{supplier.code} · {supplier.region}</span>
+                            </span>
+                            <span className="col-span-2 row-start-2 min-w-0 wrap-break-word text-sm text-[var(--text-secondary)] md:col-span-1 md:col-start-2 md:row-start-1">
+                              {previews.length ? previews.join(', ') : 'No products linked'}{remaining > 0 && ` +${remaining} more`}
+                            </span>
+                            <span className="col-start-2 row-start-1 flex items-center justify-between gap-2 md:col-start-3">
+                              <StatusBadge status={supplier.isArchived ? 'Archived' : supplier.status} />
+                              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
+                            </span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-
-                {/* Card Action Footer with All Features */}
-                <div className="pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {/* 0. 6-Tab Profile Modal Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProfileSupplierId(sup.id);
-                        setProfileTab('overview');
-                      }}
-                      className="h-7 px-2.5 rounded-md bg-[#1F6A37]/10 hover:bg-[#1F6A37]/20 text-[#1F6A37] dark:text-[#4EB462] border border-[#1F6A37]/30 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Open comprehensive 6-tab profile"
-                    >
-                      <User className="w-3 h-3" />
-                      <span>Profile</span>
-                    </button>
-
-                    {/* 1. Edit */}
-                    {canEdit && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(sup)}
-                        className="h-7 px-2.5 rounded-md bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Edit vendor profile & supplied products"
-                      >
-                        <Edit2 className="w-3 h-3 text-[var(--text-secondary)]" />
-                        <span>Edit</span>
-                      </button>
-                    )}
-
-                    {/* 2. Manage Contracts */}
-                    <button
-                      type="button"
-                      onClick={() => handleOpenContracts(sup)}
-                      className="h-7 px-2.5 rounded-md bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Manage agreements"
-                    >
-                      <FileText className="w-3 h-3 text-[var(--text-secondary)]" />
-                      <span>Contracts ({contractsCount})</span>
-                    </button>
-
-                    {/* 3. Manage Documents */}
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDocuments(sup)}
-                      className="h-7 px-2.5 rounded-md bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Manage compliance documents"
-                    >
-                      <FileCheck className="w-3 h-3 text-[var(--text-secondary)]" />
-                      <span>Docs ({docsCount})</span>
-                    </button>
-
-                    {/* 4. Evaluate Performance */}
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEvaluation(sup)}
-                      className="h-7 px-2.5 rounded-md bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Evaluate performance score"
-                    >
-                      <Award className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                      <span>Audit ({sup.qualityScorePct}%)</span>
-                    </button>
-
-                    {/* 5. Sourcing Product Config */}
-                    <button
-                      type="button"
-                      onClick={() => setSourcingSupplier(sup)}
-                      className="h-7 px-2.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Link and manage products supplied by this vendor"
-                    >
-                      <Truck className="w-3 h-3" />
-                      <span>Sourcing ({(sup.suppliedProducts?.length || 0)})</span>
-                    </button>
-                  </div>
-
-                  {/* Lifecycle Controls: Approve, Suspend, Archive, Delete */}
-                  <div className="flex items-center gap-1.5">
-                    {isUnderReview && canApprove && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenApprove(sup)}
-                        className="h-7 px-3 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shadow-xs"
-                      >
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>Approve</span>
-                      </button>
-                    )}
-
-                    {sup.status === 'Active' && canSuspend && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenSuspend(sup)}
-                        className="h-7 px-3 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-                      >
-                        <Ban className="w-3 h-3" />
-                        <span>Suspend</span>
-                      </button>
-                    )}
-
-                    {sup.isArchived ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRestoreSupplier(sup)}
-                        className="h-7 px-2.5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shadow-xs"
-                        title="Restore supplier to active status"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Restore</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleArchiveSupplier(sup)}
-                        className="h-7 px-2.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Archive supplier record"
-                      >
-                        <Archive className="w-3 h-3" />
-                        <span>Archive</span>
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteSupplier(sup)}
-                      className="h-7 px-2 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium inline-flex items-center cursor-pointer transition-colors"
-                      title="Permanently delete vendor if no POs or payables exist"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+              )}
+            </section>
+          )}
+        </>
       )}
-        </div>
-      )}
-
       {/* Accounts Payable (AP) Ledger View */}
-      {viewTab === 'payables' && (
+      {!profileSupplierId && viewTab === 'payables' && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]">
             <div>
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                Accounts Payable Ledger & Farm Sourcing Disbursements
+                Supplier payables
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                Every purchase confirmation creates an immutable payable obligation. Record M-Pesa, EFT, or Cheque settlements here.
+                Review supplier balances and record payments against purchases.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400">
-                Outstanding: KES {supplierPayables.reduce((acc, p) => acc + p.balanceKes, 0).toLocaleString()}
+                Outstanding {currency.format(totalApKes)}
               </span>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)]">
             <table className="min-w-full divide-y divide-neutral-200 dark:divide-neutral-800">
               <thead className="bg-neutral-50 dark:bg-neutral-800/50">
                 <tr>
@@ -1230,919 +582,143 @@ export default function SuppliersPage() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 1. CREATE SUPPLIER MODAL (SECTIONS A, B, C) */}
-      {/* ========================================================================= */}
-      <Modal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        title="Register Agricultural Supplier / Cooperative"
-        subtitle="Onboard a new supplier with direct produce catalog, farmgate pricing tiers, and commercial settlement terms."
-      >
-        <form onSubmit={handleCreateSubmit} className="space-y-6">
-          {/* SECTION A: Identity & Contact */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 pb-1 border-b border-[var(--border-subtle)]">
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
-                A
-              </span>
-              <h4 className="text-xs font-semibold text-[var(--text-primary)]">
-                Identity & Contact Information
-              </h4>
-            </div>
+      {(supplierForm === 'create' || (supplierForm === 'edit' && profileSupplier)) && (
+        <SupplierForm
+          key={supplierForm === 'edit' ? profileSupplier?.id : 'create'}
+          supplier={supplierForm === 'edit' ? profileSupplier ?? undefined : undefined}
+          onClose={() => setSupplierForm(null)}
+          onSaved={(msg) => { setSupplierForm(null); setFeedback({ msg, type: 'success' }); }}
+        />
+      )}
 
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Cooperative / Company Legal Name *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Nyandarua Potato Growers Society"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Produce Category *
-                </label>
-                <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-                >
-                  <option value="Fresh Vegetables & Tubers">Fresh Vegetables & Tubers</option>
-                  <option value="Dry Grains & Cereals">Dry Grains & Cereals</option>
-                  <option value="Fruits & Orchard">Fruits & Orchard</option>
-                  <option value="Leafy Greens">Leafy Greens</option>
-                  <option value="Dairy & Cold Chain">Dairy & Cold Chain</option>
-                  <option value="Herbs & Spices">Herbs & Spices</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  County / Region *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Nyandarua County"
-                  value={newRegion}
-                  onChange={(e) => setNewRegion(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Contact Person *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Stephen Njuguna"
-                  value={newContact}
-                  onChange={(e) => setNewContact(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Phone Number *
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="+254 7XX XXX XXX"
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  placeholder="orders@coop.co.ke"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Baseline Lead Time (Days) *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  required
-                  value={newLeadTime}
-                  onChange={(e) => setNewLeadTime(Number(e.target.value))}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Payment Terms *
-                </label>
-                <select
-                  value={newTerms}
-                  onChange={(e) => setNewTerms(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-                >
-                  <option value="Net 7">Net 7</option>
-                  <option value="Net 14">Net 14</option>
-                  <option value="Net 30">Net 30</option>
-                  <option value="COD / M-Pesa">COD / M-Pesa</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION B: Products Supplied Repeatable Table */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between pb-1 border-b border-[var(--border-subtle)]">
-              <div className="flex items-center gap-2">
-                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
-                  B
-                </span>
-                <h4 className="text-xs font-semibold text-[var(--text-primary)]">
-                  Products Supplied & Quoted Farmgate Costs ({newSuppliedProducts.length})
-                </h4>
-              </div>
-              <button
-                type="button"
-                onClick={handleAddProductToNewSupplier}
-                className="h-7 px-2.5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shadow-xs"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Product</span>
-              </button>
-            </div>
-
-            {newSuppliedProducts.length === 0 ? (
-              <div className="p-3 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
-                No products linked yet. Click &quot;Add Product&quot; to configure produce items, unit costs, and minimum order quantities.
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {newSuppliedProducts.map((sp, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2 text-xs"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex-1">
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Produce Product *</label>
-                        <select
-                          value={sp.productId}
-                          onChange={(e) => {
-                            const found = products.find((p) => p.id === e.target.value);
-                            if (found) {
-                              setNewSuppliedProducts((prev) =>
-                                prev.map((item, i) =>
-                                  i === idx
-                                    ? {
-                                        ...item,
-                                        productId: found.id,
-                                        productName: found.name,
-                                        unit: found.unit,
-                                        currentCostKes: found.pricing?.supplierCostKes || item.currentCostKes,
-                                      }
-                                    : item
-                                )
-                              );
-                            }
-                          }}
-                          className="w-full h-8 px-2 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                        >
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} ({p.sku}) · {p.unit}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="w-28">
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Cost / Unit (KES) *</label>
-                        <input
-                          type="number"
-                          min="1"
-                          required
-                          value={sp.currentCostKes}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setNewSuppliedProducts((prev) =>
-                              prev.map((item, i) => (i === idx ? { ...item, currentCostKes: val } : item))
-                            );
-                          }}
-                          className="w-full h-8 px-2 rounded-md text-xs font-mono font-semibold bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                        />
-                      </div>
-
-                      <div className="w-20">
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">MOQ</label>
-                        <input
-                          type="number"
-                          min="1"
-                          required
-                          value={sp.minOrderQty}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setNewSuppliedProducts((prev) =>
-                              prev.map((item, i) => (i === idx ? { ...item, minOrderQty: val } : item))
-                            );
-                          }}
-                          className="w-full h-8 px-2 rounded-md text-xs font-mono bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                        />
-                      </div>
-
-                      <div className="w-20">
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Lead (d)</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="30"
-                          required
-                          value={sp.leadTimeDays}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setNewSuppliedProducts((prev) =>
-                              prev.map((item, i) => (i === idx ? { ...item, leadTimeDays: val } : item))
-                            );
-                          }}
-                          className="w-full h-8 px-2 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setNewSuppliedProducts((prev) => prev.filter((_, i) => i !== idx))}
-                        className="mt-4 p-1.5 rounded-md hover:bg-red-500/10 text-red-600 transition-colors"
-                        title="Remove product"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-3 pt-1">
-                      <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-[var(--text-secondary)]">
-                          <input
-                            type="checkbox"
-                            checked={sp.preferredSupplier}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setNewSuppliedProducts((prev) =>
-                                prev.map((item, i) => (i === idx ? { ...item, preferredSupplier: checked } : item))
-                              );
-                            }}
-                            className="rounded border-[var(--border-subtle)] text-[#1F6A37]"
-                          />
-                          <span>Preferred Supplier</span>
-                        </label>
-
-                        <div className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
-                          <span>Availability:</span>
-                          <select
-                            value={sp.availability}
-                            onChange={(e) => {
-                              const val = e.target.value as FormSuppliedItem['availability'];
-                              setNewSuppliedProducts((prev) =>
-                                prev.map((item, i) => (i === idx ? { ...item, availability: val } : item))
-                              );
-                            }}
-                            className="h-6 px-1.5 rounded text-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                          >
-                            <option value="Available">Available</option>
-                            <option value="Seasonal">Seasonal</option>
-                            <option value="Unavailable">Unavailable</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="flex-1 max-w-xs">
-                        <input
-                          type="text"
-                          placeholder="Notes e.g. Grade 1 washed only"
-                          value={sp.notes}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setNewSuppliedProducts((prev) =>
-                              prev.map((item, i) => (i === idx ? { ...item, notes: val } : item))
-                            );
-                          }}
-                          className="w-full h-7 px-2 rounded text-[11px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* SECTION C: Commercial Terms, Banking & Notes */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-2 pb-1 border-b border-[var(--border-subtle)]">
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
-                C
-              </span>
-              <h4 className="text-xs font-semibold text-[var(--text-primary)]">
-                Payment Details & Banking Remittance
-              </h4>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Settlement Details (M-Pesa Paybill / Till Number / Bank Account)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. M-Pesa Paybill 247247, Acc: 0110928371 or Equity Bank 0410..."
-                value={newPaymentNotes}
-                onChange={(e) => setNewPaymentNotes(e.target.value)}
-                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-              />
-            </div>
-          </div>
-
-          <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-800 dark:text-amber-300">
-            <strong>Governance Note:</strong> Newly created suppliers enter the system with <strong>Under Review</strong> status until authorized by a Procurement Officer or Operations Manager.
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
-            <button
-              type="button"
-              onClick={() => setCreateOpen(false)}
-              className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs"
-            >
-              Register & Route for Approval
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* 2. EDIT SUPPLIER MODAL (SECTIONS A, B, C) */}
-      {/* ========================================================================= */}
-      <Modal
-        open={editOpen}
-        onClose={() => setEditOpen(false)}
-        title={`Edit Supplier · ${activeSupplier?.name}`}
-        subtitle="Update contact credentials, contracted produce lines, lead times, and payment terms."
-      >
-        <form onSubmit={handleEditSubmit} className="space-y-6">
-          {/* SECTION A */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 pb-1 border-b border-[var(--border-subtle)]">
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
-                A
-              </span>
-              <h4 className="text-xs font-semibold text-[var(--text-primary)]">
-                Identity & Contact Credentials
-              </h4>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Cooperative / Vendor Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Produce Category
-                </label>
-                <input
-                  type="text"
-                  value={editCategory}
-                  onChange={(e) => setEditCategory(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Region / County
-                </label>
-                <input
-                  type="text"
-                  value={editRegion}
-                  onChange={(e) => setEditRegion(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Contact Person
-                </label>
-                <input
-                  type="text"
-                  value={editContact}
-                  onChange={(e) => setEditContact(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Phone
-                </label>
-                <input
-                  type="tel"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Lead Time (Days)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={editLeadTime}
-                  onChange={(e) => setEditLeadTime(Number(e.target.value))}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Payment Terms
-                </label>
-                <select
-                  value={editTerms}
-                  onChange={(e) => setEditTerms(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                >
-                  <option value="Net 7">Net 7</option>
-                  <option value="Net 14">Net 14</option>
-                  <option value="Net 30">Net 30</option>
-                  <option value="COD / M-Pesa">COD / M-Pesa</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION B: Products Supplied Repeatable Table */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between pb-1 border-b border-[var(--border-subtle)]">
-              <div className="flex items-center gap-2">
-                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
-                  B
-                </span>
-                <h4 className="text-xs font-semibold text-[var(--text-primary)]">
-                  Supplied Products & Contracted Costs ({editSuppliedProducts.length})
-                </h4>
-              </div>
-              <button
-                type="button"
-                onClick={handleAddProductToEditSupplier}
-                className="h-7 px-2.5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shadow-xs"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Product</span>
-              </button>
-            </div>
-
-            {editSuppliedProducts.length === 0 ? (
-              <div className="p-3 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
-                No products linked yet. Click &quot;Add Product&quot; to configure produce items.
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {editSuppliedProducts.map((sp, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2 text-xs"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex-1">
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Produce Product</label>
-                        <select
-                          value={sp.productId}
-                          onChange={(e) => {
-                            const found = products.find((p) => p.id === e.target.value);
-                            if (found) {
-                              setEditSuppliedProducts((prev) =>
-                                prev.map((item, i) =>
-                                  i === idx
-                                    ? {
-                                        ...item,
-                                        productId: found.id,
-                                        productName: found.name,
-                                        unit: found.unit,
-                                        currentCostKes: found.pricing?.supplierCostKes || item.currentCostKes,
-                                      }
-                                    : item
-                                )
-                              );
-                            }
-                          }}
-                          className="w-full h-8 px-2 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                        >
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} ({p.sku}) · {p.unit}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="w-28">
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Cost / Unit (KES)</label>
-                        <input
-                          type="number"
-                          min="1"
-                          required
-                          value={sp.currentCostKes}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setEditSuppliedProducts((prev) =>
-                              prev.map((item, i) => (i === idx ? { ...item, currentCostKes: val } : item))
-                            );
-                          }}
-                          className="w-full h-8 px-2 rounded-md text-xs font-mono font-semibold bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                        />
-                      </div>
-
-                      <div className="w-20">
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">MOQ</label>
-                        <input
-                          type="number"
-                          min="1"
-                          required
-                          value={sp.minOrderQty}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setEditSuppliedProducts((prev) =>
-                              prev.map((item, i) => (i === idx ? { ...item, minOrderQty: val } : item))
-                            );
-                          }}
-                          className="w-full h-8 px-2 rounded-md text-xs font-mono bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                        />
-                      </div>
-
-                      <div className="w-20">
-                        <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Lead (d)</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="30"
-                          required
-                          value={sp.leadTimeDays}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setEditSuppliedProducts((prev) =>
-                              prev.map((item, i) => (i === idx ? { ...item, leadTimeDays: val } : item))
-                            );
-                          }}
-                          className="w-full h-8 px-2 rounded-md text-xs bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setEditSuppliedProducts((prev) => prev.filter((_, i) => i !== idx))}
-                        className="mt-4 p-1.5 rounded-md hover:bg-red-500/10 text-red-600 transition-colors"
-                        title="Remove product"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-3 pt-1">
-                      <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-[var(--text-secondary)]">
-                          <input
-                            type="checkbox"
-                            checked={sp.preferredSupplier}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setEditSuppliedProducts((prev) =>
-                                prev.map((item, i) => (i === idx ? { ...item, preferredSupplier: checked } : item))
-                              );
-                            }}
-                            className="rounded border-[var(--border-subtle)] text-[#1F6A37]"
-                          />
-                          <span>Preferred Supplier</span>
-                        </label>
-
-                        <div className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
-                          <span>Availability:</span>
-                          <select
-                            value={sp.availability}
-                            onChange={(e) => {
-                              const val = e.target.value as FormSuppliedItem['availability'];
-                              setEditSuppliedProducts((prev) =>
-                                prev.map((item, i) => (i === idx ? { ...item, availability: val } : item))
-                              );
-                            }}
-                            className="h-6 px-1.5 rounded text-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                          >
-                            <option value="Available">Available</option>
-                            <option value="Seasonal">Seasonal</option>
-                            <option value="Unavailable">Unavailable</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="flex-1 max-w-xs">
-                        <input
-                          type="text"
-                          placeholder="Notes e.g. Contracted Grade 1"
-                          value={sp.notes}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setEditSuppliedProducts((prev) =>
-                              prev.map((item, i) => (i === idx ? { ...item, notes: val } : item))
-                            );
-                          }}
-                          className="w-full h-7 px-2 rounded text-[11px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* SECTION C: Commercial Terms, Banking & Notes */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-2 pb-1 border-b border-[var(--border-subtle)]">
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1F6A37] text-white text-[10px] font-bold">
-                C
-              </span>
-              <h4 className="text-xs font-semibold text-[var(--text-primary)]">
-                Payment Details & Banking Remittance
-              </h4>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Settlement Details (M-Pesa Paybill / Till Number / Bank Account)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. M-Pesa Paybill 247247, Acc: 0110928371"
-                value={editPaymentNotes}
-                onChange={(e) => setEditPaymentNotes(e.target.value)}
-                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
-            <button
-              type="button"
-              onClick={() => setEditOpen(false)}
-              className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs"
-            >
-              Save Profile Changes
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* 6-TAB SUPPLIER PROFILE MODAL */}
-      {/* ========================================================================= */}
-      <Modal
-        open={Boolean(profileSupplier)}
-        onClose={() => setProfileSupplierId(null)}
-        title={profileSupplier ? `${profileSupplier.name} (${profileSupplier.code})` : ''}
-        subtitle={profileSupplier ? `${profileSupplier.region} · ${profileSupplier.category} · Contact: ${profileSupplier.contactPerson} (${profileSupplier.phone})` : ''}
-      >
-        {profileSupplier && (
-          <div className="space-y-4">
+      {profileSupplierId && (
+        <section aria-label="Supplier profile" className="space-y-4">
+          <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-semibold text-[var(--brand-accent)] hover:underline" href="/suppliers">
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Supplier directory
+          </Link>
+          {profileSupplier ? (
+            <>
+            <PageHeader
+              title={profileSupplier.name}
+              description={`${profileSupplier.code} · ${profileSupplier.region} · ${profileSupplier.category}`}
+              actions={canEdit && <button type="button" className={actionClass} onClick={() => setSupplierForm('edit')}><Edit2 aria-hidden="true" className="h-4 w-4" /> Edit supplier</button>}
+            />
+            <FeedbackBanner message={feedback?.msg || null} type={feedback?.type} onDismiss={() => setFeedback(null)} />
             {/* 6 Tab Buttons */}
-            <div className="flex items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2 overflow-x-auto">
-              {[
+            <nav aria-label="Supplier profile sections" className="flex flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+              {([
                 { id: 'overview', label: 'Overview' },
-                { id: 'products', label: `Products (${profileSupplier.suppliedProducts?.length || 0})` },
-                {
-                  id: 'procurement',
-                  label: `PO History (${procurementOrders.filter((po) => po.supplierId === profileSupplier.id).length})`,
-                },
-                {
-                  id: 'payables',
-                  label: `Payables (${supplierPayables.filter((sp) => sp.supplierId === profileSupplier.id).length})`,
-                },
-                {
-                  id: 'contracts',
-                  label: `Contracts & Docs (${(profileSupplier.contracts?.length || 0) + (profileSupplier.documents?.length || 0)})`,
-                },
-                { id: 'performance', label: `Audit (${profileSupplier.qualityScorePct}%)` },
-              ].map((t) => (
+                { id: 'products', label: 'Products' },
+                { id: 'procurement', label: 'Purchases' },
+                { id: 'payables', label: 'Account' },
+                { id: 'contracts', label: 'Contracts & documents' },
+                { id: 'performance', label: 'Performance' },
+              ] as const).map((t) => (
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => setProfileTab(t.id as any)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                    profileTab === t.id
-                      ? 'bg-[#1F6A37] text-white shadow-xs'
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-canvas)]'
-                  }`}
+                  aria-pressed={profileTab === t.id}
+                  onClick={() => setProfileSelection({ supplierId: profileSupplier.id, tab: t.id })}
+                  className={`${actionClass} ${profileTab === t.id ? 'bg-[var(--bg-subtle)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'}`}
                 >
                   {t.label}
                 </button>
               ))}
-            </div>
+            </nav>
 
-            {/* TAB 1: OVERVIEW */}
             {profileTab === 'overview' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
-                    <span className="text-[10px] text-[var(--text-secondary)]">Governance Status</span>
-                    <div className="mt-1">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                          profileSupplier.status === 'Active'
-                            ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300'
-                            : profileSupplier.status === 'Under Review'
-                            ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'
-                            : 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400'
-                        }`}
-                      >
-                        {profileSupplier.status}
-                      </span>
-                    </div>
-                  </div>
+                <dl className="grid gap-3 sm:grid-cols-3">
+                  <Card>
+                    <dt className="text-sm text-[var(--text-secondary)]">Outstanding balance</dt>
+                    <dd className="mt-1 font-mono-tabular text-2xl font-semibold">{currency.format(profileBalance)}</dd>
+                  </Card>
+                  <Card>
+                    <dt className="text-sm text-[var(--text-secondary)]">Products supplied</dt>
+                    <dd className="mt-1 font-mono-tabular text-2xl font-semibold">{profileSupplier.suppliedProducts.length}</dd>
+                  </Card>
+                  <Card>
+                    <dt className="text-sm text-[var(--text-secondary)]">Status</dt>
+                    <dd className="mt-2"><StatusBadge status={profileSupplier.isArchived ? 'Archived' : profileSupplier.status} /></dd>
+                    {!profileSupplier.isArchived && profileSupplier.status === 'Suspended' && profileSupplier.suspendedReason && (
+                      <dd className="mt-2 text-sm text-[var(--text-secondary)]">{profileSupplier.suspendedReason}</dd>
+                    )}
+                    {!profileSupplier.isArchived && profileSupplier.status === 'Under Review' && (
+                      <dd className="mt-2 text-sm text-[var(--text-secondary)]">Approval required before purchasing.</dd>
+                    )}
+                  </Card>
+                </dl>
 
-                  <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
-                    <span className="text-[10px] text-[var(--text-secondary)]">AP Obligation</span>
-                    <div className="font-mono font-bold text-sm text-[var(--text-primary)] mt-1">
-                      KES {profileSupplier.payableBalanceKes.toLocaleString()}
-                    </div>
-                  </div>
+                <Card className="space-y-4">
+                  <h2 className="font-heading text-lg font-semibold">Contact and commercial terms</h2>
+                  <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                    <div><dt className="text-[var(--text-secondary)]">Contact person</dt><dd className="mt-1 font-medium">{profileSupplier.contactPerson}</dd></div>
+                    <div><dt className="text-[var(--text-secondary)]">Phone</dt><dd className="mt-1 font-medium">{profileSupplier.phone}</dd></div>
+                    <div><dt className="text-[var(--text-secondary)]">Email</dt><dd className="mt-1 break-all font-medium">{profileSupplier.email || 'No email on file'}</dd></div>
+                    <div><dt className="text-[var(--text-secondary)]">Payment terms</dt><dd className="mt-1 font-medium">{profileSupplier.paymentTerms}</dd></div>
+                    <div><dt className="text-[var(--text-secondary)]">Default lead time</dt><dd className="mt-1 font-medium">{profileSupplier.leadTimeDays} days</dd></div>
+                    <div><dt className="text-[var(--text-secondary)]">Settlement instructions</dt><dd className="mt-1 wrap-break-word font-medium">{profileSupplier.paymentDetails || 'No instructions on file'}</dd></div>
+                  </dl>
+                </Card>
 
-                  <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
-                    <span className="text-[10px] text-[var(--text-secondary)]">Quality Pass Score</span>
-                    <div className="font-mono font-bold text-sm text-[#1F6A37] dark:text-[#4EB462] mt-1">
-                      {profileSupplier.qualityScorePct}%
+                {(canArchive || (!profileSupplier.isArchived && (canApprove || canSuspend))) && (
+                  <Card className="space-y-3">
+                    <h2 className="font-heading text-lg font-semibold">Supplier status</h2>
+                    <div className="flex flex-wrap gap-2">
+                      {profileSupplier.isArchived ? (
+                        canArchive && <button className={actionClass} type="button" onClick={() => handleRestoreSupplier(profileSupplier)}>Restore supplier</button>
+                      ) : (
+                        <>
+                          {canApprove && profileSupplier.status === 'Under Review' && <button className={actionClass} type="button" onClick={() => handleOpenApprove(profileSupplier)}>Approve supplier</button>}
+                          {canSuspend && profileSupplier.status === 'Suspended' && <button className={actionClass} type="button" onClick={() => handleReactivate(profileSupplier)}>Reactivate supplier</button>}
+                          {canSuspend && profileSupplier.status !== 'Suspended' && <button className={actionClass} type="button" onClick={() => handleOpenSuspend(profileSupplier)}>Suspend supplier</button>}
+                          {canArchive && <button className={actionClass} type="button" onClick={() => handleArchiveSupplier(profileSupplier)}>Archive supplier</button>}
+                        </>
+                      )}
+                      {canEdit && <button className={`${actionClass} text-red-700 dark:text-red-300`} type="button" onClick={() => handleDeleteSupplier(profileSupplier)}>Delete supplier</button>}
                     </div>
-                  </div>
-
-                  <div className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
-                    <span className="text-[10px] text-[var(--text-secondary)]">Lead Time & Terms</span>
-                    <div className="font-semibold text-xs text-[var(--text-primary)] mt-1">
-                      {profileSupplier.leadTimeDays}d · {profileSupplier.paymentTerms}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2 text-xs">
-                  <h5 className="font-semibold text-[var(--text-primary)]">Contact & Settlement Profile</h5>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[var(--text-secondary)]">
-                    <div>
-                      Contact Person: <strong className="text-[var(--text-primary)]">{profileSupplier.contactPerson}</strong>
-                    </div>
-                    <div>
-                      Phone: <strong className="text-[var(--text-primary)]">{profileSupplier.phone}</strong>
-                    </div>
-                    <div>
-                      Email: <strong className="text-[var(--text-primary)]">{profileSupplier.email || 'None on record'}</strong>
-                    </div>
-                    <div>
-                      Region / County: <strong className="text-[var(--text-primary)]">{profileSupplier.region}</strong>
-                    </div>
-                    <div>
-                      Payment Terms: <strong className="text-[var(--text-primary)]">{profileSupplier.paymentTerms}</strong>
-                    </div>
-                    <div>
-                      Banking / Remittance: <strong className="text-[var(--text-primary)]">{profileSupplier.paymentDetails || 'Default M-Pesa / EFT'}</strong>
-                    </div>
-                  </div>
-                </div>
+                  </Card>
+                )}
               </div>
             )}
 
-            {/* TAB 2: PRODUCTS SUPPLIED */}
             {profileTab === 'products' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[var(--text-primary)]">
-                    Configured Produce Lines ({profileSupplier.suppliedProducts?.length || 0})
-                  </span>
-                  {canEdit && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProfileSupplierId(null);
-                        handleOpenEdit(profileSupplier);
-                      }}
-                      className="text-xs text-[#1F6A37] dark:text-[#4EB462] font-semibold hover:underline cursor-pointer"
-                    >
-                      + Manage Products & Pricing
-                    </button>
-                  )}
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="font-heading text-lg font-semibold">Products and supplier quotes</h2>
+                  {canEdit && <button className={actionClass} type="button" onClick={() => setSupplierForm('edit')}>Manage offerings</button>}
                 </div>
-
-                <div className="border border-[var(--border-subtle)] rounded-md overflow-hidden">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
-                      <tr>
-                        <th className="py-2 px-3">Product</th>
-                        <th className="py-2 px-3 text-right">Quoted Cost</th>
-                        <th className="py-2 px-3 text-right">Prior Cost</th>
-                        <th className="py-2 px-3 text-center">MOQ</th>
-                        <th className="py-2 px-3 text-center">Lead (d)</th>
-                        <th className="py-2 px-3 text-center">Status</th>
-                        <th className="py-2 px-3 text-center">Tier</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border-subtle)]">
-                      {(profileSupplier.suppliedProducts || []).map((sp) => (
-                        <tr key={sp.productId} className="hover:bg-[var(--bg-canvas)]/50">
-                          <td className="py-2.5 px-3">
-                            <div className="font-medium text-[var(--text-primary)]">{sp.productName}</div>
-                            <div className="text-[10px] text-[var(--text-secondary)]">Updated {sp.lastUpdated}</div>
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono font-semibold text-[var(--text-primary)]">
-                            KES {sp.currentCostKes.toLocaleString()} / {sp.unit}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono text-[var(--text-secondary)]">
-                            KES {sp.previousCostKes.toLocaleString()}
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-mono">{sp.minOrderQty ?? sp.moq ?? 1}</td>
-                          <td className="py-2.5 px-3 text-center">{sp.leadTimeDays ?? profileSupplier.leadTimeDays}d</td>
-                          <td className="py-2.5 px-3 text-center">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                              {sp.availability || 'Available'}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            {sp.preferredSupplier ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300">
-                                Preferred
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-[var(--text-secondary)]">Standard</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {!profileSupplier.suppliedProducts.length && <p className="text-sm text-[var(--text-secondary)]">This supplier has no linked products.</p>}
+                <ul className="grid gap-4 lg:grid-cols-2">
+                  {profileSupplier.suppliedProducts.map((offering) => (
+                    <li key={offering.id ?? offering.productId}>
+                      <Card className="space-y-2">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <h3 className="font-semibold">{offering.productName}</h3>
+                          <span className="text-sm text-[var(--text-secondary)]">{offering.availability ?? 'Available'}{offering.preferredSupplier && ' · Preferred'}</span>
+                        </div>
+                        <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+                          <div><dt className="text-[var(--text-secondary)]">Supplier quote</dt><dd className="mt-1 font-semibold">{currency.format(offering.currentCostKes)} / {offering.unit}</dd></div>
+                          <div><dt className="text-[var(--text-secondary)]">Minimum order</dt><dd className="mt-1 font-medium">{offering.minOrderQty ?? offering.moq ?? 1} {offering.unit}</dd></div>
+                          <div><dt className="text-[var(--text-secondary)]">Lead time</dt><dd className="mt-1 font-medium">{offering.leadTimeDays ?? profileSupplier.leadTimeDays} days</dd></div>
+                        </dl>
+                        {offering.notes && <p className="text-sm text-[var(--text-secondary)]">{offering.notes}</p>}
+                        <SupplierQuoteHistory offering={offering} />
+                      </Card>
+                    </li>
+                  ))}
+                </ul>
+                {Boolean(profileSupplier.retiredSuppliedProducts?.length) && (
+                  <div className="space-y-3">
+                    <h3 className="font-heading font-semibold">Previous offerings</h3>
+                    {(profileSupplier.retiredSuppliedProducts ?? []).map((offering) => (
+                      <Card key={offering.id ?? offering.productId}>
+                        <p className="text-sm font-medium">{offering.productName}</p>
+                        <SupplierQuoteHistory offering={offering} />
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2206,7 +782,7 @@ export default function SuppliersPage() {
                     Payables & Commercial Settlement Ledger
                   </span>
                   <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400">
-                    Outstanding: KES {profileSupplier.payableBalanceKes.toLocaleString()}
+                    Outstanding {currency.format(profileBalance)}
                   </span>
                 </div>
 
@@ -2274,11 +850,12 @@ export default function SuppliersPage() {
 
             {/* TAB 5: CONTRACTS & DOCUMENTS */}
             {profileTab === 'contracts' && (
-              <div className="space-y-4 text-xs">
+              <div className="space-y-4 text-sm">
                 <div>
-                  <h5 className="font-semibold text-[var(--text-primary)] mb-2">
-                    Master Supply Agreements ({profileSupplier.contracts?.length || 0})
-                  </h5>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="font-heading text-lg font-semibold">Supply agreements</h2>
+                    {canManageContracts && <button className={actionClass} type="button" onClick={() => handleOpenContracts(profileSupplier)}>Manage contracts</button>}
+                  </div>
                   {(profileSupplier.contracts || []).length === 0 ? (
                     <div className="p-3 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-[var(--text-secondary)]">
                       No formal supply contracts uploaded.
@@ -2302,9 +879,10 @@ export default function SuppliersPage() {
                 </div>
 
                 <div>
-                  <h5 className="font-semibold text-[var(--text-primary)] mb-2">
-                    Compliance & Standardization Documents ({profileSupplier.documents?.length || 0})
-                  </h5>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="font-heading text-lg font-semibold">Compliance documents</h2>
+                    {canManageDocuments && <button className={actionClass} type="button" onClick={() => handleOpenDocuments(profileSupplier)}>Manage documents</button>}
+                  </div>
                   {(profileSupplier.documents || []).length === 0 ? (
                     <div className="p-3 text-center rounded-md border border-dashed border-[var(--border-subtle)] text-[var(--text-secondary)]">
                       No compliance documents on record.
@@ -2330,7 +908,11 @@ export default function SuppliersPage() {
 
             {/* TAB 6: PERFORMANCE */}
             {profileTab === 'performance' && (
-              <div className="space-y-4 text-xs">
+              <div className="space-y-4 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="font-heading text-lg font-semibold">Supplier performance</h2>
+                  {canEvaluate && <button className={actionClass} type="button" onClick={() => handleOpenEvaluation(profileSupplier)}>Record evaluation</button>}
+                </div>
                 <div className="grid grid-cols-3 gap-3 p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-center">
                   <div>
                     <span className="text-[10px] text-[var(--text-secondary)]">Quality Compliance</span>
@@ -2341,13 +923,13 @@ export default function SuppliersPage() {
                   <div>
                     <span className="text-[10px] text-[var(--text-secondary)]">On-Time Farm Dispatch</span>
                     <div className="font-mono font-bold text-base text-[var(--text-primary)] mt-0.5">
-                      96%
+                      {latestTimeliness === undefined ? '—' : `${latestTimeliness}%`}
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-[var(--text-secondary)]">Commercial Tier</span>
                     <div className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">
-                      Grade A Verified
+                      {latestEvaluation?.packagingGrade ?? latestEvaluation?.grade ?? '—'}
                     </div>
                   </div>
                 </div>
@@ -2376,18 +958,10 @@ export default function SuppliersPage() {
               </div>
             )}
 
-            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setProfileSupplierId(null)}
-                className="h-8 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-semibold cursor-pointer hover:bg-[var(--bg-canvas)]"
-              >
-                Close Profile
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
+            </>
+          ) : <EmptyState title="Supplier not found" description="Open the directory to find another supplier." />}
+        </section>
+      )}
 
       {/* ========================================================================= */}
       {/* 3. APPROVE SUPPLIER MODAL */}
@@ -2694,206 +1268,6 @@ export default function SuppliersPage() {
               className="h-8 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
               Close
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* 6. MANAGE PRICE LIST MODAL */}
-      {/* ========================================================================= */}
-      <Modal
-        open={priceListOpen}
-        onClose={() => setPriceListOpen(false)}
-        title={`Manage Farmgate Price Schedule · ${activeSupplier?.name}`}
-        subtitle="Add product SKUs, adjust farmgate buying costs with audit reasons, and track trend changes."
-      >
-        <div className="space-y-5">
-          {/* Current SKUs Table */}
-          <div>
-            <div className="text-xs font-semibold text-[var(--text-primary)] mb-2">
-              Contracted Product Price List
-            </div>
-
-            <div className="border border-[var(--border-subtle)] rounded-xl overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[var(--bg-canvas)] text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
-                  <tr>
-                    <th className="py-2.5 px-3">Product Name</th>
-                    <th className="py-2.5 px-3 text-right">Current Cost</th>
-                    <th className="py-2.5 px-3 text-right">Prior Cost</th>
-                    <th className="py-2.5 px-3">Last Updated</th>
-                    <th className="py-2.5 px-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border-subtle)]">
-                  {activeSupplier?.suppliedProducts.map((sp) => {
-                    const isEditing = editingPriceProductId === sp.productId;
-                    const diff = sp.currentCostKes - sp.previousCostKes;
-
-                    return (
-                      <tr key={sp.productId} className="hover:bg-[var(--bg-canvas)]/50">
-                        <td className="py-2.5 px-3">
-                          <div className="font-semibold text-[var(--text-primary)]">{sp.productName}</div>
-                          <div className="text-[10px] text-[var(--text-secondary)]">Unit: {sp.unit}</div>
-                          {isEditing && (
-                            <div className="mt-1">
-                              <input
-                                type="text"
-                                placeholder="Revision reason / notes..."
-                                value={editPriceReason}
-                                onChange={(e) => setEditPriceReason(e.target.value)}
-                                className="w-full h-6 px-1.5 rounded border border-[var(--border-subtle)] text-[10px] bg-[var(--bg-card)]"
-                              />
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono-tabular font-bold text-[var(--text-primary)]">
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              value={editPriceCost}
-                              onChange={(e) => setEditPriceCost(Number(e.target.value))}
-                              className="w-20 h-7 px-1 text-right rounded border border-[#1F6A37] text-xs"
-                            />
-                          ) : (
-                            `KES ${sp.currentCostKes.toLocaleString()}`
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono-tabular text-[var(--text-secondary)] text-[11px]">
-                          KES {sp.previousCostKes.toLocaleString()}
-                          {diff !== 0 && (
-                            <span
-                              className={`ml-1 text-[10px] ${
-                                diff > 0 ? 'text-red-600 dark:text-red-400' : 'text-[#1F6A37] dark:text-[#4EB462]'
-                              }`}
-                            >
-                              ({diff > 0 ? `+${diff}` : diff})
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-[11px] text-[var(--text-secondary)] font-mono-tabular">
-                          {sp.lastUpdated}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          {isEditing ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleSavePriceEdit(sp.productId)}
-                                className="h-6 px-2 rounded-full bg-[#1F6A37] text-white text-[10px] font-semibold cursor-pointer"
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingPriceProductId(null)}
-                                className="h-6 px-2 rounded-full border border-[var(--border-subtle)] text-[10px] cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-end gap-1">
-                              {canEdit && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingPriceProductId(sp.productId);
-                                    setEditPriceCost(sp.currentCostKes);
-                                  }}
-                                  className="h-6 px-2 rounded-full bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[10px] font-medium cursor-pointer"
-                                >
-                                  Revise
-                                </button>
-                              )}
-                              {canEdit && (
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    await removeSupplierPriceItem(activeSupplier.id, sp.productId);
-                                    const sup = suppliers.find((s) => s.id === activeSupplier.id);
-                                    if (sup) setActiveSupplier(sup);
-                                  }}
-                                  className="h-6 w-6 rounded-full hover:bg-red-500/10 text-red-600 inline-flex items-center justify-center cursor-pointer"
-                                  title="Remove from vendor catalog"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Form to Add New SKU to Price List */}
-          {canEdit && (
-            <form onSubmit={handleAddPriceItem} className="pt-3 border-t border-[var(--border-subtle)] space-y-3">
-              <div className="text-xs font-semibold text-[var(--text-primary)]">
-                Add Produce SKU to Vendor Catalog
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
-                    Select System Product *
-                  </label>
-                  <select
-                    value={selectedProductId}
-                    onChange={(e) => {
-                      setSelectedProductId(e.target.value);
-                      const p = products.find((pr) => pr.id === e.target.value);
-                      if (p) setNewPriceCost(p.pricing.supplierCostKes);
-                    }}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] cursor-pointer"
-                  >
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.category}) · Base Cost: KES {p.pricing.supplierCostKes}/{p.unit}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
-                    Agreed Cost (KES) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={newPriceCost}
-                    onChange={(e) => setNewPriceCost(Number(e.target.value))}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  className="h-8 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add SKU to Schedule</span>
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="flex justify-end pt-2 border-t border-[var(--border-subtle)]">
-            <button
-              type="button"
-              onClick={() => setPriceListOpen(false)}
-              className="h-8 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
-            >
-              Done
             </button>
           </div>
         </div>
@@ -3207,9 +1581,11 @@ export default function SuppliersPage() {
       {/* ========================================================================= */}
       <Modal
         open={Boolean(paymentPayable)}
-        onClose={() => setPaymentPayable(null)}
-        title={`Record Supplier Payment · ${paymentPayable?.supplierName}`}
-        subtitle={`Disburse payment against payable obligation ${paymentPayable?.id} (PO: ${paymentPayable?.poNumber}).`}
+        onClose={() => { if (!isSubmittingPayment) setPaymentPayable(null); }}
+        title="Record supplier payment"
+        subtitle={paymentPayable ? `${paymentPayable.supplierName} · ${paymentPayable.poNumber}` : undefined}
+        allowEscapeClose={!isSubmittingPayment}
+        allowBackdropClose={!isSubmittingPayment}
       >
         {paymentPayable && (
           <form onSubmit={handleRecordPaymentSubmit} className="space-y-4">
@@ -3228,81 +1604,78 @@ export default function SuppliersPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Disbursement Amount (KES) *
-              </label>
+            <label className="block text-sm font-medium">
+              Amount (KES)
               <input
                 type="number"
                 required
-                min={1}
+                min="0.01"
+                step="0.01"
                 max={paymentPayable.balanceKes}
+                inputMode="decimal"
                 value={payAmount}
-                onChange={(e) => setPayAmount(Number(e.target.value))}
-                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-mono font-semibold text-[var(--text-primary)]"
+                onChange={(e) => setPayAmount(e.target.value)}
+                className={`${fieldClass} font-mono`}
               />
-            </div>
+            </label>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Payment Method *
-                </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm font-medium">
+              <label>
+                Payment method
                 <select
                   value={payMethod}
                   onChange={(e) => setPayMethod(e.target.value as SupplierPaymentRecord['paymentMethod'])}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className={fieldClass}
                 >
                   <option value="M-Pesa Paybill">M-Pesa Paybill</option>
                   <option value="EFT / Bank Transfer">EFT / Bank Transfer</option>
                   <option value="Cheque">Cheque</option>
                   <option value="Cash">Cash</option>
                 </select>
-              </div>
+              </label>
 
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Transaction Code / Ref *
-                </label>
+              <label>
+                Transaction reference
                 <input
                   type="text"
                   required
                   placeholder="e.g. QK9182XZ71"
                   value={payRef}
                   onChange={(e) => setPayRef(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-mono uppercase"
+                  className={`${fieldClass} font-mono`}
                 />
-              </div>
+              </label>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Settlement Notes & Remittance Advice
-              </label>
+            <label className="block text-sm font-medium">
+              Settlement notes <span className="text-[var(--text-secondary)]">(optional)</span>
               <input
                 type="text"
                 value={payNotes}
                 onChange={(e) => setPayNotes(e.target.value)}
                 placeholder="e.g. Cleared via NCBA Business Banking"
-                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                className={fieldClass}
               />
-            </div>
+            </label>
+
+            {paymentError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{paymentError}</p>}
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
               <button
                 type="button"
                 onClick={() => setPaymentPayable(null)}
-                className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+                className={actionClass}
+                disabled={isSubmittingPayment}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmittingPayment}
-                className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--brand-accent)] px-4 text-sm font-semibold text-white disabled:opacity-60 not-disabled:cursor-pointer dark:text-[var(--bg-canvas)]"
               >
-                <DollarSign className="w-4 h-4" />
-                <span>{isSubmittingPayment ? 'Processing...' : 'Confirm Disbursement'}</span>
+                <DollarSign aria-hidden="true" className="h-4 w-4" />
+                <span>{isSubmittingPayment ? 'Recording…' : 'Record payment'}</span>
               </button>
             </div>
           </form>
@@ -3310,101 +1683,6 @@ export default function SuppliersPage() {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* 10. CONFIGURE SOURCING PRODUCT MODAL */}
-      {/* ========================================================================= */}
-      <Modal
-        open={Boolean(sourcingSupplier)}
-        onClose={() => setSourcingSupplier(null)}
-        title={`Configure Sourced Product · ${sourcingSupplier?.name}`}
-        subtitle={`Link products and farmgate procurement costs for ${sourcingSupplier?.code}.`}
-      >
-        {sourcingSupplier && (
-          <form onSubmit={handleSaveSourcingProduct} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Select Product from Catalog *
-              </label>
-              <select
-                value={sourceProductId}
-                onChange={(e) => {
-                  setSourceProductId(e.target.value);
-                  const p = products.find((prod) => prod.id === e.target.value);
-                  if (p) setSourceCostKes(p.pricing.supplierCostKes);
-                }}
-                className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-              >
-                {products.filter((p) => p.status !== 'Archived').map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.sku}) · Unit: {p.unit}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Quoted Farmgate Cost (KES) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min={1}
-                  value={sourceCostKes}
-                  onChange={(e) => setSourceCostKes(Number(e.target.value))}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-mono font-semibold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Lead Time (Days) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min={1}
-                  max={30}
-                  value={sourceLeadDays}
-                  onChange={(e) => setSourceLeadDays(Number(e.target.value))}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Min Order Qty (MOQ) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min={1}
-                  value={sourceMoq}
-                  onChange={(e) => setSourceMoq(Number(e.target.value))}
-                  className="w-full h-9 px-3 rounded-md text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
-              <button
-                type="button"
-                onClick={() => setSourcingSupplier(null)}
-                className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5"
-              >
-                <Truck className="w-4 h-4" />
-                <span>Save Sourced Product</span>
-              </button>
-            </div>
-          </form>
-        )}
-      </Modal>
     </div>
   );
 }

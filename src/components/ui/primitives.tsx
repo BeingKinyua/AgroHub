@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   AlertCircle,
   AlertTriangle,
@@ -128,7 +128,7 @@ export function KPI({
 }: {
   label: string;
   value: string;
-  sublabel: string;
+  sublabel?: string;
   delta?: string;
   tone?: 'positive' | 'warning' | 'danger' | 'neutral';
 }) {
@@ -156,9 +156,7 @@ export function KPI({
       <div className="font-heading text-2xl sm:text-[26px] font-semibold tracking-tight text-[var(--text-primary)] tabular-nums mt-2">
         {value}
       </div>
-      <div className="text-xs text-[var(--text-secondary)] mt-1.5 flex items-center gap-1.5">
-        <span>{sublabel}</span>
-      </div>
+      {sublabel && <div className="mt-1.5 text-xs text-[var(--text-secondary)]">{sublabel}</div>}
     </Card>
   );
 }
@@ -1016,52 +1014,36 @@ export function ConfirmDiscardDialog({
   onKeepEditing: () => void;
   onDiscard: () => void;
 }) {
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[calc(var(--z-modal)+20)] flex items-center justify-center p-4 bg-[#08190C]/80 backdrop-blur-xs"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onKeepEditing();
-      }}
+    <Modal
+      open={open}
+      onClose={onKeepEditing}
+      title="Discard unsaved changes?"
+      subtitle="Any changes to this form will be lost."
+      size="sm"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-[18px] bg-[var(--bg-card)] border border-amber-500/30 p-5 shadow-[var(--shadow-lg)] space-y-4"
-      >
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
-              Discard unsaved changes?
-            </h3>
-            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
-              Your changes haven't been saved. Any entered data will be lost if you leave this form now.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onKeepEditing}
-            className="px-3.5 py-2 rounded-[10px] border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] transition-colors cursor-pointer"
-          >
-            Keep Editing
-          </button>
-          <button
-            type="button"
-            onClick={onDiscard}
-            className="px-3.5 py-2 rounded-[10px] bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors cursor-pointer"
-          >
-            Discard Changes
-          </button>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onKeepEditing}
+          className="min-h-11 rounded-lg border border-[var(--border-subtle)] px-3.5 text-sm font-medium hover:bg-[var(--bg-subtle)]"
+        >
+          Keep editing
+        </button>
+        <button
+          type="button"
+          onClick={onDiscard}
+          className="min-h-11 rounded-lg bg-red-700 px-3.5 text-sm font-semibold text-white hover:bg-red-800"
+        >
+          Discard changes
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
+
+let openModalCount = 0;
+let savedBodyOverflow = '';
 
 export function Modal({
   open,
@@ -1089,6 +1071,12 @@ export function Modal({
   onConfirmDiscard?: () => void;
 }) {
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const startedOnBackdrop = useRef(false);
+  const titleId = useId();
+  const descriptionId = useId();
+  const reduceMotion = useReducedMotion();
 
   const handleAttemptClose = () => {
     if (hasUnsavedChanges) {
@@ -1102,29 +1090,43 @@ export function Modal({
     }
   };
 
-  useEffect(() => {
-    if (!open) return;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showDiscardConfirm) {
-          setShowDiscardConfirm(false);
-          return;
-        }
-        if (allowEscapeClose) {
-          handleAttemptClose();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    if (!open || !dialog) return;
+    const opener = document.activeElement;
+    dialog.showModal();
+    dialog.querySelector<HTMLElement>('[data-modal-autofocus]')?.focus({ preventScroll: true });
+    if (openModalCount++ === 0) {
+      savedBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
     return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener('keydown', handleKeyDown);
+      dialog.close();
+      if (--openModalCount === 0) document.body.style.overflow = savedBodyOverflow;
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
     };
-  }, [open, allowEscapeClose, hasUnsavedChanges, showDiscardConfirm]);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) setShowDiscardConfirm(false);
+  }, [open]);
+
+  const wrapKeyboardFocus = (event: React.KeyboardEvent<HTMLDialogElement>) => {
+    if (event.key !== 'Tab' || !panelRef.current?.contains(event.target as Node)) return;
+    const controls = [...panelRef.current.querySelectorAll<HTMLElement>(
+      'a[href], button, input, select, textarea, summary, [contenteditable="true"], [tabindex]',
+    )].filter((element) => element.tabIndex >= 0 && !element.matches(':disabled') &&
+      element.getClientRects().length > 0 && getComputedStyle(element).visibility === 'visible');
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first && last) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last && first) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const sizeClasses = {
     sm: 'max-w-md',
@@ -1136,35 +1138,41 @@ export function Modal({
     full: 'max-w-[96vw] xl:max-w-7xl',
   };
 
+  if (!open) return null;
+
   return (
-    <AnimatePresence>
-      {open && (
-        <div
-          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-3 sm:p-5 bg-[#08190C]/75 backdrop-blur-xs overflow-y-auto"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && allowBackdropClose) {
-              handleAttemptClose();
-            }
+        <dialog
+          ref={dialogRef}
+          className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none border-0 bg-transparent p-3 text-[var(--text-primary)] backdrop:bg-[#08190C]/75 backdrop:backdrop-blur-xs open:flex open:items-center open:justify-center sm:p-5"
+          aria-labelledby={titleId}
+          aria-describedby={subtitle ? descriptionId : undefined}
+          onCancel={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (allowEscapeClose) handleAttemptClose();
+          }}
+          onKeyDown={wrapKeyboardFocus}
+          onPointerDown={(event) => { startedOnBackdrop.current = event.target === event.currentTarget; }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget && startedOnBackdrop.current && allowBackdropClose) handleAttemptClose();
+            startedOnBackdrop.current = false;
           }}
         >
           <motion.div
-            {...DROPDOWN_MOTION}
-            onClick={(e) => e.stopPropagation()}
-            className={`w-full ${sizeClasses[size] || 'max-w-xl'} rounded-[20px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6 shadow-[var(--shadow-lg)] max-h-[92vh] flex flex-col my-auto`}
+            ref={panelRef}
+            {...(reduceMotion ? {} : DROPDOWN_MOTION)}
+            className={`flex max-h-full w-full flex-col rounded-[20px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 shadow-[var(--shadow-lg)] sm:p-6 ${sizeClasses[size]}`}
           >
             <div className="flex items-start justify-between gap-4 pb-4 border-b border-[var(--border-subtle)] mb-4 shrink-0">
               <div>
                 <h2
-                  id="modal-title"
+                  id={titleId}
                   className="font-heading text-lg font-semibold text-[var(--text-primary)]"
                 >
                   {title}
                 </h2>
                 {subtitle && (
-                  <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-relaxed">
+                  <p id={descriptionId} className="mt-0.5 text-sm leading-relaxed text-[var(--text-secondary)]">
                     {subtitle}
                   </p>
                 )}
@@ -1172,29 +1180,29 @@ export function Modal({
               <button
                 type="button"
                 onClick={handleAttemptClose}
-                aria-label="Close modal"
-                className="p-1.5 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors cursor-pointer shrink-0"
+                aria-label="Close dialog"
+                className="grid size-11 shrink-0 place-items-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1">
               {children}
             </div>
           </motion.div>
 
-          <ConfirmDiscardDialog
-            open={showDiscardConfirm}
-            onKeepEditing={() => setShowDiscardConfirm(false)}
-            onDiscard={() => {
-              setShowDiscardConfirm(false);
-              if (onConfirmDiscard) onConfirmDiscard();
-              onClose();
-            }}
-          />
-        </div>
-      )}
-    </AnimatePresence>
+          {showDiscardConfirm && (
+            <ConfirmDiscardDialog
+              open
+              onKeepEditing={() => setShowDiscardConfirm(false)}
+              onDiscard={() => {
+                setShowDiscardConfirm(false);
+                if (onConfirmDiscard) onConfirmDiscard();
+                onClose();
+              }}
+            />
+          )}
+        </dialog>
   );
 }
 

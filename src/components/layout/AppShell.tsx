@@ -1,20 +1,18 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   Activity,
   BarChart3,
   Bell,
   Boxes,
-  Building2,
   Car,
   CheckCheck,
   CheckCircle2,
   CheckSquare,
-  CreditCard,
   FileSpreadsheet,
   FileText,
   FolderKanban,
@@ -30,7 +28,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  Receipt,
   Search,
   Settings,
   Shield,
@@ -46,12 +43,14 @@ import {
   X,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
+import { canAccessDeliveryRun } from '@/lib/services/delivery-workflow';
 import { PermissionKey } from '@/types/domain/bos';
 import { ROUTE_REQUIRED_PERMISSION } from '@/lib/permissions/rbac';
 import {
   Avatar,
   Breadcrumbs,
   DROPDOWN_MOTION,
+  Modal,
   PermissionGateBanner,
   RoleLabel,
   StatusBadge,
@@ -73,6 +72,10 @@ interface NavGroup {
 }
 
 const STORAGE_KEY_SIDEBAR = 'agro_bos_sidebar_collapsed_v1';
+
+const isNavActive = (pathname: string, href: string) =>
+  pathname === href || pathname.startsWith(href + '/') ||
+  (href === '/finance' && ['/invoices', '/payments'].includes(pathname));
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -96,6 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     suppliers,
     invoices,
     deliveries,
+    drivers,
     procurementOrders,
     approvals,
     documents,
@@ -111,9 +115,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationTab, setNotificationTab] = useState<'all' | 'unread'>('all');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const navScrollRef = useRef<HTMLElement | null>(null);
   const headerActionsRef = useRef<HTMLDivElement | null>(null);
+  const mobileDrawerRef = useRef<HTMLDialogElement>(null);
+
+  useLayoutEffect(() => {
+    const drawer = mobileDrawerRef.current;
+    if (!mobileDrawerOpen || !drawer) return;
+    const opener = document.activeElement;
+    const overflow = document.body.style.overflow;
+    const desktop = window.matchMedia('(min-width: 768px)');
+    const closeOnDesktop = () => { if (desktop.matches) setMobileDrawerOpen(false); };
+    drawer.showModal();
+    document.body.style.overflow = 'hidden';
+    desktop.addEventListener('change', closeOnDesktop);
+    return () => {
+      drawer.close();
+      document.body.style.overflow = overflow;
+      desktop.removeEventListener('change', closeOnDesktop);
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [mobileDrawerOpen]);
 
   // Restore persisted sidebar collapsed preference
   useEffect(() => {
@@ -166,14 +190,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const isBelow = activeRect.bottom > containerRect.bottom - 16;
 
     if (isAbove || isBelow) {
-      activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      activeEl.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'instant' : 'smooth' });
     }
-  }, [pathname]);
+  }, [pathname, reduceMotion]);
 
   // Close header dropdowns on outside click or Escape key
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (document.querySelector('dialog[open]')) return;
         e.preventDefault();
         setSearchOpen((v) => !v);
       }
@@ -223,7 +248,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ],
       },
       {
-        group: 'COMMERCIAL',
+        group: 'SALES & CUSTOMERS',
         items: [
           {
             label: 'Orders',
@@ -231,7 +256,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             permission: 'orders.view',
             icon: ShoppingBag,
             badgeCount: orders.filter(
-              (o) => o.status !== 'Delivered' && o.status !== 'Closed'
+              (o) => !['Draft', 'Delivered', 'Closed', 'Cancelled'].includes(o.status)
             ).length,
           },
           {
@@ -239,12 +264,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href: '/customers',
             permission: 'customers.view',
             icon: Users,
-          },
-          {
-            label: 'Institutions',
-            href: '/institutions',
-            permission: 'customers.view',
-            icon: Building2,
           },
           {
             label: 'CRM',
@@ -255,7 +274,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ],
       },
       {
-        group: 'OPERATIONS',
+        group: 'SOURCING & STOCK',
+        items: [
+          {
+            label: 'Procurement',
+            href: '/procurement',
+            permission: 'procurement.view',
+            icon: FolderKanban,
+          },
+          {
+            label: 'Inventory',
+            href: '/inventory',
+            permission: 'inventory.view',
+            icon: Warehouse,
+          },
+          {
+            label: 'Suppliers',
+            href: '/suppliers',
+            permission: 'suppliers.view',
+            icon: Handshake,
+          },
+          {
+            label: 'Products',
+            href: '/products',
+            permission: 'products.view',
+            icon: Package,
+          },
+        ],
+      },
+      {
+        group: 'FULFILLMENT & DELIVERY',
         items: [
           {
             label: 'Fulfillment',
@@ -275,49 +323,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             permission: 'fleet.view',
             icon: Car,
           },
-          {
-            label: 'Inventory',
-            href: '/inventory',
-            permission: 'inventory.view',
-            icon: Warehouse,
-          },
-          {
-            label: 'Products',
-            href: '/products',
-            permission: 'products.view',
-            icon: Package,
-          },
-          {
-            label: 'Procurement',
-            href: '/procurement',
-            permission: 'procurement.view',
-            icon: FolderKanban,
-          },
-          {
-            label: 'Suppliers',
-            href: '/suppliers',
-            permission: 'suppliers.view',
-            icon: Handshake,
-          },
         ],
       },
       {
-        group: 'FINANCE',
+        group: 'ACCOUNTS & REPORTS',
         items: [
           {
-            label: 'Invoices',
-            href: '/invoices',
-            permission: 'finance.view',
-            icon: Receipt,
-          },
-          {
-            label: 'Payments',
-            href: '/payments',
-            permission: 'finance.view',
-            icon: CreditCard,
-          },
-          {
-            label: 'Finance',
+            label: 'Accounts',
             href: '/finance',
             permission: 'finance.view',
             icon: Landmark,
@@ -331,7 +343,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ],
       },
       {
-        group: 'MANAGEMENT & GOVERNANCE',
+        group: 'GOVERNANCE',
         items: [
           {
             label: 'Approvals',
@@ -347,6 +359,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             icon: FileText,
             badgeCount: unverifiedDocsCount,
           },
+        ],
+      },
+      {
+        group: 'ADMINISTRATION',
+        items: [
           {
             label: 'Users',
             href: '/administration/users',
@@ -365,18 +382,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             permission: 'audit.view',
             icon: FileSpreadsheet,
           },
-          {
-            label: 'My Profile',
-            href: '/profile',
-            permission: 'dashboard.view',
-            icon: User,
-          },
-          {
-            label: 'Settings',
-            href: '/settings',
-            permission: 'dashboard.view',
-            icon: Settings,
-          },
         ],
       },
     ],
@@ -385,13 +390,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Filter nav groups by RBAC permissions
   const permittedNavGroups = useMemo(() => {
+    const driverRoutes = ['/dashboard', '/deliveries'];
     return navGroups
       .map((group) => ({
         ...group,
-        items: group.items.filter((item) => can(item.permission)),
+        items: group.items.filter((item) => can(item.permission) &&
+          (currentUser?.roleId !== 'delivery_driver' || driverRoutes.includes(item.href))),
       }))
       .filter((group) => group.items.length > 0);
-  }, [navGroups, can]);
+  }, [navGroups, can, currentUser?.roleId]);
 
   // Filter notifications by RBAC permissions
   const permittedNotifications = useMemo(() => {
@@ -411,6 +418,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [];
+    const isDriver = currentUser?.roleId === 'delivery_driver';
     const results: {
       category: string;
       title: string;
@@ -436,7 +444,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (can('orders.view')) {
+    if (can('orders.view') && !isDriver) {
       orders
         .filter(
           (o) =>
@@ -448,7 +456,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             category: 'Order',
             title: `${o.orderNumber} · ${o.customerName}`,
             subtitle: `${o.status} · KES ${o.totalKes.toLocaleString()}`,
-            href: '/orders',
+            href: '/orders?orderNumber=' + encodeURIComponent(o.orderNumber),
           })
         );
     }
@@ -466,7 +474,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             category: c.isInstitutional ? 'Institution' : 'Customer',
             title: c.name,
             subtitle: `${c.segment} · ${c.paymentTerms} · Balance KES ${c.outstandingBalanceKes.toLocaleString()}`,
-            href: c.isInstitutional ? '/institutions' : '/customers',
+            href: '/customers?' + new URLSearchParams({ type: c.isInstitutional ? 'institutional' : 'retail', q: c.code }),
           })
         );
     }
@@ -483,7 +491,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             category: 'Supplier',
             title: s.name,
             subtitle: `${s.category} · ${s.region}`,
-            href: '/suppliers',
+            href: '/suppliers?supplier=' + encodeURIComponent(s.id),
           })
         );
     }
@@ -507,6 +515,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     if (can('deliveries.view')) {
       deliveries
+        .filter((run) => canAccessDeliveryRun(run, currentUser, drivers))
         .filter(
           (d) =>
             d.runNumber.toLowerCase().includes(q) ||
@@ -518,7 +527,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             category: 'Delivery Run',
             title: `${d.runNumber} · ${d.routeZone}`,
             subtitle: `${d.status} · Driver: ${d.driverName}`,
-            href: '/deliveries',
+            href: '/deliveries#run-' + d.id,
           })
         );
     }
@@ -540,7 +549,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (can('documents.view')) {
+    if (can('documents.view') && !isDriver) {
       documents
         .filter(
           (doc) =>
@@ -568,6 +577,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     suppliers,
     invoices,
     deliveries,
+    drivers,
+    currentUser,
     procurementOrders,
     documents,
   ]);
@@ -581,30 +592,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       .flatMap((g) => g.items)
       .find((i) => pathname === i.href || pathname.startsWith(i.href + '/'))
       ?.label ||
-    (pathname === '/profile'
-      ? 'My Profile'
-      : pathname.includes('audit-logs')
-      ? 'Audit Logs'
-      : 'Workspace');
+    ({
+      '/profile': 'My Profile',
+      '/settings': 'Settings',
+      '/invoices': 'Invoices',
+      '/payments': 'Payments',
+      '/audit-logs': 'Audit Logs',
+    }[pathname] ?? 'Workspace');
 
   const mainBreadcrumbs = useMemo(() => {
     if (pathname === '/dashboard') {
       return [
         { label: 'AgroHub BOS', href: '/dashboard' },
-        { label: 'Command Center' },
+        { label: 'Dashboard' },
       ];
     }
     if (pathname.startsWith('/administration/')) {
       const sub =
         pathname === '/administration/users'
-          ? 'Internal Operators'
+          ? 'Users'
           : pathname === '/administration/roles'
-          ? 'RBAC Roles Matrix'
-          : 'System Audit Trail';
+          ? 'Roles'
+          : 'Audit logs';
       return [
         { label: 'AgroHub BOS', href: '/dashboard' },
-        { label: 'Administration', href: '/administration/users' },
+        { label: 'Administration' },
         { label: sub },
+      ];
+    }
+    if (pathname === '/invoices' || pathname === '/payments') {
+      return [
+        { label: 'AgroHub BOS', href: '/dashboard' },
+        { label: 'Accounts', href: '/finance' },
+        { label: currentPageLabel },
       ];
     }
     return [
@@ -666,6 +686,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-[var(--bg-canvas)] text-[var(--text-primary)] flex">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-[var(--bg-card)] focus:px-4 focus:py-3">
+        Skip to main content
+      </a>
       {/* DESKTOP & TABLET INDEPENDENT SCROLLING SIDEBAR */}
       <aside
         aria-label="Workspace Sidebar"
@@ -750,15 +773,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className={sidebarCollapsed ? 'space-y-1.5' : 'space-y-1'}>
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const active =
-                    pathname === item.href ||
-                    pathname.startsWith(item.href + '/');
+                  const active = isNavActive(pathname, item.href);
 
                   const linkNode = (
                     <Link
                       key={item.href}
                       href={item.href}
                       data-nav-active={active ? 'true' : undefined}
+                      aria-current={active ? 'page' : undefined}
                       aria-label={sidebarCollapsed ? item.label : undefined}
                       className={`relative flex items-center rounded-xl text-xs font-medium transition-all duration-150 ${
                         sidebarCollapsed
@@ -896,23 +918,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* MOBILE SLIDE-OUT NAVIGATION DRAWER */}
-      <AnimatePresence>
         {mobileDrawerOpen && (
-          <div
-            className="fixed inset-0 z-[var(--z-drawer)] md:hidden flex"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Mobile Navigation Drawer"
+          <dialog
+            id="mobile-navigation"
+            ref={mobileDrawerRef}
+            className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-[#08190C]/75 backdrop:backdrop-blur-xs"
+            aria-label="Workspace navigation"
+            onCancel={(event) => { event.preventDefault(); setMobileDrawerOpen(false); }}
+            onClick={(event) => { if (event.target === event.currentTarget) setMobileDrawerOpen(false); }}
           >
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-[#08190C]/75 backdrop-blur-xs"
-              onClick={() => setMobileDrawerOpen(false)}
-            />
-            <motion.div
-              initial={{ x: '-100%' }}
+              initial={reduceMotion ? false : { x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
@@ -936,13 +952,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   type="button"
                   onClick={() => setMobileDrawerOpen(false)}
                   aria-label="Close navigation menu"
-                  className="p-2 rounded-full text-[#A9BEAE] hover:text-white cursor-pointer"
+                  className="grid size-11 place-items-center rounded-full text-[#A9BEAE] hover:text-white cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <nav className="flex-1 overflow-y-auto sidebar-scroll p-3.5 space-y-5">
+              <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto sidebar-scroll p-3.5 space-y-5">
                 {permittedNavGroups.map((group) => (
                   <div key={group.group}>
                     <div className="px-2.5 mb-1.5 text-[10px] font-semibold tracking-wider text-[#A9BEAE]/65">
@@ -951,15 +967,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <div className="space-y-1">
                       {group.items.map((item) => {
                         const Icon = item.icon;
-                        const active =
-                          pathname === item.href ||
-                          pathname.startsWith(item.href + '/');
+                        const active = isNavActive(pathname, item.href);
                         return (
                           <Link
                             key={item.href}
                             href={item.href}
+                            aria-current={active ? 'page' : undefined}
                             onClick={() => setMobileDrawerOpen(false)}
-                            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium ${
+                            className={`flex min-h-11 items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium ${
                               active
                                 ? 'bg-[#142B1B] text-[#4EB462] border border-[#4EB462]/25'
                                 : 'text-[#A9BEAE] hover:text-white'
@@ -1016,9 +1031,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
             </motion.div>
-          </div>
+          </dialog>
         )}
-      </AnimatePresence>
 
       {/* MAIN INDEPENDENT SCROLL WORKSPACE COLUMN */}
       <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
@@ -1028,8 +1042,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setMobileDrawerOpen(true)}
-            className="md:hidden p-2 rounded-[10px] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] cursor-pointer shrink-0"
+            className="grid size-11 place-items-center rounded-[10px] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] cursor-pointer shrink-0 md:hidden"
             aria-label="Open navigation menu"
+            aria-expanded={mobileDrawerOpen}
+            aria-controls={mobileDrawerOpen ? 'mobile-navigation' : undefined}
           >
             <Menu className="w-4 h-4" />
           </button>
@@ -1329,7 +1345,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* WORKSPACE CONTENT CANVAS */}
-        <main className="flex-1 p-3 sm:p-5 lg:p-6 xl:p-8 max-w-[1600px] w-full mx-auto">
+        <main id="main-content" tabIndex={-1} className="flex-1 scroll-mt-16 p-3 sm:p-5 lg:p-6 xl:p-8 max-w-[1600px] w-full mx-auto">
           {/* Breadcrumb relocated from top nav bar into main content area */}
           <div className="mb-4">
             <Breadcrumbs items={mainBreadcrumbs} />
@@ -1420,102 +1436,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
       </nav>
 
-      {/* COMMAND-STYLE GLOBAL SEARCH MODAL */}
-      <AnimatePresence>
-        {searchOpen && (
-          <div
-            className="fixed inset-0 z-[var(--z-modal)] bg-[#08190C]/70 backdrop-blur-xs flex items-start justify-center p-4 pt-16 sm:pt-24"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Global Command Search"
-          >
-            <motion.div
-              {...DROPDOWN_MOTION}
-              className="w-full max-w-2xl rounded-[20px] bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-lg)] overflow-hidden"
-            >
-              <div className="p-4 border-b border-[var(--border-subtle)] flex items-center gap-3">
-                <Search className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
-                <input
-                  type="text"
-                  autoFocus
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Products, Orders, Institutions, Suppliers, Invoices, Documents..."
-                  className="flex-1 bg-transparent text-sm text-[var(--text-primary)] focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setSearchOpen(false)}
-                  className="text-xs px-2.5 py-1 rounded-full bg-[var(--bg-canvas)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-                >
-                  ESC
-                </button>
-              </div>
-
-              <div className="max-h-96 overflow-y-auto p-3">
-                {searchQuery.trim() === '' ? (
-                  <div className="p-6 text-center text-xs text-[var(--text-secondary)]">
-                    Type to search across all modules permitted for{' '}
-                    <strong>{currentUser.roleName}</strong> (e.g.,{' '}
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('Tomatoes')}
-                      className="px-2 py-0.5 rounded-full bg-[var(--bg-canvas)] text-[#1F6A37] dark:text-[#4EB462] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] font-medium cursor-pointer"
-                    >
-                      Tomatoes
-                    </button>
-                    ,{' '}
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('Alliance')}
-                      className="px-2 py-0.5 rounded-full bg-[var(--bg-canvas)] text-[#1F6A37] dark:text-[#4EB462] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] font-medium cursor-pointer"
-                    >
-                      Alliance
-                    </button>
-                    ,{' '}
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('ORD-2026')}
-                      className="px-2 py-0.5 rounded-full bg-[var(--bg-canvas)] text-[#1F6A37] dark:text-[#4EB462] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] font-medium cursor-pointer"
-                    >
-                      ORD-2026
-                    </button>
-                    ).
-                  </div>
-                ) : searchResults.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-[var(--text-secondary)]">
-                    No RBAC-authorized records matched &ldquo;{searchQuery}
-                    &rdquo;.
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {searchResults.map((item, idx) => (
-                      <Link
-                        key={idx}
-                        href={item.href}
-                        onClick={() => setSearchOpen(false)}
-                        className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                            {item.title}
-                          </div>
-                          <div className="text-[11px] text-[var(--text-secondary)] truncate mt-0.5">
-                            {item.subtitle}
-                          </div>
-                        </div>
-                        <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-[var(--bg-canvas)] text-[#1F6A37] dark:text-[#4EB462] shrink-0">
-                          {item.category}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
+      <Modal open={searchOpen} onClose={() => setSearchOpen(false)} title="Search AgroHub" size="lg">
+        <label className="relative flex items-center">
+          <span className="sr-only">Search records</span>
+          <Search aria-hidden="true" className="pointer-events-none absolute left-3 size-4 text-[var(--brand-accent)]" />
+          <input
+            data-modal-autofocus
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={currentUser.roleId === 'delivery_driver' ? 'Search your delivery runs' : 'Search by name or reference'}
+            className="min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] pl-9 pr-3 text-sm"
+          />
+        </label>
+        {searchQuery.trim() && (
+          searchResults.length ? (
+            <ul className="mt-2 divide-y divide-[var(--border-subtle)]">
+              {searchResults.map((item) => (
+                <li key={item.category + item.title + item.href}>
+                  <Link href={item.href} onClick={() => setSearchOpen(false)}
+                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg p-3 hover:bg-[var(--bg-subtle)]">
+                    <div>
+                      <p className="text-sm font-semibold">{item.title}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">{item.subtitle}</p>
+                    </div>
+                    <span className="text-xs text-[var(--brand-accent)]">{item.category}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="p-3 text-sm text-[var(--text-secondary)]" role="status">No matching records.</p>
         )}
-      </AnimatePresence>
+      </Modal>
 
       {/* GLOBAL TOAST FEEDBACK STACK */}
       <div

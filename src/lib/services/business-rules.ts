@@ -286,34 +286,39 @@ export function calculateInvoiceEligibility(
   let outstandingTotalKes = 0;
   let hasOutstandingShortages = false;
 
+  for (const item of deliveredItems) {
+    const price = item.unitPriceKes || 0;
+    rejectedTotalKes += Math.round((item.rejectedQty ?? 0) * price * 100) / 100;
+    outstandingTotalKes += Math.round((item.outstandingQty ?? 0) * price * 100) / 100;
+    hasOutstandingShortages ||= (item.outstandingQty ?? 0) > 0;
+  }
+
   const billableLines = deliveredItems
     .filter((it) => (it.acceptedQty ?? it.deliveredQty ?? 0) > 0)
     .map((it) => {
       const acceptedQty = it.acceptedQty ?? it.deliveredQty ?? 0;
-      const rejectedQty = it.rejectedQty ?? 0;
-      const outstandingQty = it.outstandingQty ?? 0;
+      const orderedQty = it.orderedQty ?? it.requestedQty ?? Infinity;
+      const remainingQty = Math.max(0, orderedQty - (it.previousAcceptedQty ?? 0));
+      const billableQty = Math.min(acceptedQty, it.dispatchedQty ?? remainingQty, remainingQty);
       const price = it.unitPriceKes || 0;
 
-      const lineTotal = Math.round(acceptedQty * price);
+      const lineTotal = Math.round(billableQty * price * 100) / 100;
       billableTotalKes += lineTotal;
-      rejectedTotalKes += Math.round(rejectedQty * price);
-      outstandingTotalKes += Math.round(outstandingQty * price);
-
-      if (outstandingQty > 0) {
-        hasOutstandingShortages = true;
-      }
 
       return {
         productId: it.productId,
         productName: it.productName,
         sku: it.sku,
         unit: String(it.unit),
-        acceptedQty,
-        billableQty: acceptedQty,
+        acceptedQty: billableQty,
+        billableQty,
         unitPriceKes: price,
         lineTotalKes: lineTotal,
       };
-    });
+    })
+    .filter((item) => item.billableQty > 0);
+
+  billableTotalKes = Math.round(billableTotalKes * 100) / 100;
 
   if (billableLines.length === 0 || billableTotalKes <= 0) {
     return {
@@ -478,10 +483,11 @@ export function calculateSupplierBalances(
  */
 export function validateSupplierPayment(
   payable: SupplierPayableRecord,
-  paymentAmount: number
+  paymentAmount: number,
+  reference?: { number: string; method: SupplierPaymentRecord['paymentMethod']; existing: readonly SupplierPaymentRecord[] }
 ): { valid: boolean; message?: string; resultingStatus?: 'Paid' | 'Partially Paid' } {
-  if (paymentAmount <= 0) {
-    return { valid: false, message: 'Payment amount must be greater than zero.' };
+  if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+    return { valid: false, message: 'Enter a payment amount greater than zero.' };
   }
 
   const currentBalance = payable.balanceKes;
@@ -490,6 +496,15 @@ export function validateSupplierPayment(
       valid: false,
       message: `Payment amount (KES ${paymentAmount.toLocaleString()}) cannot exceed the outstanding balance of KES ${currentBalance.toLocaleString()}.`,
     };
+  }
+
+  if (reference) {
+    const normalized = reference.number.trim().toLowerCase();
+    if (!normalized) return { valid: false, message: 'Enter the payment transaction reference.' };
+    if (reference.existing.some((payment) => payment.payableId === payable.id && payment.paymentMethod === reference.method &&
+      payment.referenceNumber.trim().toLowerCase() === normalized)) {
+      return { valid: false, message: 'This payment reference is already recorded for the payable.' };
+    }
   }
 
   const remaining = currentBalance - paymentAmount;

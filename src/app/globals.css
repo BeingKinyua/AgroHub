@@ -83,6 +83,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  scroll-padding-top: 4.5rem;
+}
+
+:where(a, button, input, select, textarea, summary, [role="button"]):focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+
 .font-heading {
   font-family: var(--font-manrope), var(--font-inter), sans-serif;
 }

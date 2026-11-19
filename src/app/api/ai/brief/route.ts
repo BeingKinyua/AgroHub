@@ -8,15 +8,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       userId,
-      openOrdersCount = 4,
-      expiringBatchesCount = 2,
-      pendingApprovalsCount = 2,
-      overdueReceivablesKes = 295000,
-      upcomingPayablesKes = 2010500,
+      openOrdersCount = 0,
+      expiringBatchesCount = 0,
+      pendingApprovalsCount = 0,
+      overdueReceivablesKes = 0,
+      upcomingPayablesKes = 0,
     } = body;
 
-    const user =
-      INITIAL_USERS.find((u) => u.id === userId) || INITIAL_USERS[0];
+    const user = INITIAL_USERS.find((u) => u.id === userId);
+    if (!user) return NextResponse.json({ error: 'Unknown operator.' }, { status: 400 });
 
     const brief = await generateRoleAwareOperationalBrief({
       user,

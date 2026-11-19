@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Plus } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
 import {
@@ -11,33 +13,29 @@ import {
   PageHeader,
   StatusBadge,
 } from '@/components/ui/primitives';
+import { podInputClass, podPrimaryClass, podSecondaryClass } from '@/components/ui/PODQuantityForm';
 import { PaymentRecord } from '@/types/domain/bos';
 
-export default function PaymentsPage() {
+function PaymentsContent({ invoiceNumber }: { invoiceNumber: string }) {
   const {
     payments,
     invoices,
-    customers,
-    suppliers,
     can,
     recordPayment,
     reconcilePayment,
   } = useBos();
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [direction, setDirection] = useState<PaymentRecord['direction']>(
-    'Inbound (Customer AR)'
-  );
-  const [counterpartyName, setCounterpartyName] = useState(
-    customers[0]?.name || ''
-  );
+  const canAllocate = can('finance.record_payment') && can('finance.allocate_payment');
+  const [createOpen, setCreateOpen] = useState(Boolean(invoiceNumber && canAllocate));
   const [method, setMethod] =
     useState<PaymentRecord['method']>('M-Pesa Paybill');
-  const [referenceCode, setReferenceCode] = useState('QKA41M98LP');
-  const [amountKes, setAmountKes] = useState(168900);
-  const [allocatedToDoc, setAllocatedToDoc] = useState(
-    invoices[0]?.invoiceNumber || 'INV-2026-9041'
-  );
+  const [referenceCode, setReferenceCode] = useState('');
+  const [amountKes, setAmountKes] = useState('');
+  const [allocatedToDoc, setAllocatedToDoc] = useState(invoiceNumber);
+  const [submitting, setSubmitting] = useState(false);
+  const [allocationError, setAllocationError] = useState('');
+  const openInvoices = invoices.filter((invoice) => invoice.balanceKes > 0);
+  const selectedInvoice = openInvoices.find((invoice) => invoice.invoiceNumber === allocatedToDoc);
   const [feedback, setFeedback] = useState<{
     msg: string;
     type: 'success' | 'error';
@@ -45,35 +43,44 @@ export default function PaymentsPage() {
 
   const handleRecord = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await recordPayment({
-      direction,
-      counterpartyName,
-      method,
-      referenceCode,
-      amountKes: Number(amountKes),
-      allocatedToDoc,
-    });
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) setCreateOpen(false);
+    if (!selectedInvoice || submitting) return;
+    setSubmitting(true);
+    setAllocationError('');
+    try {
+      const res = await recordPayment({
+        direction: 'Inbound (Customer AR)', counterpartyName: selectedInvoice.customerName,
+        method, referenceCode, amountKes: Number(amountKes), allocatedToDoc,
+      });
+      if (res.ok) {
+        setFeedback({ msg: res.message, type: 'success' });
+        setReferenceCode('');
+        setAmountKes('');
+        setCreateOpen(false);
+      } else setAllocationError(res.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div>
       <PageHeader
-        kicker="TREASURY, M-PESA PAYBILL & BANK SETTLEMENTS"
-        title="Payments & Invoice Allocations"
-        description="Record inbound customer receipts (M-Pesa Paybill 542900, RTGS, EFT) and outbound cooperative supplier payouts with direct document allocation."
+        title="Payments and allocations"
+        description="Allocate customer receipts to invoices and reconcile recorded transactions."
         actions={
-          can('finance.record_payment') && (
+          <div className="flex flex-wrap items-center gap-2">
+            {can('suppliers.view') && <Link href="/suppliers" className={podSecondaryClass}>Supplier accounts</Link>}
+            {canAllocate && (
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+              className={podPrimaryClass}
             >
-              <Plus className="w-4 h-4" />
-              <span>Record Payment</span>
+              <Plus className="mr-2 size-4" aria-hidden="true" />
+              <span>Record customer payment</span>
             </button>
-          )
+            )}
+          </div>
         }
       />
 
@@ -176,127 +183,54 @@ export default function PaymentsPage() {
         </div>
       </Card>
 
-      <Modal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        title="Record & Allocate Payment (KES)"
-        subtitle="Allocates settlement directly to an open Customer Invoice or Supplier Purchase Order."
-      >
+      <Modal open={createOpen && canAllocate} onClose={() => setCreateOpen(false)} title="Record customer payment">
         <form onSubmit={handleRecord} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Settlement Direction
-              </label>
-              <select
-                value={direction}
-                onChange={(e) => {
-                  const dir = e.target.value as PaymentRecord['direction'];
-                  setDirection(dir);
-                  setCounterpartyName(
-                    dir === 'Inbound (Customer AR)'
-                      ? customers[0]?.name || ''
-                      : suppliers[0]?.name || ''
-                  );
-                }}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-              >
-                <option value="Inbound (Customer AR)">
-                  Inbound (Customer AR)
-                </option>
-                <option value="Outbound (Supplier AP)">
-                  Outbound (Supplier AP)
-                </option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Payment Channel
-              </label>
-              <select
-                value={method}
-                onChange={(e) =>
-                  setMethod(e.target.value as PaymentRecord['method'])
-                }
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-              >
-                <option value="M-Pesa Paybill">M-Pesa Paybill</option>
-                <option value="Bank EFT / RTGS">Bank EFT / RTGS</option>
-                <option value="Corporate Cheque">Corporate Cheque</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium mb-1">
-              Counterparty (Customer or Supplier)
+          <label className="block space-y-1 text-sm font-medium">
+            <span>Open invoice</span>
+            <select required className={podInputClass} value={selectedInvoice?.invoiceNumber ?? ''}
+              onChange={(event) => { setAllocatedToDoc(event.target.value); setAllocationError(''); }}>
+              <option value="">Select an invoice</option>
+              {openInvoices.map((invoice) => (
+                <option key={invoice.id} value={invoice.invoiceNumber}>{invoice.invoiceNumber} · {invoice.customerName}</option>
+              ))}
+            </select>
+          </label>
+          {selectedInvoice && <p className="text-sm text-[var(--text-secondary)]">Available balance for allocation · KES {selectedInvoice.balanceKes.toLocaleString('en-KE')}</p>}
+          <label className="block space-y-1 text-sm font-medium">
+            <span>Payment channel</span>
+            <select className={podInputClass} value={method} onChange={(event) => setMethod(event.target.value as PaymentRecord['method'])}>
+              <option value="M-Pesa Paybill">M-Pesa Paybill</option>
+              <option value="Bank EFT / RTGS">Bank EFT / RTGS</option>
+              <option value="Corporate Cheque">Corporate Cheque</option>
+            </select>
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-1 text-sm font-medium">
+              <span>Transaction reference</span>
+              <input required className={podInputClass} value={referenceCode} onChange={(event) => setReferenceCode(event.target.value)} />
             </label>
-            <input
-              type="text"
-              required
-              value={counterpartyName}
-              onChange={(e) => setCounterpartyName(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
-            />
+            <label className="block space-y-1 text-sm font-medium">
+              <span>Amount (KES)</span>
+              <input required type="number" inputMode="decimal" min="0.01" max={selectedInvoice?.balanceKes} step="0.01"
+                className={podInputClass} value={amountKes} onChange={(event) => setAmountKes(event.target.value)} />
+            </label>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Reference Code
-              </label>
-              <input
-                type="text"
-                required
-                value={referenceCode}
-                onChange={(e) => setReferenceCode(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Amount (KES)
-              </label>
-              <input
-                type="number"
-                required
-                value={amountKes}
-                onChange={(e) => setAmountKes(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">
-                Allocate to Document #
-              </label>
-              <input
-                type="text"
-                required
-                value={allocatedToDoc}
-                onChange={(e) => setAllocatedToDoc(e.target.value)}
-                placeholder="e.g., INV-2026-9041"
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setCreateOpen(false)}
-              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
-            >
-              Post & Allocate Payment
-            </button>
+          {allocationError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{allocationError}</p>}
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" onClick={() => setCreateOpen(false)} disabled={submitting} className={podSecondaryClass}>Cancel</button>
+            <button type="submit" disabled={submitting || !selectedInvoice} className={podPrimaryClass}>{submitting ? 'Saving…' : 'Allocate payment'}</button>
           </div>
         </form>
       </Modal>
     </div>
   );
+}
+
+function PaymentsRoute() {
+  const invoiceNumber = useSearchParams().get('invoice') ?? '';
+  return <PaymentsContent key={invoiceNumber} invoiceNumber={invoiceNumber} />;
+}
+
+export default function PaymentsPage() {
+  return <Suspense fallback={<p className="p-6 text-sm text-[var(--text-secondary)]">Loading payments…</p>}><PaymentsRoute /></Suspense>;
 }

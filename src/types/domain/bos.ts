@@ -242,6 +242,7 @@ export type InvoiceGenerationStatus =
   | 'Paid';
 
 export interface PODDeliveredItem {
+  orderLineId?: string;
   productId: string;
   productName: string;
   sku: string;
@@ -254,6 +255,8 @@ export interface PODDeliveredItem {
   rejectedQty: number;
   outstandingQty?: number;
   currentDeliveryShortage?: number;
+  excessQty?: number;
+  cumulativeAcceptedQty?: number;
   classification?: DiscrepancyClassification;
   rejectionReason?: string;
   discrepancyReason?: DiscrepancyReason | string;
@@ -286,6 +289,7 @@ export interface PODEvidenceRecord {
     | 'Disputed'
     | 'Pending Resolution';
   deliveredItems: PODDeliveredItem[];
+  capturedItems?: PODDeliveredItem[];
   evidenceFiles: {
     name: string;
     size: string;
@@ -303,6 +307,8 @@ export interface PODEvidenceRecord {
   invoiceNumber?: string;
   hasDiscrepancies?: boolean;
   discrepancyNotes?: string;
+  replacementRunId?: string;
+  shortageAccepted?: boolean;
 }
 
 export interface CreateOrderItemInput {
@@ -337,6 +343,7 @@ export interface CreateOrderInput {
 }
 
 export interface OrderLineItem {
+  id?: string;
   productId: string;
   productName: string;
   sku: string;
@@ -461,6 +468,14 @@ export interface SupplierEvaluationRecord {
   pricingScore?: number;
 }
 
+export interface SupplierQuoteEvent {
+  recordedAt?: string;
+  recordedBy?: string;
+  priceKes: number;
+  unit: UnitOfMeasure;
+  reason?: string;
+}
+
 export interface SupplierProductItem {
   id?: string;
   productId: string;
@@ -472,6 +487,7 @@ export interface SupplierProductItem {
   lastUpdated?: string;
   lastPriceUpdate?: string;
   priceChangeReason?: string;
+  quoteHistory?: SupplierQuoteEvent[];
   leadTimeDays?: number;
   moq?: number;
   minOrderQty?: number;
@@ -493,8 +509,9 @@ export interface SupplierRecord {
   paymentTerms: string;
   payableBalanceKes: number;
   qualityScorePct: number;
-  recentPriceTrend: 'Stable' | 'Increased +6%' | 'Decreased -4%' | 'Price Review Needed';
+  recentPriceTrend: 'Stable' | `Increased +${number}%` | `Decreased ${number}%` | 'Price Review Needed';
   suppliedProducts: SupplierProductItem[];
+  retiredSuppliedProducts?: SupplierProductItem[];
   status: 'Active' | 'Under Review' | 'Suspended';
   isArchived?: boolean;
   archivedAt?: string;
@@ -506,6 +523,7 @@ export interface SupplierRecord {
 }
 
 export interface PurchaseOrderLineItem {
+  id?: string;
   productId: string;
   productName: string;
   sku: string;
@@ -514,6 +532,33 @@ export interface PurchaseOrderLineItem {
   unitCostKes: number;
   lineTotalKes: number;
   customerOrderRef?: string;
+  customerOrderLineId?: string;
+  supplierOfferingId?: string;
+}
+
+export interface PurchaseLineInput {
+  productId: string;
+  customerOrderLineId?: string;
+  quantity: number;
+  unitCostKes: number;
+}
+
+export interface PurchaseReceiptLineInput {
+  lineId: string;
+  quantity: number;
+  unitCostKes: number;
+  expiryDate?: string;
+}
+
+export interface PurchaseReceiptRecord {
+  id: string;
+  receivedAt: string;
+  receivedBy?: string;
+  receiptRef?: string;
+  supplierInvoiceRef?: string;
+  lines: (PurchaseReceiptLineInput & { lineTotalKes: number })[];
+  totalKes: number;
+  payableId: string;
 }
 
 export interface ProcurementOrderRecord {
@@ -523,10 +568,14 @@ export interface ProcurementOrderRecord {
   supplierId: string;
   supplierName: string;
   warehouseName: string;
+  warehouseId?: string;
   purpose?: 'Direct Customer Fulfillment' | 'Bulk Stock Procurement';
   customerOrderId?: string;
   customerOrderNumber?: string;
   lines?: PurchaseOrderLineItem[];
+  receipts?: PurchaseReceiptRecord[];
+  paymentTerms?: string;
+  closureReason?: string;
   stage:
     | 'Purchase Request'
     | 'Pending Approval'
@@ -535,6 +584,9 @@ export interface ProcurementOrderRecord {
     | 'Quality Check'
     | 'Stock Posted'
     | 'Goods Collected'
+    | 'Partially Received'
+    | 'Closed Short'
+    | 'Cancelled'
     | 'Completed';
   status?: string;
   expectedDate: string;
@@ -561,6 +613,23 @@ export interface DeliveryRunStop {
   notes?: string;
 }
 
+export interface ReplacementStockPick {
+  orderLineId: string;
+  batchId: string;
+  batchNumber: string;
+  productId: string;
+  unit: UnitOfMeasure;
+  quantity: number;
+}
+
+export interface ReplacementRunLoad {
+  warehouseId: string;
+  warehouseName: string;
+  loadedAt: string;
+  loadedBy: string;
+  picks: ReplacementStockPick[];
+}
+
 export interface DeliveryRunRecord {
   id: string;
   runNumber: string;
@@ -569,6 +638,9 @@ export interface DeliveryRunRecord {
   driverName: string;
   driverPhone: string;
   departureTime: string;
+  scheduledDate?: string;
+  sourcePODId?: string;
+  replacementLoad?: ReplacementRunLoad;
   status:
     | 'Planned'
     | 'Loaded'
@@ -625,6 +697,7 @@ export interface SupplierPayableRecord {
   supplierId: string;
   supplierName: string;
   purchaseOrderId?: string;
+  purchaseReceiptId?: string;
   poId?: string;
   poNumber: string;
   customerOrderNumber?: string;

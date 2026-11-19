@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   AccountStatus,
   ApprovalRequestRecord,
@@ -20,12 +20,14 @@ import {
   OrderRecord,
   PaymentRecord,
   PermissionKey,
-  PODDeliveredItem,
   PODEvidenceRecord,
   PODStatus,
   PriceHistoryEntry,
   ProcurementOrderRecord,
   ProductRecord,
+  PurchaseLineInput,
+  PurchaseReceiptLineInput,
+  PurchaseReceiptRecord,
   RoleDefinition,
   StockBatchRecord,
   StockMovementRecord,
@@ -40,14 +42,46 @@ import {
   WarehouseRecord,
 } from '@/types/domain/bos';
 import {
-  calculatePODLineQuantities,
-  classifyPODDiscrepancy,
+  buildPurchaseLines,
+  getOrderSourcingLines,
+  getSupplierDueDate,
+  isCalendarDate,
+  planPurchaseReceipt,
+  purchaseLineId,
+  reserveOrderStock,
+  resolveOrderAllocation,
+} from '@/lib/services/procurement-rules';
+import {
   calculateInvoiceEligibility,
   isSupplierEligibleForPurchasing,
   calculateSupplierBalances,
   validateSupplierPayment,
   generateNextSku,
 } from '@/lib/services/business-rules';
+import {
+  allocateInvoicePayment,
+  canAccessDeliveryRun,
+  getDeliveryRunStops,
+  getExistingPODInvoice,
+  getOrderReceipts,
+  getPODExpectedLines,
+  getUnassignedPackedOrders,
+  isDeliveryPlanDate,
+  isOpenPODDiscrepancy,
+  isPendingPOD,
+  isReplacementBatchUsable,
+  permitsManualOrderStage,
+  planReplacementLoad,
+  preparePODReceipt,
+  replacementPicksCoverDemand,
+  replacementStockNeededThrough,
+  type DeliveryPlanInput,
+  type PODQuantityInput,
+  type ReplacementLoadInput,
+} from '@/lib/services/delivery-workflow';
+import { canSourceCatalogProduct, identifySupplierOffering, reconcileSupplierOfferings } from '@/lib/services/supplier-offerings';
+import type { SupplierOfferingInput } from '@/lib/services/supplier-offerings';
+import { getNairobiDate, offsetBusinessDate } from '@/lib/services/workspace-metrics';
 import {
   DEFAULT_ROLES,
   getRolePermissions,
@@ -78,6 +112,10 @@ import {
 } from '@/lib/services/initial-data';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
+
+type SupplierDetailsInput = Pick<SupplierRecord,
+  'name' | 'category' | 'region' | 'contactPerson' | 'phone' | 'email' | 'leadTimeDays' | 'paymentTerms' | 'paymentDetails'
+> & { suppliedProducts?: SupplierOfferingInput[] };
 
 export interface ToastItem {
   id: string;
@@ -181,7 +219,8 @@ interface BosContextValue {
       recipientPhone?: string;
       receivingDepartment?: string;
       deliveryRunId?: string;
-      deliveredItems: PODDeliveredItem[];
+      quantities: PODQuantityInput[];
+      quantitiesConfirmed: boolean;
       notes?: string;
       exceptions?: string;
       files?: {
@@ -195,7 +234,7 @@ interface BosContextValue {
   ) => Promise<{ ok: boolean; message: string; podId?: string }>;
   verifyPOD: (
     podId: string,
-    options?: { autoGenerateInvoice?: boolean; createInvoice?: boolean; reject?: boolean; notes?: string }
+    options: { quantities: PODQuantityInput[]; quantitiesConfirmed: boolean; createInvoice: boolean; notes?: string }
   ) => Promise<{ ok: boolean; message: string; invoiceNumber?: string }>;
   rejectPOD: (
     podId: string,
@@ -204,12 +243,14 @@ interface BosContextValue {
   reconcilePODDiscrepancy: (
     podId: string,
     resolution: {
-      action: 'Accept Shortage' | 'Schedule Re-delivery' | 'Issue Credit Note';
+      action: 'Accept Final Quantities' | 'Schedule Re-delivery';
       notes: string;
+      replacementDate?: string;
     }
   ) => Promise<{ ok: boolean; message: string }>;
   generateDraftInvoice: (
-    orderId: string
+    orderId: string,
+    podId?: string
   ) => Promise<{ ok: boolean; message: string; invoiceNumber?: string }>;
   createProduct: (
     input: Omit<
@@ -236,22 +277,23 @@ interface BosContextValue {
   }) => Promise<{ ok: boolean; message: string }>;
   createPurchaseOrder: (input: {
     supplierId: string;
-    warehouseName: string;
-    itemsSummary: string;
-    totalKes: number;
+    warehouseId?: string;
+    lines: PurchaseLineInput[];
     expectedDate: string;
-    purpose?: 'Direct Customer Fulfillment' | 'Bulk Stock Procurement';
+    purpose: NonNullable<ProcurementOrderRecord['purpose']>;
     customerOrderId?: string;
-    customerOrderNumber?: string;
   }) => Promise<{ ok: boolean; message: string }>;
   advanceProcurementStage: (
     poId: string
   ) => Promise<{ ok: boolean; message: string }>;
+  closePurchaseBalance: (poId: string, reason: string) => Promise<{ ok: boolean; message: string }>;
   updateDeliveryStatus: (
     runId: string,
     status: DeliveryRunRecord['status'],
     recipientSignOff?: string
   ) => Promise<{ ok: boolean; message: string }>;
+  createDeliveryRun: (input: DeliveryPlanInput) => Promise<{ ok: boolean; message: string }>;
+  loadReplacementRun: (runId: string, input: ReplacementLoadInput) => Promise<{ ok: boolean; message: string }>;
   recordPayment: (input: {
     direction: PaymentRecord['direction'];
     counterpartyName: string;
@@ -314,31 +356,10 @@ interface BosContextValue {
   markAllNotificationsRead: () => void;
 
   // Supplier Management Mutations
-  createSupplier: (input: {
-    name: string;
-    category: string;
-    region: string;
-    contactPerson: string;
-    phone: string;
-    email: string;
-    leadTimeDays: number;
-    paymentTerms: string;
-    paymentDetails?: string;
-    suppliedProducts?: Array<{
-      productId: string;
-      productName: string;
-      unit: UnitOfMeasure;
-      currentCostKes: number;
-      minOrderQty?: number;
-      leadTimeDays?: number;
-      availability?: 'Available' | 'Seasonal' | 'Unavailable';
-      preferredSupplier?: boolean;
-      notes?: string;
-    }>;
-  }) => Promise<{ ok: boolean; message: string; supplier?: SupplierRecord }>;
+  createSupplier: (input: SupplierDetailsInput) => Promise<{ ok: boolean; message: string; supplier?: SupplierRecord }>;
   updateSupplier: (
     id: string,
-    updates: Partial<SupplierRecord>
+    updates: Partial<SupplierDetailsInput>
   ) => Promise<{ ok: boolean; message: string }>;
   approveSupplier: (
     id: string,
@@ -416,11 +437,16 @@ interface BosContextValue {
   getSuppliersForProduct: (productId: string) => SupplierRecord[];
 
   // Procurement Sourcing & Supplier Payables
-  confirmPurchaseAndCollection: (
-    poId: string,
-    actualCostKes: number,
-    notes?: string
-  ) => Promise<{ ok: boolean; message: string; payableId?: string }>;
+  confirmPurchaseAndCollection: (input: {
+    poId: string;
+    receiptId: string;
+    lines: PurchaseReceiptLineInput[];
+    legacyCostKes?: number;
+    receiptRef?: string;
+    supplierInvoiceRef?: string;
+    dueDate?: string;
+    settlement?: { amountKes: number; method: 'Cash' | 'M-Pesa Business'; reference: string };
+  }) => Promise<{ ok: boolean; message: string; payableId?: string }>;
   recordSupplierPayment: (input: {
     payableId: string;
     amountKes: number;
@@ -547,6 +573,22 @@ export const INITIAL_PODS: PODEvidenceRecord[] = [
   },
 ];
 
+// Commands may resume after authorization before React has rendered the previous update.
+function useBusinessRecords<T>(initial: T[]) {
+  const [records, setRecords] = useState(initial);
+  const current = useRef(initial);
+  const update = (transform: (previous: T[]) => T[]) => {
+    current.current = transform(current.current);
+    setRecords(current.current);
+  };
+  return [records, update, current] as const;
+}
+
+const INITIAL_SUPPLIERS_WITH_OFFERINGS = INITIAL_SUPPLIERS.map((supplier) => ({
+  ...supplier,
+  suppliedProducts: supplier.suppliedProducts.map((offering) => identifySupplierOffering(supplier.id, offering)),
+}));
+
 export function BosProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<InternalUser | null>(
     INITIAL_USERS[0]
@@ -561,24 +603,27 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
   const [roles, setRoles] = useState<RoleDefinition[]>(DEFAULT_ROLES);
   const [users, setUsers] = useState<InternalUser[]>(INITIAL_USERS);
   const [warehouses] = useState<WarehouseRecord[]>(INITIAL_WAREHOUSES);
-  const [products, setProducts] = useState<ProductRecord[]>(INITIAL_PRODUCTS);
-  const [stockBatches, setStockBatches] =
-    useState<StockBatchRecord[]>(INITIAL_STOCK_BATCHES);
+  const [products, setProducts, currentProducts] = useBusinessRecords(INITIAL_PRODUCTS);
+  const [stockBatches, setStockBatches, currentStockBatches] = useBusinessRecords(INITIAL_STOCK_BATCHES);
   const [stockMovements, setStockMovements] = useState<StockMovementRecord[]>(
     INITIAL_STOCK_MOVEMENTS
   );
   const [customers, setCustomers] =
     useState<CustomerInstitutionRecord[]>(INITIAL_CUSTOMERS);
-  const [orders, setOrders] = useState<OrderRecord[]>(INITIAL_ORDERS);
-  const [suppliers, setSuppliers] =
-    useState<SupplierRecord[]>(INITIAL_SUPPLIERS);
-  const [procurementOrders, setProcurementOrders] = useState<
-    ProcurementOrderRecord[]
-  >(INITIAL_PROCUREMENT_ORDERS);
-  const [deliveries, setDeliveries] =
-    useState<DeliveryRunRecord[]>(INITIAL_DELIVERIES);
-  const [invoices, setInvoices] = useState<InvoiceRecord[]>(INITIAL_INVOICES);
-  const [payments, setPayments] = useState<PaymentRecord[]>(INITIAL_PAYMENTS);
+  const [orders, setOrders, currentOrders] = useBusinessRecords(INITIAL_ORDERS);
+  const [suppliers, setSuppliers, currentSuppliers] = useBusinessRecords(INITIAL_SUPPLIERS_WITH_OFFERINGS);
+  const supplierSequence = useRef(Math.max(0, ...INITIAL_SUPPLIERS.map((supplier) => Number(supplier.id.match(/^SUP-(\d+)$/)?.[1] ?? 0))));
+  const [procurementOrders, setProcurementOrders, currentProcurementOrders] = useBusinessRecords(INITIAL_PROCUREMENT_ORDERS);
+  const [deliveries, setDeliveries, currentDeliveries] = useBusinessRecords(INITIAL_DELIVERIES);
+  const [podLedger, setPodLedger] = useState({ records: INITIAL_PODS, invoices: INITIAL_INVOICES });
+  const podLedgerRef = useRef(podLedger);
+  const { records: podRecords, invoices } = podLedger;
+  const updatePodLedger = (update: (current: typeof podLedger) => typeof podLedger) => {
+    const next = update(podLedgerRef.current);
+    podLedgerRef.current = next;
+    setPodLedger(next);
+  };
+  const [payments, setPayments, currentPayments] = useBusinessRecords<PaymentRecord>(INITIAL_PAYMENTS);
   const [crmTickets, setCrmTickets] =
     useState<CrmTicketRecord[]>(INITIAL_CRM_TICKETS);
   const [approvals, setApprovals] =
@@ -590,14 +635,10 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>(
     INITIAL_NOTIFICATIONS
   );
-  const [podRecords, setPodRecords] =
-    useState<PODEvidenceRecord[]>(INITIAL_PODS);
   const [vehicles, setVehicles] = useState<VehicleRecord[]>(INITIAL_VEHICLES);
   const [drivers, setDrivers] = useState<DriverRecord[]>(INITIAL_DRIVERS);
-  const [supplierPayables, setSupplierPayables] =
-    useState<SupplierPayableRecord[]>(INITIAL_SUPPLIER_PAYABLES);
-  const [supplierPayments, setSupplierPayments] =
-    useState<SupplierPaymentRecord[]>(INITIAL_SUPPLIER_PAYMENTS);
+  const [supplierPayables, setSupplierPayables, currentSupplierPayables] = useBusinessRecords(INITIAL_SUPPLIER_PAYABLES);
+  const [supplierPayments, setSupplierPayments, currentSupplierPayments] = useBusinessRecords(INITIAL_SUPPLIER_PAYMENTS);
   const [deletedSkus, setDeletedSkus] = useState<string[]>([]);
   const [enabledWidgets, setEnabledWidgets] =
     useState<string[]>(DEFAULT_WIDGETS);
@@ -946,7 +987,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
 
     // Validate all items before mutating state
     const processedItems: OrderLineItem[] = [];
-    const stockDeltas: { productId: string; quantity: number }[] = [];
+    const reservedByProduct = new Map<string, number>();
     let orderTotalKes = 0;
     const priceOverrideApprovals: {
       product: ProductRecord;
@@ -959,51 +1000,27 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       if (!item.productId) {
         return { ok: false, message: 'Invalid product selected in line items.' };
       }
-      const qty = Number(item.quantity);
-      if (isNaN(qty) || qty <= 0) {
-        return { ok: false, message: 'Every line item must have a quantity greater than zero.' };
+      const product = currentProducts.current.find((p) => p.id === item.productId);
+      if (!product || !canSourceCatalogProduct(product)) {
+        return { ok: false, message: 'Select a product currently available to order.' };
+      }
+      if ((item.overridePriceKes !== undefined && (!Number.isFinite(item.overridePriceKes) || item.overridePriceKes <= 0)) ||
+          (item.purchaseCostKes !== undefined && (!Number.isFinite(item.purchaseCostKes) || item.purchaseCostKes < 0))) {
+        return { ok: false, message: `Enter a valid price and estimated sourcing cost for ${product.name}.` };
       }
 
-      const product = products.find((p) => p.id === item.productId);
-      if (!product) {
-        return { ok: false, message: `Product ${item.productId} not found in catalog.` };
-      }
-
-      // Sourcing mode resolution: direct procurement does not demand warehouse stock
-      const rawMode = item.sourcingMode || (qty > product.availableQty ? 'Direct Procurement' : 'Existing Stock');
-      const sourcingMode: 'Direct Procurement' | 'Existing Stock' | 'Mixed Sourcing' =
-        rawMode === 'direct_procurement' || rawMode === 'Direct Procurement'
-          ? 'Direct Procurement'
-          : rawMode === 'mixed' || rawMode === 'Mixed Sourcing'
-          ? 'Mixed Sourcing'
-          : 'Existing Stock';
-      const isDirectOnly = sourcingMode === 'Direct Procurement';
-      const stockQty =
-        item.stockAllocatedQty !== undefined
-          ? item.stockAllocatedQty
-          : isDirectOnly
-          ? 0
-          : Math.min(qty, product.availableQty);
-      const directQty =
-        item.directProcuredQty !== undefined
-          ? item.directProcuredQty
-          : isDirectOnly
-          ? qty
-          : Math.max(0, qty - stockQty);
-
-      // Check stock sufficiency only for lines allocating from warehouse stock
-      if (stockQty > product.availableQty && !can('orders.approve')) {
-        const msg = `Insufficient FEFO stock for ${product.name} (${product.availableQty} ${product.unit} available, stock allocation requested ${stockQty} ${product.unit}). Stock override requires 'orders.approve' authority.`;
-        pushToast({ title: 'FEFO Stock Constraint', description: msg, tone: 'warning' });
-        return { ok: false, message: msg };
-      }
+      const reserved = reservedByProduct.get(product.id) ?? 0;
+      const allocation = resolveOrderAllocation(item, Math.max(0, product.availableQty - reserved));
+      if (allocation.ok === false) return { ok: false, message: `${product.name}. ${allocation.message}` };
+      const { quantity: qty, sourcingMode, stockQty, directQty } = allocation;
+      reservedByProduct.set(product.id, reserved + stockQty);
 
       // Auto-assign FEFO batch
       const matchingBatch =
         item.allocatedBatch ||
-        (isDirectOnly
+        (stockQty === 0
           ? 'DIRECT-FARM-DISPATCH'
-          : stockBatches
+          : currentStockBatches.current
               .filter((b) => b.productId === product.id && b.daysToExpiry > 0)
               .sort((a, b) => a.daysToExpiry - b.daysToExpiry)[0]?.batchNumber ||
             'LOT-FEFO-AUTO');
@@ -1051,6 +1068,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       }
 
       processedItems.push({
+        id: `line-${processedItems.length + 1}`,
         productId: product.id,
         productName: product.name,
         sku: product.sku,
@@ -1068,14 +1086,12 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         purchaseCostKes: item.purchaseCostKes,
       });
 
-      if (stockQty > 0) {
-        stockDeltas.push({ productId: product.id, quantity: stockQty });
-      }
     }
 
     const needsPriceApproval = priceOverrideApprovals.length > 0;
-    const orderNumber = `ORD-2026-${888 + orders.length}`;
-    const orderId = `ORD-00${orders.length + 1}`;
+    const needsSourcing = processedItems.some((item) => (item.directProcuredQty ?? 0) > 0);
+    const orderNumber = `ORD-2026-${888 + currentOrders.current.length}`;
+    const orderId = `ORD-00${currentOrders.current.length + 1}`;
     const todayStr = ('orderDate' in input && input.orderDate)
       ? input.orderDate
       : new Date().toISOString().split('T')[0];
@@ -1105,7 +1121,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         : 'Samuel Mutua (Storekeeper)',
       nextStepLabel: needsPriceApproval
         ? 'Awaiting Finance/Operations Approval'
-        : 'Release to Warehouse Picking Queue',
+        : needsSourcing ? 'Source outstanding customer quantities' : 'Release to Warehouse Picking Queue',
       totalKes: orderTotalKes,
       itemsCount: processedItems.length,
       items: processedItems,
@@ -1122,17 +1138,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     // Atomic update of orders and product stock
     setOrders((prev) => [newOrder, ...prev]);
 
-    setProducts((prev) =>
-      prev.map((p) => {
-        const delta = stockDeltas.find((d) => d.productId === p.id);
-        if (!delta) return p;
-        return {
-          ...p,
-          availableQty: Math.max(0, p.availableQty - delta.quantity),
-          reservedQty: p.reservedQty + delta.quantity,
-        };
-      })
-    );
+    setProducts((prev) => reserveOrderStock(prev, processedItems));
 
     // If approvals needed, generate ApprovalRequestRecords
     if (needsPriceApproval && currentUser) {
@@ -1174,447 +1180,377 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     return { ok: true, message: msg, orderId };
   };
 
-  const recordDeliveryArrival: BosContextValue['recordDeliveryArrival'] = async (
-    orderId,
-    details
-  ) => {
+  const syncRunReceipts = (run: DeliveryRunRecord, records: PODEvidenceRecord[]) => {
+    const stops = getDeliveryRunStops(run, currentOrders.current, records);
+    const received = stops.filter(({ receipt }) => receipt && receipt.status !== 'Rejected').length;
+    const status = received === stops.length ? 'Delivered' : received > 0 ? 'Partially Delivered' : 'Dispatched';
+    setDeliveries((previous) => previous.map((entry) => entry.id === run.id ? {
+      ...entry,
+      status,
+      podCaptured: received === stops.length,
+      recipientSignOff: received ? `${received} of ${stops.length} stops recorded` : undefined,
+    } : entry));
+  };
+
+  const recordDeliveryArrival: BosContextValue['recordDeliveryArrival'] = async (orderId, details) => {
     const auth = await verifyServerAction('deliveries.dispatch', 'Record Delivery Arrival');
     if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const order = orders.find((o) => o.id === orderId || o.orderNumber === orderId);
+    const order = currentOrders.current.find((entry) => entry.id === orderId || entry.orderNumber === orderId);
     if (!order) return { ok: false, message: 'Order not found.' };
 
-    const podId = `POD-2026-${String(podRecords.length + 1).padStart(3, '0')}`;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const run = currentDeliveries.current.find((entry) => entry.id === details.deliveryRunId);
+    if (!run || !['Dispatched', 'Partially Delivered'].includes(run.status)) {
+      return { ok: false, message: 'Select an order on a dispatched delivery run.' };
+    }
+    if (!canAccessDeliveryRun(run, currentUser, drivers)) {
+      return { ok: false, message: 'This delivery run is assigned to another driver.' };
+    }
+    if (!run.ordersIncluded.some((identifier) => identifier === order.id || identifier === order.orderNumber)) {
+      return { ok: false, message: 'This order does not belong to the selected delivery run.' };
+    }
 
-    // Quantity calculations and discrepancy detection per line item
-    let hasDiscrepancies = false;
-    let anyOutstanding = false;
+    const { records } = podLedgerRef.current;
+    const receipts = getOrderReceipts(order, records);
+    const sameStop = receipts.find((pod) => pod.deliveryRunId === run.id || pod.deliveryRunId === run.runNumber);
+    if (sameStop && sameStop.status !== 'Rejected') {
+      return { ok: false, message: 'This stop already has a proof of delivery.' };
+    }
+    if (receipts.some(isPendingPOD)) {
+      return { ok: false, message: 'The previous proof of delivery must be reviewed before further quantities can be recorded.' };
+    }
+    if (order.status === 'Cancelled' || order.status === 'Closed' || receipts.some((pod) => pod.shortageAccepted)) {
+      return { ok: false, message: 'This order is closed to new receipts.' };
+    }
+    if (!details.recipientName.trim() || !details.quantitiesConfirmed) {
+      return { ok: false, message: 'Enter the recipient name and confirm the received and accepted quantities.' };
+    }
 
-    const reconciledItems: PODDeliveredItem[] = details.deliveredItems.map((it) => {
-      const orderItem = order.items.find(
-        (oi) => oi.productId === it.productId || oi.sku === it.sku
-      );
-      const orderedQty = it.orderedQty ?? it.requestedQty ?? orderItem?.quantity ?? 0;
-      const dispatchedQty = it.dispatchedQty ?? it.requestedQty ?? it.deliveredQty ?? orderedQty;
-      const receivedQty = it.receivedQty ?? it.deliveredQty ?? dispatchedQty;
-      const acceptedQty = it.acceptedQty ?? it.deliveredQty ?? receivedQty;
-      const previousAcceptedQty = it.previousAcceptedQty ?? 0;
+    const expected = getPODExpectedLines(order, records);
+    if (run.sourcePODId && (!run.replacementLoad || !replacementPicksCoverDemand(expected, run.replacementLoad.picks))) {
+      return { ok: false, message: 'The replacement run has no confirmed load for these outstanding quantities.' };
+    }
+    const result = preparePODReceipt(expected, details.quantities);
+    if (result.ok === false) return result;
 
-      const calc = calculatePODLineQuantities({
-        orderedQty,
-        dispatchedQty,
-        receivedQty,
-        acceptedQty,
-        previousAcceptedQty,
-      });
-
-      if (calc.hasDiscrepancy) {
-        hasDiscrepancies = true;
-      }
-      if (calc.outstandingQty > 0) {
-        anyOutstanding = true;
-      }
-
-      const defaultDiscrepancyReason =
-        it.discrepancyReason ||
-        (calc.rejectedQty > 0
-          ? 'Damaged goods'
-          : calc.currentDeliveryShortage > 0
-          ? 'Short supplied'
-          : calc.isOverDelivery
-          ? 'Incorrect quantity'
-          : undefined);
-
-      return {
-        ...it,
-        orderedQty: calc.orderedQty,
-        dispatchedQty: calc.dispatchedQty,
-        receivedQty: calc.receivedQty,
-        acceptedQty: calc.acceptedQty,
-        rejectedQty: calc.rejectedQty,
-        currentDeliveryShortage: calc.currentDeliveryShortage,
-        cumulativeAcceptedQty: calc.cumulativeAcceptedQty,
-        outstandingQty: calc.outstandingQty,
-        classification: it.classification || calc.classification,
-        discrepancyReason: defaultDiscrepancyReason,
-        rejectionReason: it.rejectionReason || (calc.rejectedQty > 0 ? defaultDiscrepancyReason : undefined),
-        deliveredQty: calc.acceptedQty,
-        requestedQty: calc.orderedQty,
-      };
-    });
-
-    const newPod: PODEvidenceRecord = {
+    const now = new Date();
+    const today = getNairobiDate(now);
+    const podId = `POD-${today.slice(0, 4)}-${String(records.length + 1).padStart(3, '0')}`;
+    const newReceipt: PODEvidenceRecord = {
       id: podId,
       orderId: order.id,
       orderNumber: order.orderNumber,
-      deliveryRunId: details.deliveryRunId,
+      deliveryRunId: run.id,
       customerName: order.customerName,
-      recipientName: details.recipientName,
-      recipientRole: details.recipientRole || 'Receiving Staff',
+      recipientName: details.recipientName.trim(),
+      recipientRole: details.recipientRole?.trim(),
       recipientPhone: details.recipientPhone,
-      receivingDepartment: details.receivingDepartment,
-      deliveryDate: todayStr,
-      submittedAt: `${todayStr} ${new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })} EAT`,
-      submittedBy: currentUser ? `${currentUser.fullName} (${currentUser.roleName})` : 'Delivery Driver',
+      receivingDepartment: details.receivingDepartment?.trim(),
+      deliveryDate: today,
+      submittedAt: now.toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' }),
+      submittedBy: currentUser!.fullName,
       status: 'Pending Verification',
-      reconciliationStatus: hasDiscrepancies ? 'Disputed' : 'Fully Reconciled',
-      deliveredItems: reconciledItems,
+      reconciliationStatus: result.hasDiscrepancies ? 'Disputed' : 'Fully Reconciled',
+      deliveredItems: result.items,
       evidenceFiles: details.files || [],
       deliveryNotes: details.notes,
       deliveryExceptions: details.exceptions,
-      hasDiscrepancies,
+      hasDiscrepancies: result.hasDiscrepancies,
     };
 
-    setPodRecords((prev) => [newPod, ...prev]);
+    const nextRecords = [newReceipt, ...records];
+    updatePodLedger((ledger) => ({ ...ledger, records: nextRecords }));
+    syncRunReceipts(run, nextRecords);
+    setOrders((previous) => previous.map((entry) => entry.id === order.id ? {
+      ...entry,
+      status: result.hasOutstanding ? 'Partially Fulfilled' : 'Delivered',
+      podStatus: 'Pending Verification',
+      podEvidenceId: podId,
+      nextStepLabel: 'Review received and accepted quantities',
+    } : entry));
 
-    // Update order lifecycle status reflecting delivery outcome
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === order.id
-          ? {
-              ...o,
-              status: anyOutstanding ? 'Partially Fulfilled' : 'Delivered',
-              podStatus: 'Pending Verification',
-              podEvidenceId: podId,
-              nextStepLabel: hasDiscrepancies
-                ? 'Delivery Recorded with Discrepancy · Awaiting Verification & Reconciliation'
-                : 'Awaiting POD Verification by Operations / Finance',
-            }
-          : o
-      )
-    );
-
-    if (hasDiscrepancies) {
-      setNotifications((prev) => [
-        {
-          id: `NOTIF-${Date.now()}`,
-          severity: 'Warning',
-          title: `Delivery Discrepancy: ${order.orderNumber}`,
-          description: `${details.recipientName} recorded shortages or rejected produce for ${order.customerName}. Verification and review required.`,
-          timestamp: new Date().toISOString(),
-          href: '/fulfillment',
-          permissionRequired: 'fulfillment.manage',
-          read: false,
-        },
-        ...prev,
-      ]);
+    if (result.hasDiscrepancies) {
+      setNotifications((previous) => [{
+        id: `NOTIF-${podId}`,
+        severity: 'Warning',
+        title: `Delivery discrepancy · ${order.orderNumber}`,
+        description: `${order.customerName} recorded a delivery discrepancy. Review the proof of delivery.`,
+        timestamp: now.toISOString(),
+        href: '/fulfillment#pod-queue',
+        permissionRequired: 'fulfillment.manage',
+        read: false,
+      }, ...previous]);
     }
 
-    appendAudit(
-      'Deliveries',
-      order.orderNumber,
-      hasDiscrepancies
-        ? 'Recorded Delivery Arrival with Discrepancies (Shortage/Rejection)'
-        : 'Recorded Physical Delivery Arrival & Submitted POD',
-      'Dispatched',
-      `${hasDiscrepancies ? 'Disputed' : 'Delivered'} · POD ${podId} Pending Verification`
-    );
+    appendAudit('Deliveries', order.orderNumber, 'Submitted proof of delivery', order.status, podId);
+    return { ok: true, message: `${podId} submitted for verification.`, podId };
+  };
 
-    pushToast({
-      title: hasDiscrepancies ? 'Delivery Recorded (Discrepancy Noted)' : 'Delivery Arrival Recorded',
-      description: hasDiscrepancies
-        ? `Delivery for ${order.customerName} submitted with discrepancies. POD queued for supervisor verification.`
-        : `Delivery documented for ${order.customerName}. POD submitted for verification.`,
-      tone: hasDiscrepancies ? 'warning' : 'success',
-    });
+  const getAcceptedGoodsInvoice = (pod: PODEvidenceRecord, order: OrderRecord, currentInvoices: InvoiceRecord[]) => {
+    const existing = getExistingPODInvoice(pod, currentInvoices);
+    const eligibility = calculateInvoiceEligibility(pod, existing?.invoiceNumber);
+    const customer = customers.find((entry) => entry.id === order.customerId);
+    if (!eligibility.eligible) return { ok: false as const, message: eligibility.reason ?? 'No accepted goods to invoice.' };
+    if (!customer?.isInstitutional || customer.paymentTerms === 'Prepaid / M-Pesa') {
+      return { ok: false as const, message: 'This customer is not on institutional credit terms.' };
+    }
 
-    return { ok: true, message: `Delivery recorded. POD ${podId} awaiting verification.`, podId };
+    const issueDate = getNairobiDate();
+    const year = issueDate.slice(0, 4);
+    const sequence = 8890 + currentInvoices.length;
+    const terms = customer.paymentTerms;
+    const invoice: InvoiceRecord = {
+      id: `INV-00${currentInvoices.length + 1}`,
+      invoiceNumber: `INV-${year}-${sequence}`,
+      orderNumber: order.orderNumber,
+      customerId: customer.id,
+      customerName: customer.name,
+      issueDate,
+      dueDate: offsetBusinessDate(issueDate, Number(terms.slice(4))),
+      amountKes: eligibility.billableTotalKes,
+      paidAmountKes: 0,
+      balanceKes: eligibility.billableTotalKes,
+      status: 'Issued',
+      agingBucket: 'Current (0-15d)',
+      lineItems: eligibility.billableLines.map((line) => ({
+        productId: line.productId,
+        productName: line.productName,
+        sku: line.sku,
+        unit: line.unit as UnitOfMeasure,
+        quantity: line.billableQty,
+        allocatedBatch: 'Delivered-Verified',
+        unitPriceKes: line.unitPriceKes,
+        pricingTier: 'Institutional',
+        lineTotalKes: line.lineTotalKes,
+      })),
+      podRef: pod.id,
+      paymentTerms: terms,
+    };
+    return { ok: true as const, invoice };
+  };
+
+  const addCustomerInvoiceBalance = (invoice: InvoiceRecord) => {
+    setCustomers((previous) => previous.map((customer) => customer.id === invoice.customerId
+      ? { ...customer, outstandingBalanceKes: customer.outstandingBalanceKes + invoice.amountKes }
+      : customer));
   };
 
   const verifyPOD: BosContextValue['verifyPOD'] = async (podId, options) => {
-    if (options?.reject) {
-      return rejectPOD(podId, options.notes || 'Rejected POD sign-off');
-    }
-
     const auth = await verifyServerAction('orders.approve', 'Verify Proof of Delivery');
     if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const pod = podRecords.find((p) => p.id === podId);
-    if (!pod) return { ok: false, message: 'POD record not found.' };
+    const ledger = podLedgerRef.current;
+    const pod = ledger.records.find((entry) => entry.id === podId);
+    if (!pod || !isPendingPOD(pod)) return { ok: false, message: 'Only a pending proof of delivery can be verified.' };
+    if (!options.quantitiesConfirmed) return { ok: false, message: 'Confirm the quantities checked against the delivery evidence.' };
 
-    if (pod.status === 'Verified') {
-      return { ok: false, message: 'This Proof of Delivery has already been verified.' };
+    const order = currentOrders.current.find((entry) => entry.id === pod.orderId && entry.orderNumber === pod.orderNumber);
+    if (!order) return { ok: false, message: 'The order linked to this proof of delivery could not be identified.' };
+    if (order.status === 'Cancelled' || order.status === 'Closed') {
+      return { ok: false, message: 'The linked order is closed to verification.' };
     }
+    const expected = getPODExpectedLines(order, ledger.records, pod);
+    const result = preparePODReceipt(expected, options.quantities);
+    if (result.ok === false) return result;
 
-    const order = orders.find((o) => o.id === pod.orderId || o.orderNumber === pod.orderNumber);
-    const customer = customers.find((c) => c.name === pod.customerName || (order && c.id === order.customerId));
-
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    // Compute billable items strictly from verified accepted quantities
-    const existingInvoice = invoices.find((inv) => inv.orderNumber === pod.orderNumber);
-    const invoiceEligibility = calculateInvoiceEligibility(
-      pod.deliveredItems,
-      existingInvoice?.invoiceNumber
-    );
-
-    const updatedPod: PODEvidenceRecord = {
+    const verified: PODEvidenceRecord = {
       ...pod,
       status: 'Verified',
-      verifiedBy: currentUser ? `${currentUser.fullName} (${currentUser.roleName})` : 'Operations Manager',
-      verifiedAt: `${todayStr} ${new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })} EAT`,
-      verificationNotes: options?.notes || 'POD sign-off and accepted quantities verified.',
+      capturedItems: pod.capturedItems ?? pod.deliveredItems,
+      deliveredItems: result.items,
+      hasDiscrepancies: result.hasDiscrepancies,
+      reconciliationStatus: result.hasDiscrepancies ? 'Disputed' : 'Fully Reconciled',
+      verifiedBy: currentUser!.fullName,
+      verifiedAt: new Date().toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' }),
+      verificationNotes: options.notes?.trim() || undefined,
     };
 
-    let generatedInvoiceNumber: string | undefined;
+    const billing = options.createInvoice ? getAcceptedGoodsInvoice(verified, order, ledger.invoices) : null;
+    if (billing?.ok === false) return billing;
+    const invoice = billing?.ok === true ? billing.invoice : undefined;
+    updatePodLedger((current) => ({
+      records: current.records.map((entry) => {
+        if (entry.id === podId) return invoice
+          ? { ...verified, invoiceCreated: true, invoiceNumber: invoice.invoiceNumber }
+          : verified;
+        if (entry.orderId === order.id && entry.replacementRunId && entry.reconciliationStatus === 'Pending Resolution' && !result.hasOutstanding) {
+          return {
+            ...entry,
+            reconciliationStatus: 'Fully Reconciled',
+            discrepancyNotes: [entry.discrepancyNotes, `Remaining goods verified on ${podId}.`].filter(Boolean).join(' · '),
+          };
+        }
+        return entry;
+      }),
+      invoices: invoice ? [invoice, ...current.invoices] : current.invoices,
+    }));
+    if (invoice) addCustomerInvoiceBalance(invoice);
 
-    // Invoicing policy: only institutional credit customers, no existing invoice, and billable items exist
-    const shouldInvoice =
-      options?.autoGenerateInvoice !== false &&
-      customer &&
-      customer.isInstitutional &&
-      customer.paymentTerms !== 'Prepaid / M-Pesa' &&
-      invoiceEligibility.eligible;
+    setOrders((previous) => previous.map((entry) => entry.id === order.id ? {
+      ...entry,
+      status: result.hasOutstanding ? 'Partially Fulfilled' : 'Delivered',
+      podStatus: 'Verified',
+      invoiceStatus: invoice ? 'Issued' : entry.invoiceStatus,
+      invoiceNumber: invoice?.invoiceNumber ?? entry.invoiceNumber,
+      nextStepLabel: result.hasOutstanding ? 'Review outstanding quantities'
+        : result.hasDiscrepancies ? 'Resolve the delivery discrepancy'
+        : invoice ? 'Review invoice and close order' : 'Review billing and close order',
+    } : entry));
 
-    if (shouldInvoice && !existingInvoice && order) {
-      const invNum = `INV-2026-${8890 + invoices.length}`;
-      generatedInvoiceNumber = invNum;
-
-      const dueDate = new Date();
-      if (customer.paymentTerms === 'Net 15') dueDate.setDate(dueDate.getDate() + 15);
-      else if (customer.paymentTerms === 'Net 45') dueDate.setDate(dueDate.getDate() + 45);
-      else dueDate.setDate(dueDate.getDate() + 30); // Net 30 default
-
-      const newInvoice: InvoiceRecord = {
-        id: `INV-00${invoices.length + 1}`,
-        invoiceNumber: invNum,
-        orderNumber: order.orderNumber,
-        customerId: customer.id,
-        customerName: customer.name,
-        issueDate: todayStr,
-        dueDate: dueDate.toISOString().split('T')[0],
-        amountKes: invoiceEligibility.billableTotalKes,
-        paidAmountKes: 0,
-        balanceKes: invoiceEligibility.billableTotalKes,
-        status: 'Issued',
-        agingBucket: 'Current (0-15d)',
-        lineItems: invoiceEligibility.billableLines.map((bl) => ({
-          productId: bl.productId,
-          productName: bl.productName,
-          sku: bl.sku,
-          unit: bl.unit as UnitOfMeasure,
-          quantity: bl.acceptedQty,
-          allocatedBatch: 'Delivered-Verified',
-          unitPriceKes: bl.unitPriceKes,
-          pricingTier: 'Institutional',
-          lineTotalKes: bl.lineTotalKes,
-        })),
-        podRef: pod.id,
-        paymentTerms: customer.paymentTerms,
-      };
-
-      setInvoices((prev) => [newInvoice, ...prev]);
-      updatedPod.invoiceCreated = true;
-      updatedPod.invoiceNumber = invNum;
-
-      // Update customer balance accurately with billable accepted total
-      setCustomers((prev) =>
-        prev.map((c) =>
-          c.id === customer.id
-            ? { ...c, outstandingBalanceKes: c.outstandingBalanceKes + invoiceEligibility.billableTotalKes }
-            : c
-        )
-      );
-    }
-
-    setPodRecords((prev) => prev.map((p) => (p.id === pod.id ? updatedPod : p)));
-
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.orderNumber === pod.orderNumber
-          ? {
-              ...o,
-              status: invoiceEligibility.hasOutstandingShortages ? 'Partially Fulfilled' : 'Delivered',
-              podStatus: 'Verified',
-              invoiceStatus: generatedInvoiceNumber ? 'Draft Created' : o.invoiceStatus,
-              invoiceNumber: generatedInvoiceNumber || o.invoiceNumber,
-              nextStepLabel: generatedInvoiceNumber
-                ? `Invoice ${generatedInvoiceNumber} Issued (Accepted: KES ${invoiceEligibility.billableTotalKes.toLocaleString()})${invoiceEligibility.hasOutstandingShortages ? ' · Outstanding Shortage Remains' : ''}`
-                : invoiceEligibility.hasOutstandingShortages
-                ? 'POD Verified · Outstanding Sourcing Shortages Remain'
-                : 'Order Verified · Ready for Invoicing / Closure',
-            }
-          : o
-      )
-    );
-
-    appendAudit(
-      'Fulfillment',
-      pod.orderNumber,
-      'Verified Electronic POD & Validated Delivered Quantities',
-      'POD Pending Verification',
-      generatedInvoiceNumber
-        ? `POD Verified · Auto-generated Tax Invoice ${generatedInvoiceNumber} (KES ${invoiceEligibility.billableTotalKes.toLocaleString()})`
-        : 'POD Verified'
-    );
-
-    const successMsg = generatedInvoiceNumber
-      ? `Proof of Delivery verified for ${pod.customerName}. Draft Invoice ${generatedInvoiceNumber} generated for accepted goods (KES ${invoiceEligibility.billableTotalKes.toLocaleString()}).`
-      : `Proof of Delivery verified for ${pod.customerName}.`;
-
-    pushToast({
-      title: 'POD Verified',
-      description: successMsg,
-      tone: 'success',
-    });
-
-    return { ok: true, message: successMsg, invoiceNumber: generatedInvoiceNumber };
+    appendAudit('Fulfillment', order.orderNumber, 'Verified accepted delivery quantities', 'Pending Verification',
+      invoice ? `Verified · ${invoice.invoiceNumber}` : 'Verified');
+    return {
+      ok: true,
+      message: invoice ? `Proof of delivery verified and invoice ${invoice.invoiceNumber} issued.` : 'Proof of delivery verified.',
+      invoiceNumber: invoice?.invoiceNumber,
+    };
   };
 
-  const reconcilePODDiscrepancy: BosContextValue['reconcilePODDiscrepancy'] = async (
-    podId,
-    resolution
-  ) => {
-    const pod = podRecords.find((p) => p.id === podId);
-    if (!pod) return { ok: false, message: 'POD record not found.' };
+  const reconcilePODDiscrepancy: BosContextValue['reconcilePODDiscrepancy'] = async (podId, resolution) => {
+    const auth = await verifyServerAction('orders.approve', 'Reconcile Delivery Discrepancy');
+    if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const updatedPod: PODEvidenceRecord = {
-      ...pod,
-      reconciliationStatus: 'Fully Reconciled',
-      discrepancyNotes: `${pod.discrepancyNotes ? pod.discrepancyNotes + ' | ' : ''}Resolution: ${resolution.action} (${resolution.notes}) by ${currentUser?.fullName || 'Operations'}`,
-    };
+    const { records } = podLedgerRef.current;
+    const pod = records.find((entry) => entry.id === podId);
+    if (!pod || pod.status !== 'Verified' || !isOpenPODDiscrepancy(pod)) {
+      return { ok: false, message: 'Verify the quantities before resolving an open delivery discrepancy.' };
+    }
+    const notes = resolution.notes.trim();
+    if (!notes) return { ok: false, message: 'Enter the resolution notes.' };
+    const order = currentOrders.current.find((entry) => entry.id === pod.orderId && entry.orderNumber === pod.orderNumber);
+    if (!order) return { ok: false, message: 'The linked order could not be identified.' };
+    const expected = getPODExpectedLines(order, records);
+    const hasOutstanding = expected.some((line) => line.outstandingQty > 0);
+    const openReplacementRun = currentDeliveries.current.some((run) => run.sourcePODId &&
+      run.ordersIncluded.includes(order.orderNumber) && run.status !== 'Delivered' && run.status !== 'Rescheduled');
+    if (openReplacementRun || getOrderReceipts(order, records).some(isPendingPOD)) {
+      return { ok: false, message: 'Complete the pending delivery or verification before resolving the remaining quantities.' };
+    }
 
-    setPodRecords((prev) => prev.map((p) => (p.id === podId ? updatedPod : p)));
+    let replacementRunId = pod.replacementRunId;
+    if (resolution.action === 'Schedule Re-delivery') {
+      if (replacementRunId) return { ok: false, message: 'A replacement run is already scheduled.' };
+      const original = currentDeliveries.current.find((entry) => entry.id === pod.deliveryRunId || entry.runNumber === pod.deliveryRunId);
+      if (!original || !hasOutstanding) {
+        return { ok: false, message: 'A linked route and outstanding order quantities are required.' };
+      }
+      const scheduledDate = resolution.replacementDate ?? '';
+      if (!isDeliveryPlanDate(scheduledDate)) {
+        return { ok: false, message: 'Choose a replacement delivery date on or after today.' };
+      }
 
-    appendAudit(
-      'Fulfillment',
-      pod.orderNumber,
-      'Reconciled Delivery Discrepancy',
-      pod.reconciliationStatus || 'Disputed',
-      `Reconciled: ${resolution.action} · ${resolution.notes}`
-    );
+      replacementRunId = `RUN-R-${pod.id}`;
+      const replacement: DeliveryRunRecord = {
+        id: replacementRunId,
+        runNumber: `${original.runNumber}-R${pod.id.split('-').at(-1)}`,
+        routeZone: original.routeZone,
+        vehicleReg: original.vehicleReg,
+        driverName: original.driverName,
+        driverPhone: original.driverPhone,
+        departureTime: 'To be confirmed',
+        scheduledDate,
+        status: 'Planned',
+        ordersIncluded: [order.orderNumber],
+        institutionsServed: [order.customerName],
+        totalWeightKg: expected.filter((line) => line.unit === 'kilograms').reduce((sum, line) => sum + line.outstandingQty, 0),
+        assignedDriverId: original.assignedDriverId,
+        assignedVehicleId: original.assignedVehicleId,
+        sourcePODId: pod.id,
+        podCaptured: false,
+      };
+      setDeliveries((previous) => [replacement, ...previous]);
+      setOrders((previous) => previous.map((entry) => entry.id === order.id
+        ? { ...entry, nextStepLabel: `Replacement delivery planned for ${scheduledDate}` }
+        : entry));
+    }
 
-    pushToast({
-      title: 'Discrepancy Reconciled',
-      description: `Delivery discrepancy for ${pod.orderNumber} resolved with action '${resolution.action}'.`,
-      tone: 'success',
-    });
-
-    return { ok: true, message: 'Discrepancy reconciled successfully.' };
+    const reconciliationStatus = resolution.action === 'Schedule Re-delivery' ? 'Pending Resolution' : 'Fully Reconciled';
+    const shortageAccepted = resolution.action === 'Accept Final Quantities' && hasOutstanding;
+    updatePodLedger((ledger) => ({
+      ...ledger,
+      records: ledger.records.map((entry) => entry.id === pod.id ? {
+        ...entry,
+        replacementRunId,
+        reconciliationStatus,
+        shortageAccepted,
+        discrepancyNotes: [entry.discrepancyNotes, `${resolution.action} · ${notes} · ${currentUser!.fullName}`].filter(Boolean).join(' · '),
+      } : entry.orderId === order.id && entry.replacementRunId && entry.reconciliationStatus === 'Pending Resolution' && shortageAccepted
+        ? { ...entry, reconciliationStatus: 'Fully Reconciled', discrepancyNotes: [entry.discrepancyNotes, `Final quantities accepted on ${pod.id}.`].filter(Boolean).join(' · ') }
+        : entry),
+    }));
+    if (shortageAccepted) {
+      setOrders((previous) => previous.map((entry) => entry.id === order.id
+        ? { ...entry, status: 'Delivered', nextStepLabel: 'Review billing and close order' }
+        : entry));
+    }
+    appendAudit('Fulfillment', pod.orderNumber, resolution.action, pod.reconciliationStatus || 'Disputed', notes);
+    return { ok: true, message: resolution.action === 'Schedule Re-delivery' ? 'Replacement delivery planned.' : 'Final accepted quantities recorded.' };
   };
 
   const rejectPOD: BosContextValue['rejectPOD'] = async (podId, reason) => {
     const auth = await verifyServerAction('orders.approve', 'Reject Proof of Delivery');
     if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const pod = podRecords.find((p) => p.id === podId);
-    if (!pod) return { ok: false, message: 'POD record not found.' };
+    const { records } = podLedgerRef.current;
+    const pod = records.find((entry) => entry.id === podId);
+    if (!pod || !isPendingPOD(pod)) return { ok: false, message: 'Only a pending proof of delivery can be rejected.' };
+    const note = reason.trim();
+    if (!note) return { ok: false, message: 'Enter a rejection reason.' };
 
-    if (!reason || reason.trim().length === 0) {
-      return { ok: false, message: 'A rejection reason is required.' };
-    }
-
-    const updatedPod: PODEvidenceRecord = {
-      ...pod,
+    const nextRecords: PODEvidenceRecord[] = records.map((entry) => entry.id === podId ? {
+      ...entry,
       status: 'Rejected',
-      rejectionReason: reason,
-      verifiedBy: currentUser ? `${currentUser.fullName} (${currentUser.roleName})` : 'Operations',
-      verifiedAt: `${new Date().toISOString().split('T')[0]} ${new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })} EAT`,
-    };
+      rejectionReason: note,
+      verifiedBy: currentUser!.fullName,
+      verifiedAt: new Date().toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' }),
+    } : entry);
+    updatePodLedger((ledger) => ({ ...ledger, records: nextRecords }));
+    const run = currentDeliveries.current.find((entry) => entry.id === pod.deliveryRunId || entry.runNumber === pod.deliveryRunId);
+    if (run) syncRunReceipts(run, nextRecords);
 
-    setPodRecords((prev) => prev.map((p) => (p.id === pod.id ? updatedPod : p)));
+    setOrders((previous) => previous.map((order) => order.id === pod.orderId ? {
+      ...order,
+      status: 'Dispatched',
+      podStatus: 'Rejected',
+      nextStepLabel: 'Capture a corrected proof of delivery',
+    } : order));
 
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.orderNumber === pod.orderNumber
-          ? {
-              ...o,
-              podStatus: 'Rejected',
-              nextStepLabel: `POD Rejected: ${reason}. Driver re-capture required.`,
-            }
-          : o
-      )
-    );
-
-    appendAudit(
-      'Fulfillment',
-      pod.orderNumber,
-      'Rejected Proof of Delivery',
-      'Pending Verification',
-      `Rejected: ${reason}`
-    );
-
-    pushToast({
-      title: 'POD Rejected',
-      description: `POD for ${pod.customerName} rejected: ${reason}`,
-      tone: 'warning',
-    });
-
-    return { ok: true, message: `POD marked as rejected. Driver notification queued.` };
+    appendAudit('Fulfillment', pod.orderNumber, 'Rejected proof of delivery', 'Pending Verification', note);
+    return { ok: true, message: 'Proof of delivery rejected. The stop is open for a corrected receipt.' };
   };
 
-  const generateDraftInvoice: BosContextValue['generateDraftInvoice'] = async (orderId) => {
-    const auth = await verifyServerAction('finance.view', 'Generate Draft Invoice');
+  const generateDraftInvoice: BosContextValue['generateDraftInvoice'] = async (orderId, podId) => {
+    const auth = await verifyServerAction('finance.record_payment', 'Issue Accepted Goods Invoice');
     if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const order = orders.find((o) => o.id === orderId || o.orderNumber === orderId);
+    const order = currentOrders.current.find((entry) => entry.id === orderId || entry.orderNumber === orderId);
     if (!order) return { ok: false, message: 'Order not found.' };
 
-    const existing = invoices.find((i) => i.orderNumber === order.orderNumber);
-    if (existing) {
-      return { ok: false, message: `Invoice ${existing.invoiceNumber} already exists for this order.` };
-    }
+    const ledger = podLedgerRef.current;
+    const eligible = getOrderReceipts(order, ledger.records).filter((entry) => entry.status === 'Verified');
+    const pod = podId ? eligible.find((entry) => entry.id === podId)
+      : eligible.find((entry) => calculateInvoiceEligibility(entry, getExistingPODInvoice(entry, ledger.invoices)?.invoiceNumber).eligible);
+    if (!pod) return { ok: false, message: 'Select a verified receipt with unbilled accepted quantities.' };
 
-    const customer = customers.find((c) => c.id === order.customerId);
-    const todayStr = new Date().toISOString().split('T')[0];
-    const invNum = `INV-2026-${8890 + invoices.length}`;
+    const billing = getAcceptedGoodsInvoice(pod, order, ledger.invoices);
+    if (billing.ok === false) return billing;
+    const { invoice } = billing;
+    updatePodLedger((current) => ({
+      records: current.records.map((entry) => entry.id === pod.id
+        ? { ...entry, invoiceCreated: true, invoiceNumber: invoice.invoiceNumber }
+        : entry),
+      invoices: [invoice, ...current.invoices],
+    }));
+    addCustomerInvoiceBalance(invoice);
 
-    const dueDate = new Date();
-    const terms = customer?.paymentTerms || 'Net 30';
-    if (terms === 'Net 15') dueDate.setDate(dueDate.getDate() + 15);
-    else if (terms === 'Net 45') dueDate.setDate(dueDate.getDate() + 45);
-    else dueDate.setDate(dueDate.getDate() + 30);
+    setOrders((previous) => previous.map((entry) => entry.id === order.id ? {
+      ...entry,
+      invoiceStatus: 'Issued',
+      invoiceNumber: invoice.invoiceNumber,
+    } : entry));
 
-    const newInvoice: InvoiceRecord = {
-      id: `INV-00${invoices.length + 1}`,
-      invoiceNumber: invNum,
-      orderNumber: order.orderNumber,
-      customerId: order.customerId,
-      customerName: order.customerName,
-      issueDate: todayStr,
-      dueDate: dueDate.toISOString().split('T')[0],
-      amountKes: order.totalKes,
-      paidAmountKes: 0,
-      balanceKes: order.totalKes,
-      status: 'Issued',
-      agingBucket: 'Current (0-15d)',
-      lineItems: order.items,
-      podRef: order.podEvidenceId,
-      paymentTerms: terms,
-    };
-
-    setInvoices((prev) => [newInvoice, ...prev]);
-
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === order.id
-          ? {
-              ...o,
-              invoiceStatus: 'Draft Created',
-              invoiceNumber: invNum,
-              paymentStatus: 'Invoiced (Net 30)',
-              nextStepLabel: `Invoice ${invNum} Generated · Awaiting Payment Settlement`,
-            }
-          : o
-      )
-    );
-
-    appendAudit(
-      'Finance',
-      order.orderNumber,
-      'Generated Commercial Tax Invoice',
-      'Uninvoiced',
-      `${invNum} · KES ${order.totalKes.toLocaleString()}`
-    );
-
-    pushToast({
-      title: `Invoice ${invNum} Generated`,
-      description: `Commercial tax invoice created for ${order.customerName}.`,
-      tone: 'success',
-    });
-
-    return { ok: true, message: `Invoice ${invNum} generated successfully.`, invoiceNumber: invNum };
+    appendAudit('Finance', order.orderNumber, 'Issued accepted-goods invoice', pod.id, invoice.invoiceNumber);
+    return { ok: true, message: `Invoice ${invoice.invoiceNumber} issued.`, invoiceNumber: invoice.invoiceNumber };
   };
 
   const advanceOrderStatus: BosContextValue['advanceOrderStatus'] = async (
@@ -1624,8 +1560,6 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     const requiredPerm: PermissionKey =
       nextStatus === 'Picking' || nextStatus === 'Packed'
         ? 'fulfillment.manage'
-        : nextStatus === 'Dispatched' || nextStatus === 'Delivered'
-        ? 'deliveries.dispatch'
         : 'orders.edit';
 
     const auth = await verifyServerAction(
@@ -1634,13 +1568,39 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     );
     if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const target = orders.find((o) => o.id === orderId);
+    const target = currentOrders.current.find((o) => o.id === orderId);
     if (!target) return { ok: false, message: 'Order not found.' };
+    if (!permitsManualOrderStage(target.status, nextStatus)) {
+      return { ok: false, message: 'Use the next available action for this order in Fulfillment, Deliveries, or Approvals.' };
+    }
+    if (nextStatus === 'Closed') {
+      const receipts = getOrderReceipts(target, podLedgerRef.current.records);
+      const outstanding = getPODExpectedLines(target, receipts).some((line) => line.outstandingQty > 0);
+      if (target.status !== 'Delivered' || !receipts.some((pod) => pod.status === 'Verified') ||
+          receipts.some((pod) => isPendingPOD(pod) || isOpenPODDiscrepancy(pod)) ||
+          (outstanding && !receipts.some((pod) => pod.shortageAccepted))) {
+        return { ok: false, message: 'Verify delivery quantities and resolve open discrepancies before closing.' };
+      }
+      const customer = customers.find((entry) => entry.id === target.customerId);
+      if (customer?.isInstitutional && customer.paymentTerms !== 'Prepaid / M-Pesa' && receipts.some((pod) =>
+        pod.status === 'Verified' && calculateInvoiceEligibility(pod, getExistingPODInvoice(pod, podLedgerRef.current.invoices)?.invoiceNumber).eligible)) {
+        return { ok: false, message: 'Issue the invoices for verified accepted quantities before closing.' };
+      }
+    }
+
+    const stillSourcing = getOrderSourcingLines(target, currentProcurementOrders.current)
+      .filter((line) => line.outstanding > 0);
+    if (nextStatus === 'Packed' && stillSourcing.length) {
+      const required = stillSourcing.map(({ item, outstanding }) =>
+        `${item.productName} ${outstanding.toLocaleString()} ${item.unit}`
+      ).join(', ');
+      return { ok: false, message: `Source the outstanding quantities before packing or dispatching. ${required}.` };
+    }
 
     const nextStepMap: Record<OrderLifecycleStatus, string> = {
       Draft: 'Confirm Order Details',
       'Pending Payment': 'Verify M-Pesa / EFT Receipt',
-      Confirmed: 'Release to Warehouse Picking Queue',
+      Confirmed: stillSourcing.length ? 'Source outstanding customer quantities' : 'Release to Warehouse Picking Queue',
       Picking: 'Complete FEFO Picking & Stage for Packing',
       Packed: 'Assign Vehicle & Dispatch Route Run',
       Dispatched: 'Capture Electronic Proof of Delivery (POD)',
@@ -1723,7 +1683,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     const auth = await verifyServerAction('products.edit', 'Update Product Details');
     if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const target = products.find((p) => p.id === productId);
+    const target = currentProducts.current.find((p) => p.id === productId);
     if (!target) return { ok: false, message: 'Product not found.' };
 
     const updatedPricing = updates.pricing
@@ -1796,7 +1756,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     const auth = await verifyServerAction('products.edit', 'Update Product Pricing');
     if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const target = products.find((p) => p.id === productId);
+    const target = currentProducts.current.find((p) => p.id === productId);
     if (!target) return { ok: false, message: 'Product not found.' };
 
     setProducts((prev) =>
@@ -1850,10 +1810,15 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     const auth = await verifyServerAction(perm, `Record Stock ${input.type}`);
     if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const batch = stockBatches.find((b) => b.id === input.batchId);
+    const batch = currentStockBatches.current.find((b) => b.id === input.batchId);
     if (!batch) return { ok: false, message: 'Stock batch not found.' };
 
-    const newAvailable = Math.max(0, batch.availableQty + input.quantityDelta);
+    const product = currentProducts.current.find((item) => item.id === batch.productId);
+    const newAvailable = batch.availableQty + input.quantityDelta;
+    if (!product || !Number.isFinite(input.quantityDelta) || input.quantityDelta === 0 ||
+        newAvailable < 0 || product.availableQty + input.quantityDelta < 0) {
+      return { ok: false, message: 'Enter a stock movement within the available batch and product quantities.' };
+    }
 
     setStockBatches((prev) =>
       prev.map((b) =>
@@ -1864,14 +1829,14 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     setProducts((prev) =>
       prev.map((p) =>
         p.id === batch.productId
-          ? { ...p, availableQty: Math.max(0, p.availableQty + input.quantityDelta) }
+          ? { ...p, availableQty: p.availableQty + input.quantityDelta }
           : p
       )
     );
 
     const mov: StockMovementRecord = {
-      id: `MOV-${305 + stockMovements.length}`,
-      timestamp: 'Just now',
+      id: `MOV-${crypto.randomUUID()}`,
+      timestamp: new Date().toISOString(),
       type: input.type,
       productName: batch.productName,
       batchNumber: batch.batchNumber,
@@ -1911,7 +1876,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     );
     if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const supplier = suppliers.find((s) => s.id === input.supplierId);
+    const supplier = currentSuppliers.current.find((s) => s.id === input.supplierId);
     if (!supplier) return { ok: false, message: 'Supplier not found.' };
 
     const eligibility = isSupplierEligibleForPurchasing(supplier);
@@ -1920,23 +1885,40 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       return { ok: false, message: eligibility.reason! };
     }
 
-    const poNumber = `PO-2026-${517 + procurementOrders.length}`;
-    const prNumber = `PR-2026-${312 + procurementOrders.length}`;
+    if (!isCalendarDate(input.expectedDate)) return { ok: false, message: 'Enter a valid expected date.' };
+    const direct = input.purpose === 'Direct Customer Fulfillment';
+    const warehouse = warehouses.find((item) => item.id === input.warehouseId);
+    const order = direct ? currentOrders.current.find((item) => item.id === input.customerOrderId) : undefined;
+    if (direct && (!order || !['Confirmed', 'Picking', 'Partially Fulfilled'].includes(order.status))) {
+      return { ok: false, message: 'Select a confirmed customer order with open sourcing demand.' };
+    }
+    if (!direct && !warehouse) return { ok: false, message: 'Select the warehouse receiving the goods.' };
+    const demand = order ? getOrderSourcingLines(order, currentProcurementOrders.current) : undefined;
+    const planned = buildPurchaseLines(supplier, currentProducts.current, input.lines, demand);
+    if (planned.ok === false) return planned;
+
+    const records = currentProcurementOrders.current;
+    const poNumber = `PO-${input.expectedDate.slice(0, 4)}-${517 + records.length}`;
+    const prNumber = `PR-${input.expectedDate.slice(0, 4)}-${312 + records.length}`;
+    const itemsSummary = planned.lines.map((line) => `${line.quantity.toLocaleString()} ${line.unit} ${line.productName}`).join(' · ');
 
     const newPo: ProcurementOrderRecord = {
-      id: `PO-0${procurementOrders.length + 1}`,
+      id: `PO-0${records.length + 1}`,
       poNumber,
       prNumber,
       supplierId: supplier.id,
       supplierName: supplier.name,
-      warehouseName: input.warehouseName,
-      purpose: input.purpose || 'Direct Customer Fulfillment',
-      customerOrderId: input.customerOrderId,
-      customerOrderNumber: input.customerOrderNumber,
-      stage: input.totalKes >= 250000 ? 'Pending Approval' : 'PO Issued',
+      warehouseName: direct ? 'Direct to customer' : warehouse!.name,
+      warehouseId: warehouse?.id,
+      purpose: input.purpose,
+      customerOrderId: order?.id,
+      customerOrderNumber: order?.orderNumber,
+      lines: planned.lines,
+      paymentTerms: supplier.paymentTerms,
+      stage: planned.totalKes >= 250000 ? 'Pending Approval' : 'PO Issued',
       expectedDate: input.expectedDate,
-      totalKes: input.totalKes,
-      itemsSummary: input.itemsSummary,
+      totalKes: planned.totalKes,
+      itemsSummary,
       requestedBy: currentUser?.fullName || 'Procurement Officer',
     };
 
@@ -1948,11 +1930,11 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
           id: `APR-0${prev.length + 1}`,
           reference: poNumber,
           category: 'Purchase Order',
-          entityTitle: `${supplier.name} · ${input.itemsSummary}`,
+          entityTitle: `${supplier.name} · ${itemsSummary}`,
           requesterName: currentUser.fullName,
           requesterRole: currentUser.roleName,
-          valueKes: input.totalKes,
-          reason: `Replenishment for ${input.warehouseName}`,
+          valueKes: planned.totalKes,
+          reason: order ? `Direct sourcing for ${order.orderNumber}` : `Replenishment for ${warehouse!.name}`,
           requestedAt: 'Just now',
           status: 'Pending',
         },
@@ -1965,7 +1947,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       poNumber,
       'Created Procurement Requisition',
       'None',
-      `${supplier.name} · KES ${input.totalKes.toLocaleString()} (${newPo.stage})`
+      `${supplier.name} · KES ${planned.totalKes.toLocaleString()} (${newPo.stage})`
     );
 
     const msg = `${poNumber} created (${newPo.stage}).`;
@@ -1975,50 +1957,37 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
 
   const advanceProcurementStage: BosContextValue['advanceProcurementStage'] =
     async (poId) => {
-      const target = procurementOrders.find((p) => p.id === poId);
+      const target = currentProcurementOrders.current.find((p) => p.id === poId);
       if (!target) return { ok: false, message: 'Purchase Order not found.' };
 
-      const stageOrder: ProcurementOrderRecord['stage'][] = [
-        'Purchase Request',
-        'Pending Approval',
-        'PO Issued',
-        'Receiving (GRN)',
-        'Quality Check',
-        'Stock Posted',
-      ];
-      const idx = stageOrder.indexOf(target.stage);
-      if (idx === -1 || idx === stageOrder.length - 1) {
-        return { ok: false, message: 'Already at final Stock Posted stage.' };
+      if (target.stage !== 'Purchase Request' && target.stage !== 'Pending Approval') {
+        return { ok: false, message: 'Use goods collection or warehouse receiving to advance an issued purchase order.' };
       }
 
-      const nextStage = stageOrder[idx + 1];
-      const requiredPerm: PermissionKey =
-        target.stage === 'Pending Approval'
-          ? 'procurement.approve'
-          : nextStage === 'Receiving (GRN)' || nextStage === 'Stock Posted'
-          ? 'inventory.receive'
-          : 'procurement.create';
+      const nextStage = target.stage === 'Purchase Request' ? 'Pending Approval' : 'PO Issued';
+      const requiredPerm = nextStage === 'PO Issued' ? 'procurement.approve' : 'procurement.create';
 
       const auth = await verifyServerAction(
         requiredPerm,
         `Advance PO to ${nextStage}`
       );
       if (!auth.ok) return { ok: false, message: auth.error! };
+      if (currentProcurementOrders.current.find((po) => po.id === poId)?.stage !== target.stage) {
+        return { ok: false, message: 'The purchase order stage has changed. Review the current status.' };
+      }
+      const supplier = currentSuppliers.current.find((item) => item.id === target.supplierId);
+      if (nextStage === 'PO Issued' && (!supplier || !isSupplierEligibleForPurchasing(supplier).eligible)) {
+        return { ok: false, message: 'An active eligible supplier is required before issuing a purchase order.' };
+      }
 
       setProcurementOrders((prev) =>
-        prev.map((p) =>
-          p.id === poId
-            ? {
-                ...p,
-                stage: nextStage,
-                qualityCheckPassPct:
-                  nextStage === 'Quality Check' || nextStage === 'Stock Posted'
-                    ? 98.6
-                    : p.qualityCheckPassPct,
-              }
-            : p
-        )
+        prev.map((p) => p.id === poId ? { ...p, stage: nextStage } : p)
       );
+      if (nextStage === 'PO Issued') {
+        setApprovals((prev) => prev.map((item) => item.reference === target.poNumber && item.status === 'Pending'
+          ? { ...item, status: 'Approved', decisionBy: currentUser?.fullName, decisionAt: new Date().toISOString() }
+          : item));
+      }
 
       appendAudit(
         'Procurement',
@@ -2033,105 +2002,261 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       return { ok: true, message: msg };
     };
 
-  const updateDeliveryStatus: BosContextValue['updateDeliveryStatus'] = async (
-    runId,
-    status,
-    recipientSignOff
-  ) => {
-    const auth = await verifyServerAction(
-      'deliveries.dispatch',
-      `Update Delivery Run to ${status}`
-    );
+  const closePurchaseBalance: BosContextValue['closePurchaseBalance'] = async (poId, reason) => {
+    const auth = await verifyServerAction('procurement.approve', 'Close Outstanding Purchase Balance');
+    if (!auth.ok) return { ok: false, message: auth.error! };
+    const target = currentProcurementOrders.current.find((po) => po.id === poId);
+    if (!target?.lines?.length || !['PO Issued', 'Partially Received'].includes(target.stage)) {
+      return { ok: false, message: 'This purchase order has no open quantities to close.' };
+    }
+    const closureReason = reason.trim();
+    if (!closureReason) return { ok: false, message: 'Enter why the remaining quantities will not be received.' };
+
+    const stage = target.receipts?.length ? 'Closed Short' : 'Cancelled';
+    setProcurementOrders((previous) => previous.map((po) => po.id === poId ? { ...po, stage, closureReason } : po));
+    appendAudit('Procurement', target.poNumber, 'Closed unreceived purchase balance', target.stage, `${stage} · ${closureReason}`);
+    const message = `The remaining quantities on ${target.poNumber} are available for a new purchase.`;
+    pushToast({ title: 'Purchase balance closed', description: message, tone: 'success' });
+    return { ok: true, message };
+  };
+
+  const createDeliveryRun: BosContextValue['createDeliveryRun'] = async (input) => {
+    const auth = await verifyServerAction('deliveries.assign', 'Plan Delivery Run');
     if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const run = deliveries.find((r) => r.id === runId);
-    if (!run) return { ok: false, message: 'Delivery run not found.' };
+    const routeZone = input.routeZone.trim();
+    if (!routeZone || !isDeliveryPlanDate(input.scheduledDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.departureTime)) {
+      return { ok: false, message: 'Enter a route name, a current or future date, and a valid departure time.' };
+    }
+    const runs = currentDeliveries.current;
+    const available = getUnassignedPackedOrders(currentOrders.current, runs);
+    const orderIds = new Set(input.orderIds);
+    const stops = available.filter((order) => orderIds.has(order.id));
+    if (!stops.length || stops.length !== orderIds.size) {
+      return { ok: false, message: 'Choose packed orders that are available for route assignment.' };
+    }
+    if (stops.some((order) => getOrderSourcingLines(order, currentProcurementOrders.current).some((line) => line.outstanding > 0))) {
+      return { ok: false, message: 'Complete sourcing for every order in the run.' };
+    }
+    const vehicle = vehicles.find((entry) => entry.id === input.vehicleId);
+    const driver = drivers.find((entry) => entry.id === input.driverId);
+    if (!vehicle || !driver || ['Maintenance', 'Out of Service'].includes(vehicle.status) || ['Leave', 'Off Duty'].includes(driver.status)) {
+      return { ok: false, message: 'Choose an available vehicle and driver.' };
+    }
+    const runPrefix = `RUN-${input.scheduledDate.replaceAll('-', '')}`;
+    let sequence = 1;
+    while (runs.some((run) => run.runNumber === `${runPrefix}-${sequence}`)) sequence++;
+    const runNumber = `${runPrefix}-${sequence}`;
+    const run: DeliveryRunRecord = {
+      id: runNumber,
+      runNumber,
+      routeZone,
+      scheduledDate: input.scheduledDate,
+      departureTime: `${input.departureTime} EAT`,
+      vehicleReg: vehicle.registration,
+      vehicleId: vehicle.id,
+      assignedVehicleId: vehicle.id,
+      driverName: driver.fullName,
+      driverPhone: driver.phone,
+      assignedDriverId: driver.id,
+      status: 'Planned',
+      ordersIncluded: stops.map((order) => order.orderNumber),
+      institutionsServed: stops.map((order) => order.customerName),
+      totalWeightKg: stops.flatMap((order) => order.items).filter((item) => item.unit === 'kilograms')
+        .reduce((sum, item) => sum + item.quantity, 0),
+      podCaptured: false,
+    };
+    setDeliveries((previous) => [run, ...previous]);
+    const plannedIds = new Set(stops.map((order) => order.id));
+    setOrders((previous) => previous.map((order) => plannedIds.has(order.id)
+      ? { ...order, nextStepLabel: `Delivery run ${runNumber} planned`, deliveryRunId: run.id }
+      : order));
+    appendAudit('Deliveries', runNumber, 'Planned delivery run', 'Unassigned', `${stops.length} stops · ${input.scheduledDate}`);
+    return { ok: true, message: `${runNumber} planned for ${stops.length} customer ${stops.length === 1 ? 'stop' : 'stops'}.` };
+  };
 
-    const isDelivered = status === 'Delivered';
-    setDeliveries((prev) =>
-      prev.map((r) =>
-        r.id === runId
-          ? {
-              ...r,
-              status,
-              podCaptured: isDelivered ? true : r.podCaptured,
-              recipientSignOff:
-                recipientSignOff ||
-                (isDelivered
-                  ? `Verified Electronic POD · ${new Date().toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })} EAT`
-                  : r.recipientSignOff),
-            }
-          : r
-      )
-    );
+  const getReplacementDemand = (run: DeliveryRunRecord) => {
+    const { records } = podLedgerRef.current;
+    const source = records.find((pod) => pod.id === run.sourcePODId && pod.replacementRunId === run.id &&
+      pod.status === 'Verified' && pod.reconciliationStatus === 'Pending Resolution');
+    const order = source && currentOrders.current.find((entry) => entry.id === source.orderId && entry.orderNumber === source.orderNumber);
+    if (!order || run.ordersIncluded.length !== 1 || ![order.id, order.orderNumber].includes(run.ordersIncluded[0]) ||
+        order.status !== 'Partially Fulfilled' || getOrderReceipts(order, records).some(isPendingPOD)) return null;
+    return { order, expected: getPODExpectedLines(order, records) };
+  };
 
-    appendAudit(
-      'Deliveries',
-      run.runNumber,
-      `Updated Route Dispatch Status`,
-      `Status: ${run.status}`,
-      `Status: ${status}${isDelivered ? ' (POD Verified)' : ''}`
-    );
+  const loadReplacementRun: BosContextValue['loadReplacementRun'] = async (runId, input) => {
+    const auth = await verifyServerAction('fulfillment.manage', 'Pick Stock for Replacement Delivery');
+    if (!auth.ok) return { ok: false, message: auth.error! };
 
-    const msg = `Delivery run ${run.runNumber} updated to ${status}.`;
-    pushToast({ title: 'Delivery Run Updated', description: msg, tone: 'success' });
-    return { ok: true, message: msg };
+    const run = currentDeliveries.current.find((entry) => entry.id === runId);
+    if (!run?.sourcePODId || run.status !== 'Planned' || run.replacementLoad) {
+      return { ok: false, message: 'Stock can only be picked once for a planned replacement run.' };
+    }
+    const demand = getReplacementDemand(run);
+    if (!demand) return { ok: false, message: 'Review the source proof of delivery and the outstanding order quantities.' };
+    const warehouse = warehouses.find((entry) => entry.id === input.warehouseId);
+    if (!warehouse) return { ok: false, message: 'Select the warehouse supplying the replacement goods.' };
+
+    const now = new Date();
+    const neededThrough = replacementStockNeededThrough(run, getNairobiDate(now));
+    const before = currentStockBatches.current;
+    const plan = planReplacementLoad(demand.expected, warehouse.id, input.picks, before, currentProducts.current, neededThrough);
+    if (plan.ok === false) return plan;
+
+    const timestamp = now.toISOString();
+    const actor = currentUser!.fullName;
+    const movements = plan.picks.map((pick, index): StockMovementRecord => {
+      const batch = before.find((entry) => entry.id === pick.batchId)!;
+      return {
+        id: `MOV-${run.id}-${index + 1}`,
+        timestamp,
+        type: 'Order Pick',
+        productName: batch.productName,
+        batchNumber: pick.batchNumber,
+        quantityDelta: -pick.quantity,
+        unit: pick.unit,
+        fromLocation: `${warehouse.name} · ${batch.binCode}`,
+        toLocation: run.runNumber,
+        actorName: actor,
+        reason: `Replacement delivery for ${demand.order.orderNumber} · ${run.sourcePODId}`,
+      };
+    });
+    setProducts(() => plan.products);
+    setStockBatches(() => plan.batches);
+    setStockMovements((previous) => [...movements, ...previous]);
+    setDeliveries((previous) => previous.map((entry) => entry.id === runId ? {
+      ...entry,
+      status: 'Loaded',
+      replacementLoad: { warehouseId: warehouse.id, warehouseName: warehouse.name, loadedAt: timestamp, loadedBy: actor, picks: plan.picks },
+    } : entry));
+    setOrders((previous) => previous.map((order) => order.id === demand.order.id
+      ? { ...order, nextStepLabel: `Replacement run ${run.runNumber} is loaded and ready for dispatch` }
+      : order));
+    appendAudit('Deliveries', run.runNumber, 'Loaded replacement from warehouse stock', 'Planned', `${warehouse.name} · ${plan.picks.length} batch picks`);
+    return { ok: true, message: `Replacement stock picked from ${warehouse.name}. ${run.runNumber} is ready to dispatch.` };
+  };
+
+  const updateDeliveryStatus: BosContextValue['updateDeliveryStatus'] = async (runId, status) => {
+    const auth = await verifyServerAction('deliveries.dispatch', `Update Delivery Run to ${status}`);
+    if (!auth.ok) return { ok: false, message: auth.error! };
+
+    const run = currentDeliveries.current.find((entry) => entry.id === runId);
+    if (!run || !canAccessDeliveryRun(run, currentUser, drivers)) {
+      return { ok: false, message: 'Assigned delivery run not found.' };
+    }
+    if (run.sourcePODId && (status !== 'Dispatched' || run.status !== 'Loaded' || !run.replacementLoad)) {
+      return { ok: false, message: 'Confirm the warehouse stock picked for this replacement run before dispatch.' };
+    }
+    const canLoad = status === 'Loaded' && run.status === 'Planned';
+    const canDispatch = status === 'Dispatched' && (run.status === 'Planned' || run.status === 'Loaded');
+    if (!canLoad && !canDispatch) {
+      return { ok: false, message: 'Advance a planned or loaded run here. Use proof of delivery to record arrivals.' };
+    }
+
+    if (run.sourcePODId) {
+      const demand = getReplacementDemand(run);
+      const load = run.replacementLoad!;
+      const neededThrough = replacementStockNeededThrough(run);
+      const containsUnusableStock = load.picks.some((pick) => {
+        const batch = currentStockBatches.current.find((entry) => entry.id === pick.batchId);
+        const product = currentProducts.current.find((entry) => entry.id === pick.productId);
+        return !batch || !product || batch.warehouseId !== load.warehouseId || !isReplacementBatchUsable(batch, product, neededThrough);
+      });
+      if (!demand || !replacementPicksCoverDemand(demand.expected, load.picks) || containsUnusableStock) {
+        return { ok: false, message: 'The recorded warehouse stock no longer matches eligible goods for this replacement run.' };
+      }
+    }
+
+    const stops = getDeliveryRunStops(run, currentOrders.current, podLedgerRef.current.records);
+    const blockedStop = stops.find(({ order }) => {
+      if (!order) return true;
+      if (run.sourcePODId) return false;
+      return !['Packed', 'Dispatched'].includes(order.status) ||
+        getOrderSourcingLines(order, currentProcurementOrders.current).some((line) => line.outstanding > 0);
+    });
+    if (!stops.length || blockedStop) {
+      return { ok: false, message: blockedStop
+        ? `Ready the quantities for order ${blockedStop.identifier} before starting this run.`
+        : 'Add an order stop before starting this run.' };
+    }
+
+    setDeliveries((previous) => previous.map((entry) => entry.id === run.id ? { ...entry, status } : entry));
+    if (canDispatch) {
+      const orderIds = new Set(stops.map(({ order }) => order?.id));
+      setOrders((previous) => previous.map((order) => orderIds.has(order.id) ? {
+        ...order,
+        status: 'Dispatched',
+        podStatus: 'Not Submitted',
+        deliveryRunId: run.id,
+        nextStepLabel: 'Record actual quantities at the delivery stop',
+      } : order));
+    }
+    appendAudit('Deliveries', run.runNumber, 'Updated route status', run.status, status);
+    return { ok: true, message: `Delivery run ${run.runNumber} updated to ${status}.` };
   };
 
   const recordPayment: BosContextValue['recordPayment'] = async (input) => {
-    const auth = await verifyServerAction(
-      'finance.record_payment',
-      'Record Financial Settlement'
-    );
+    const auth = await verifyServerAction('finance.record_payment', 'Record Customer Payment');
     if (!auth.ok) return { ok: false, message: auth.error! };
-
-    const newPay: PaymentRecord = {
-      id: `PAY-0${payments.length + 1}`,
-      referenceCode: input.referenceCode,
-      direction: input.direction,
-      counterpartyName: input.counterpartyName,
-      method: input.method,
-      date: '2026-10-01',
-      amountKes: input.amountKes,
-      allocatedToDoc: input.allocatedToDoc,
-      reconciled: false,
-      recordedBy: currentUser?.fullName || 'Accounts Clerk',
-    };
-
-    setPayments((prev) => [newPay, ...prev]);
-
-    if (input.direction === 'Inbound (Customer AR)') {
-      setInvoices((prev) =>
-        prev.map((inv) => {
-          if (inv.invoiceNumber === input.allocatedToDoc) {
-            const nextPaid = inv.paidAmountKes + input.amountKes;
-            const nextBal = Math.max(0, inv.amountKes - nextPaid);
-            return {
-              ...inv,
-              paidAmountKes: nextPaid,
-              balanceKes: nextBal,
-              status: nextBal === 0 ? 'Paid' : 'Partially Paid',
-            };
-          }
-          return inv;
-        })
-      );
+    if (input.direction !== 'Inbound (Customer AR)') {
+      return { ok: false, message: 'Allocate supplier payments from the supplier account.' };
+    }
+    if (!can('finance.allocate_payment')) {
+      return { ok: false, message: 'Your role cannot allocate invoice payments.' };
     }
 
-    appendAudit(
-      'Finance',
-      input.referenceCode,
-      `Recorded ${input.direction} Payment`,
-      'Unrecorded',
-      `KES ${input.amountKes.toLocaleString()} allocated to ${input.allocatedToDoc}`
-    );
+    const referenceCode = input.referenceCode.trim();
+    if (!referenceCode) return { ok: false, message: 'Enter the payment reference.' };
+    if (currentPayments.current.some((payment) => payment.direction === input.direction && payment.method === input.method &&
+      payment.referenceCode.trim().toUpperCase() === referenceCode.toUpperCase())) {
+      return { ok: false, message: 'A payment with this channel and reference is already recorded.' };
+    }
 
-    const msg = `Payment ${input.referenceCode} (KES ${input.amountKes.toLocaleString()}) recorded and allocated to ${input.allocatedToDoc}.`;
-    pushToast({ title: 'Payment Recorded', description: msg, tone: 'success' });
-    return { ok: true, message: msg };
+    const currentInvoices = podLedgerRef.current.invoices;
+    const invoice = currentInvoices.find((entry) => entry.invoiceNumber === input.allocatedToDoc);
+    if (!invoice) return { ok: false, message: 'Select an open customer invoice.' };
+    const updatedInvoice = allocateInvoicePayment(invoice, input.amountKes);
+    if (!updatedInvoice) return { ok: false, message: 'Enter a positive payment up to the remaining invoice balance.' };
+
+    const amountKes = Math.round(input.amountKes * 100) / 100;
+    const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+    const newPayment: PaymentRecord = {
+      id: `PAY-0${currentPayments.current.length + 1}`,
+      referenceCode,
+      direction: input.direction,
+      counterpartyName: invoice.customerName,
+      method: input.method,
+      date,
+      amountKes,
+      allocatedToDoc: invoice.invoiceNumber,
+      reconciled: false,
+      recordedBy: currentUser!.fullName,
+    };
+
+    const nextInvoices = currentInvoices.map((entry) => entry.id === invoice.id ? updatedInvoice : entry);
+    updatePodLedger((ledger) => ({ ...ledger, invoices: nextInvoices }));
+    setPayments((previous) => [newPayment, ...previous]);
+    setCustomers((previous) => previous.map((customer) => customer.id === invoice.customerId ? {
+      ...customer,
+      outstandingBalanceKes: Math.max(0, Math.round((customer.outstandingBalanceKes - amountKes) * 100) / 100),
+      overdueBalanceKes: invoice.dueDate < date
+        ? Math.max(0, Math.round((customer.overdueBalanceKes - amountKes) * 100) / 100)
+        : customer.overdueBalanceKes,
+    } : customer));
+
+    const balance = nextInvoices.reduce((total, entry) => entry.orderNumber === invoice.orderNumber ? total + entry.balanceKes : total, 0);
+    const unbilled = podLedgerRef.current.records.some((pod) => pod.orderNumber === invoice.orderNumber && pod.status === 'Verified' &&
+      calculateInvoiceEligibility(pod, getExistingPODInvoice(pod, nextInvoices)?.invoiceNumber).eligible);
+    setOrders((previous) => previous.map((order) => order.orderNumber === invoice.orderNumber ? {
+      ...order,
+      paymentStatus: balance === 0 && !unbilled && ['Delivered', 'Closed'].includes(order.status) ? 'Paid' : 'Partially Paid',
+      invoiceStatus: balance === 0 && !unbilled && ['Delivered', 'Closed'].includes(order.status) ? 'Paid' : order.invoiceStatus,
+    } : order));
+
+    appendAudit('Finance', referenceCode, 'Recorded customer invoice payment', invoice.invoiceNumber,
+      `KES ${amountKes.toLocaleString()} allocated`);
+    return { ok: true, message: `KES ${amountKes.toLocaleString()} allocated to ${invoice.invoiceNumber}.` };
   };
 
   const reconcilePayment: BosContextValue['reconcilePayment'] = async (
@@ -2176,6 +2301,16 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
 
     const target = approvals.find((a) => a.id === approvalId);
     if (!target) return { ok: false, message: 'Approval item not found.' };
+    const pendingPo = currentProcurementOrders.current.find((po) => po.poNumber === target.reference);
+    if (pendingPo && pendingPo.stage !== 'Pending Approval') {
+      return { ok: false, message: 'The purchase order has already been reviewed.' };
+    }
+    if (pendingPo && decision === 'Approved') {
+      const supplier = currentSuppliers.current.find((item) => item.id === pendingPo.supplierId);
+      if (!supplier || !isSupplierEligibleForPurchasing(supplier).eligible) {
+        return { ok: false, message: 'An active eligible supplier is required before approving a purchase order.' };
+      }
+    }
 
     setApprovals((prev) =>
       prev.map((a) =>
@@ -2191,21 +2326,24 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       )
     );
 
-    if (decision === 'Approved') {
+    if (pendingPo) {
       setProcurementOrders((prev) =>
         prev.map((po) =>
-          po.poNumber === target.reference && po.stage === 'Pending Approval'
-            ? { ...po, stage: 'PO Issued' }
+          po.id === pendingPo.id
+            ? { ...po, stage: decision === 'Approved' ? 'PO Issued' : 'Cancelled' }
             : po
         )
       );
+    }
+    if (decision === 'Approved') {
       setOrders((prev) =>
         prev.map((o) =>
           o.orderNumber === target.reference && o.status === 'On Hold'
             ? {
                 ...o,
                 status: 'Confirmed',
-                nextStepLabel: 'Release to Warehouse Picking Queue',
+                nextStepLabel: getOrderSourcingLines(o, currentProcurementOrders.current).some((line) => line.outstanding > 0)
+                  ? 'Source outstanding customer quantities' : 'Release to Warehouse Picking Queue',
               }
             : o
         )
@@ -2565,34 +2703,30 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
       return { ok: false, message: msg };
     }
-    const nextNum = suppliers.length + 1;
-    const code = `VND-${input.name.slice(0, 3).toUpperCase()}-${String(nextNum).padStart(3, '0')}`;
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    const suppliedProducts = input.suppliedProducts
-      ? input.suppliedProducts.map((p, idx) => ({
-          id: `SPI-${Date.now().toString().slice(-4)}-${idx}`,
-          productId: p.productId,
-          productName: p.productName,
-          unit: p.unit,
-          currentCostKes: p.currentCostKes,
-          priceKes: p.currentCostKes,
-          previousCostKes: p.currentCostKes,
-          lastUpdated: todayStr,
-          lastPriceUpdate: todayStr,
-          leadTimeDays: p.leadTimeDays ?? input.leadTimeDays,
-          moq: p.minOrderQty ?? (p as { moq?: number }).moq ?? 1,
-          minOrderQty: p.minOrderQty ?? (p as { moq?: number }).moq ?? 1,
-          availability: p.availability || 'Available',
-          preferredSupplier: p.preferredSupplier || false,
-          notes: p.notes,
-        }))
-      : [];
+    const name = input.name.trim();
+    if (!name) return { ok: false, message: 'Enter a supplier name.' };
+    if (!Number.isSafeInteger(input.leadTimeDays) || input.leadTimeDays < 0) {
+      return { ok: false, message: 'Enter a whole, nonnegative lead time.' };
+    }
+    const nextNum = supplierSequence.current + 1;
+    const supplierId = `SUP-${String(nextNum).padStart(2, '0')}`;
+    const code = `VND-${name.slice(0, 3).toUpperCase()}-${String(nextNum).padStart(3, '0')}`;
+    const result = reconcileSupplierOfferings(input.suppliedProducts ?? [], {
+      supplierId,
+      catalog: currentProducts.current,
+      leadTimeDays: input.leadTimeDays,
+      recordedAt: new Date().toISOString(),
+      recordedBy: currentUser?.fullName,
+      reason: 'Initial supplier quote',
+    });
+    if (result.ok === false) return result;
+    const suppliedProducts = result.offerings;
+    supplierSequence.current = nextNum;
 
     const newSupplier: SupplierRecord = {
-      id: `SUP-${String(nextNum).padStart(2, '0')}`,
+      id: supplierId,
       code,
-      name: input.name,
+      name,
       category: input.category,
       region: input.region,
       contactPerson: input.contactPerson,
@@ -2632,15 +2766,45 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
       return { ok: false, message: msg };
     }
-    const target = suppliers.find((s) => s.id === id);
+    const target = currentSuppliers.current.find((supplier) => supplier.id === id);
     if (!target) return { ok: false, message: 'Supplier not found.' };
 
-    const updated: SupplierRecord = {
-      ...target,
-      ...updates,
-      suppliedProducts: updates.suppliedProducts ?? target.suppliedProducts,
+    const { suppliedProducts, ...details } = updates;
+    const name = details.name?.trim() ?? target.name;
+    const leadTimeDays = details.leadTimeDays ?? target.leadTimeDays;
+    if (!name) return { ok: false, message: 'Enter a supplier name.' };
+    if (!Number.isSafeInteger(leadTimeDays) || leadTimeDays < 0) {
+      return { ok: false, message: 'Enter a whole, nonnegative lead time.' };
+    }
+    const result = suppliedProducts && reconcileSupplierOfferings(suppliedProducts, {
+      supplierId: target.id,
+      catalog: currentProducts.current,
+      existing: target.suppliedProducts,
+      retired: target.retiredSuppliedProducts,
+      leadTimeDays,
+      recordedAt: new Date().toISOString(),
+      recordedBy: currentUser?.fullName,
+      reason: 'Supplier offering updated',
+    });
+    if (result?.ok === false) return result;
+    const changes: Partial<SupplierRecord> = {
+      ...details,
+      name,
+      leadTimeDays,
+      ...(result && { suppliedProducts: result.offerings, retiredSuppliedProducts: result.retired }),
     };
-    setSuppliers((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    for (const offering of result?.offerings ?? []) {
+      const prior = target.suppliedProducts.find((item) => item.productId === offering.productId);
+      if (!prior || (prior.unit === offering.unit && prior.currentCostKes === offering.currentCostKes)) continue;
+      const changePercent = Math.round((offering.currentCostKes / prior.currentCostKes - 1) * 100);
+      if (prior.unit !== offering.unit || !Number.isFinite(changePercent)) changes.recentPriceTrend = 'Price Review Needed';
+      else if (changePercent > 0) changes.recentPriceTrend = `Increased +${changePercent}%`;
+      else if (changePercent < 0) changes.recentPriceTrend = `Decreased ${changePercent}%`;
+      else changes.recentPriceTrend = 'Stable';
+      break;
+    }
+    const updated = { ...target, ...changes };
+    setSuppliers((prev) => prev.map((supplier) => supplier.id === id ? { ...supplier, ...changes } : supplier));
     appendAudit(
       'Suppliers',
       target.code,
@@ -2798,125 +2962,28 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     return { ok: true, message: 'Contract status updated.' };
   };
 
-  const updateSupplierPriceList: BosContextValue['updateSupplierPriceList'] = async (
-    supplierId,
-    productId,
-    newCostKes,
-    reason
-  ) => {
-    if (!can('suppliers.edit')) {
-      const msg = 'Access Denied: Your role lacks permission (suppliers.edit) to revise supplier price lists.';
-      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
-      return { ok: false, message: msg };
-    }
-    const target = suppliers.find((s) => s.id === supplierId);
-    if (!target) return { ok: false, message: 'Supplier not found.' };
+  const updateSupplierPriceList: BosContextValue['updateSupplierPriceList'] = async (supplierId, productId, currentCostKes, quoteReason) => {
+    const target = currentSuppliers.current.find((supplier) => supplier.id === supplierId);
+    const offering = target?.suppliedProducts.find((item) => item.productId === productId);
+    if (!offering) return { ok: false, message: 'Product not found in supplier price list.' };
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const prevItem = target.suppliedProducts.find((p) => p.productId === productId);
-    if (!prevItem) return { ok: false, message: 'Product not found in supplier price list.' };
-
-    const pctChange = ((newCostKes - prevItem.currentCostKes) / prevItem.currentCostKes) * 100;
-    const trendText =
-      pctChange > 0 ? `Increased +${pctChange.toFixed(0)}%` : pctChange < 0 ? `Decreased ${pctChange.toFixed(0)}%` : 'Stable';
-
-    const updatedProducts = target.suppliedProducts.map((p) =>
-      p.productId === productId
-        ? {
-            ...p,
-            previousCostKes: p.currentCostKes,
-            currentCostKes: newCostKes,
-            lastUpdated: todayStr,
-          }
-        : p
-    );
-    const updated: SupplierRecord = {
-      ...target,
-      suppliedProducts: updatedProducts,
-      recentPriceTrend: trendText as SupplierRecord['recentPriceTrend'],
-    };
-    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
-    appendAudit(
-      'Suppliers',
-      target.code,
-      `Adjusted Farmgate Cost (${prevItem.productName})`,
-      `KES ${prevItem.currentCostKes}/${prevItem.unit}`,
-      `KES ${newCostKes}/${prevItem.unit} (${reason || 'Market price adjustment'})`
-    );
-    pushToast({
-      title: 'Supplier Price Updated',
-      description: `${prevItem.productName} updated from KES ${prevItem.currentCostKes} to KES ${newCostKes}/${prevItem.unit}.`,
-      tone: 'info',
+    return updateSupplier(supplierId, {
+      suppliedProducts: target.suppliedProducts.map((item) => item.productId === productId ? { ...item, currentCostKes, quoteReason } : item),
     });
-    return { ok: true, message: 'Price revised successfully.' };
   };
 
   const addSupplierPriceItem: BosContextValue['addSupplierPriceItem'] = async (supplierId, item) => {
-    if (!can('suppliers.edit')) {
-      const msg = 'Access Denied: Your role lacks permission to modify price list.';
-      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
-      return { ok: false, message: msg };
-    }
-    const target = suppliers.find((s) => s.id === supplierId);
+    const target = currentSuppliers.current.find((supplier) => supplier.id === supplierId);
     if (!target) return { ok: false, message: 'Supplier not found.' };
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    const newItem = {
-      productId: item.productId,
-      productName: item.productName,
-      unit: item.unit,
-      currentCostKes: item.currentCostKes,
-      previousCostKes: item.currentCostKes,
-      lastUpdated: todayStr,
-    };
-    const updated: SupplierRecord = {
-      ...target,
-      suppliedProducts: [...target.suppliedProducts, newItem],
-    };
-    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
-    appendAudit(
-      'Suppliers',
-      target.code,
-      'Added SKU to Supplier Price List',
-      'None',
-      `${newItem.productName} at KES ${newItem.currentCostKes}/${newItem.unit}`
-    );
-    pushToast({
-      title: 'Product Added to Price List',
-      description: `${newItem.productName} added to ${target.name}.`,
-      tone: 'success',
-    });
-    return { ok: true, message: 'SKU added to price list.' };
+    return updateSupplier(supplierId, { suppliedProducts: [...target.suppliedProducts, item] });
   };
 
   const removeSupplierPriceItem: BosContextValue['removeSupplierPriceItem'] = async (supplierId, productId) => {
-    if (!can('suppliers.edit')) {
-      const msg = 'Access Denied: Your role lacks permission to modify price list.';
-      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
-      return { ok: false, message: msg };
-    }
-    const target = suppliers.find((s) => s.id === supplierId);
+    const target = currentSuppliers.current.find((supplier) => supplier.id === supplierId);
     if (!target) return { ok: false, message: 'Supplier not found.' };
-
-    const item = target.suppliedProducts.find((p) => p.productId === productId);
-    const updated: SupplierRecord = {
-      ...target,
-      suppliedProducts: target.suppliedProducts.filter((p) => p.productId !== productId),
-    };
-    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
-    appendAudit(
-      'Suppliers',
-      target.code,
-      'Removed SKU from Price List',
-      item?.productName || productId,
-      'Discontinued from vendor catalog'
-    );
-    pushToast({
-      title: 'Item Removed',
-      description: `${item?.productName || 'SKU'} removed from price list.`,
-      tone: 'info',
+    return updateSupplier(supplierId, {
+      suppliedProducts: target.suppliedProducts.filter((item) => item.productId !== productId),
     });
-    return { ok: true, message: 'Item removed from price list.' };
   };
 
   const addSupplierDocument: BosContextValue['addSupplierDocument'] = async (supplierId, docInput) => {
@@ -3061,7 +3128,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
       return { ok: false, message: msg };
     }
-    const target = products.find((p) => p.id === productId);
+    const target = currentProducts.current.find((p) => p.id === productId);
     if (!target) return { ok: false, message: 'Product not found.' };
 
     const now = new Date().toISOString();
@@ -3092,7 +3159,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
       return { ok: false, message: msg };
     }
-    const target = products.find((p) => p.id === productId);
+    const target = currentProducts.current.find((p) => p.id === productId);
     if (!target) return { ok: false, message: 'Product not found.' };
 
     const updated: ProductRecord = {
@@ -3122,23 +3189,25 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
       return { ok: false, message: msg };
     }
-    const target = products.find((p) => p.id === productId);
+    const target = currentProducts.current.find((p) => p.id === productId);
     if (!target) return { ok: false, message: 'Product not found.' };
 
     // Strict dependency check
-    const hasOrderRefs = orders.some((o) =>
+    const hasOrderRefs = currentOrders.current.some((o) =>
       o.items?.some((i) => i.productId === productId || i.sku === target.sku)
     );
-    const hasStockRefs = stockBatches.some((b) => b.productId === productId || b.sku === target.sku);
-    const hasProcurementRefs = procurementOrders.some((p) =>
+    const hasStockRefs = currentStockBatches.current.some((b) => b.productId === productId || b.sku === target.sku);
+    const hasProcurementRefs = currentProcurementOrders.current.some((p) =>
       p.lines?.some((l) => l.productId === productId || l.sku === target.sku)
     );
 
-    if (hasOrderRefs || hasStockRefs || hasProcurementRefs) {
+    const hasSupplierRefs = suppliers.some((supplier) => [...supplier.suppliedProducts, ...(supplier.retiredSuppliedProducts ?? [])].some((offering) => offering.productId === productId));
+    if (hasOrderRefs || hasStockRefs || hasProcurementRefs || hasSupplierRefs) {
       const reason = [
         hasOrderRefs ? 'historical customer orders' : '',
         hasStockRefs ? 'warehouse stock batches' : '',
         hasProcurementRefs ? 'procurement purchase orders' : '',
+        hasSupplierRefs ? 'supplier offerings' : '',
       ]
         .filter(Boolean)
         .join(', ');
@@ -3266,173 +3335,241 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
       return { ok: false, message: msg };
     }
-    const target = suppliers.find((s) => s.id === supplierId);
+    const target = currentSuppliers.current.find((supplier) => supplier.id === supplierId);
     if (!target) return { ok: false, message: 'Supplier not found.' };
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const existingIndex = (target.suppliedProducts || []).findIndex(
-      (p) => p.productId === item.productId
-    );
-
-    let updatedProducts = [...(target.suppliedProducts || [])];
-    if (existingIndex >= 0) {
-      updatedProducts[existingIndex] = {
-        ...updatedProducts[existingIndex],
-        productName: item.productName,
-        unit: item.unit,
-        currentCostKes: item.currentCostKes,
-        leadTimeDays: item.leadTimeDays ?? target.leadTimeDays,
-        moq: item.moq ?? 10,
-        lastUpdated: todayStr,
-      };
-    } else {
-      updatedProducts.push({
-        productId: item.productId,
-        productName: item.productName,
-        unit: item.unit,
-        currentCostKes: item.currentCostKes,
-        previousCostKes: item.currentCostKes,
-        leadTimeDays: item.leadTimeDays ?? target.leadTimeDays,
-        moq: item.moq ?? 10,
-        lastUpdated: todayStr,
-      });
-    }
-
-    const updated: SupplierRecord = {
-      ...target,
-      suppliedProducts: updatedProducts,
-    };
-    setSuppliers((prev) => prev.map((s) => (s.id === supplierId ? updated : s)));
-    appendAudit(
-      'Suppliers',
-      target.code,
-      'Configured Sourced Product in Catalog',
-      'Previous Sourcing List',
-      `${item.productName} @ KES ${item.currentCostKes}/${item.unit}`
-    );
-    pushToast({
-      title: 'Sourced Product Linked',
-      description: `${item.productName} linked to ${target.name} at KES ${item.currentCostKes}/${item.unit}.`,
-      tone: 'success',
+    const previous = target.suppliedProducts.find((offering) => offering.productId === item.productId);
+    return updateSupplier(supplierId, {
+      suppliedProducts: previous
+        ? target.suppliedProducts.map((offering) => offering.productId === item.productId
+          ? { ...offering, ...item, minOrderQty: item.moq ?? offering.minOrderQty }
+          : offering)
+        : [...target.suppliedProducts, item],
     });
-    return { ok: true, message: 'Sourced product saved.' };
   };
 
   const getSuppliersForProduct: BosContextValue['getSuppliersForProduct'] = (productId: string) => {
+    const product = products.find((item) => item.id === productId);
+    if (!product || !canSourceCatalogProduct(product)) return [];
     return suppliers.filter(
       (s) =>
         isSupplierEligibleForPurchasing(s).eligible &&
-        s.suppliedProducts?.some((p) => p.productId === productId)
+        s.suppliedProducts.some((offering) => offering.productId === productId && offering.unit === product.unit && offering.availability !== 'Unavailable')
     );
   };
 
-  const confirmPurchaseAndCollection: BosContextValue['confirmPurchaseAndCollection'] = async (
-    poId,
-    actualCostKes,
-    notes
-  ) => {
-    if (!can('procurement.create') && !can('procurement.approve') && !can('inventory.receive')) {
-      const msg = 'Access Denied: Your role lacks permission to confirm goods collection.';
-      pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
-      return { ok: false, message: msg };
-    }
-    const target = procurementOrders.find((p) => p.id === poId);
-    if (!target) return { ok: false, message: 'Purchase order not found.' };
+  const confirmPurchaseAndCollection: BosContextValue['confirmPurchaseAndCollection'] = async (input) => {
+    const initial = currentProcurementOrders.current.find((po) => po.id === input.poId);
+    if (!initial) return { ok: false, message: 'Purchase order not found.' };
 
-    // Idempotency protection: Prevent duplicate payable creation if collection was already confirmed
-    const existingPayable = supplierPayables.find(
-      (p) => p.purchaseOrderId === target.id || p.poNumber === target.poNumber
-    );
-    if (target.goodsCollected || target.supplierPayableCreated || existingPayable) {
-      return {
-        ok: true,
-        message: `Goods collection already confirmed for ${target.poNumber}. Existing payable referenced.`,
-        payableId: existingPayable?.id,
-      };
+    const bulk = initial.purpose === 'Bulk Stock Procurement' && Boolean(initial.lines?.length);
+    const permission: PermissionKey = bulk ? 'inventory.receive' :
+      can('procurement.create') ? 'procurement.create' :
+      can('procurement.approve') ? 'procurement.approve' : 'inventory.receive';
+    const auth = await verifyServerAction(permission, bulk ? 'Receive Purchase into Stock' : 'Record Purchase Collection');
+    if (!auth.ok) return { ok: false, message: auth.error! };
+    if (input.settlement) {
+      const settlementAuth = await verifyServerAction('finance.record_payment', 'Record Supplier Settlement at Receipt');
+      if (!settlementAuth.ok) return { ok: false, message: settlementAuth.error! };
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
-    const payableId = `PAYABLE-2026-${String(supplierPayables.length + 1).padStart(3, '0')}`;
+    const target = currentProcurementOrders.current.find((po) => po.id === input.poId)!;
+    const receiptId = input.receiptId.trim();
+    if (!receiptId) return { ok: false, message: 'The receipt is missing its record ID.' };
+    const receiptKey = `${target.id}-${receiptId}`;
+    const existingReceipt = target.receipts?.find((entry) => entry.id === receiptId);
+    if (existingReceipt) {
+      return { ok: true, message: 'This receipt has already been recorded.', payableId: existingReceipt.payableId };
+    }
+    const structured = Boolean(target.lines?.length);
+    const legacyPayable = !structured ? currentSupplierPayables.current.find(
+      (payable) => payable.purchaseOrderId === target.id || payable.poId === target.id || payable.poNumber === target.poNumber
+    ) : undefined;
+    if (!structured && (target.goodsCollected || target.supplierPayableCreated || legacyPayable)) {
+      return { ok: false, message: 'This legacy purchase already has a collection or supplier payable.' };
+    }
+    if (!['PO Issued', 'Receiving (GRN)', 'Quality Check', 'Partially Received'].includes(target.stage)) {
+      return { ok: false, message: 'Only an issued purchase order with a receiving balance can be collected.' };
+    }
 
+    const now = new Date();
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(now);
+    const supplier = currentSuppliers.current.find((item) => item.id === target.supplierId);
+    const terms = target.paymentTerms ?? supplier?.paymentTerms ?? '';
+    const dueDate = getSupplierDueDate(today, terms) ?? input.dueDate?.trim();
+    if (!dueDate || !isCalendarDate(dueDate)) {
+      return { ok: false, message: 'Enter the agreed due date for these payment terms.' };
+    }
+    const planned = structured ? planPurchaseReceipt(target, input.lines) : undefined;
+    if (planned?.ok === false) return planned;
+    const totalKes = planned?.totalKes ?? Math.round((input.legacyCostKes ?? 0) * 100) / 100;
+    if (!Number.isFinite(totalKes) || totalKes <= 0) {
+      return { ok: false, message: 'Enter a positive actual purchase cost.' };
+    }
+
+    const paid = input.settlement ? Math.round(input.settlement.amountKes * 100) / 100 : 0;
+    const paymentRef = input.settlement?.reference.trim();
+    if (input.settlement && (!paymentRef || !Number.isFinite(paid) || paid <= 0 || paid > totalKes ||
+        !['Cash', 'M-Pesa Business'].includes(input.settlement.method))) {
+      return { ok: false, message: 'Enter a payment reference and an amount within the received goods total.' };
+    }
+
+    const warehouse = bulk ? warehouses.find((item) =>
+      target.warehouseId ? item.id === target.warehouseId : item.name === target.warehouseName
+    ) : undefined;
+    if (bulk && !warehouse) return { ok: false, message: 'The receiving warehouse could not be found.' };
+    const actor = currentUser?.fullName ?? 'Procurement Operations';
+    const batches: StockBatchRecord[] = [];
+    for (const entry of warehouse ? planned?.lines ?? [] : []) {
+      const line = target.lines!.find((line, index) => purchaseLineId(line, index) === entry.lineId)!;
+      const product = currentProducts.current.find((item) => item.id === line.productId && item.unit === line.unit);
+      if (!product) return { ok: false, message: `The catalogue record for ${line.productName} could not be matched.` };
+      const expiryDate = entry.expiryDate?.trim() ?? '';
+      if ((product.expiryTracked || expiryDate) && (!isCalendarDate(expiryDate) || expiryDate < today)) {
+        return { ok: false, message: `Enter a current or future expiry date for ${line.productName}.` };
+      }
+      const daysToExpiry = expiryDate
+        ? (Date.parse(expiryDate) - Date.parse(today)) / 86400000
+        : Number.MAX_SAFE_INTEGER;
+      batches.push({
+        id: `${receiptKey}-${entry.lineId}`,
+        batchNumber: `${target.poNumber}-R${(target.receipts?.length ?? 0) + 1}-${batches.length + 1}`,
+        productId: line.productId,
+        productName: line.productName,
+        sku: line.sku,
+        unit: line.unit,
+        warehouseId: warehouse!.id,
+        warehouseName: warehouse!.name,
+        binCode: 'Receiving',
+        supplierName: target.supplierName,
+        receivedDate: today,
+        expiryDate,
+        daysToExpiry,
+        availableQty: entry.quantity,
+        reservedQty: 0,
+        unitCostKes: entry.unitCostKes,
+        fefoPriority: daysToExpiry <= 7 ? 1 : 3,
+        status: daysToExpiry <= 7 ? 'Expiring Soon' : 'Nominal',
+      });
+    }
+
+    const payableId = `AP-${receiptKey}`;
+    const receipt: PurchaseReceiptRecord = {
+      id: receiptId,
+      receivedAt: today,
+      receivedBy: actor,
+      receiptRef: input.receiptRef?.trim() || undefined,
+      supplierInvoiceRef: input.supplierInvoiceRef?.trim() || undefined,
+      lines: planned?.lines ?? [],
+      totalKes,
+      payableId,
+    };
+    const balanceKes = Math.round((totalKes - paid) * 100) / 100;
     const newPayable: SupplierPayableRecord = {
       id: payableId,
       supplierId: target.supplierId,
       supplierName: target.supplierName,
       purchaseOrderId: target.id,
+      purchaseReceiptId: receipt.id,
       poNumber: target.poNumber,
-      invoiceRef: `INV-SUP-${target.poNumber}`,
-      amountKes: actualCostKes,
-      paidAmountKes: 0,
-      balanceKes: actualCostKes,
+      customerOrderNumber: target.customerOrderNumber,
+      invoiceRef: receipt.supplierInvoiceRef,
+      amountKes: totalKes,
+      paidAmountKes: paid,
+      balanceKes,
       dueDate,
-      status: 'Unpaid',
-      createdAt: todayStr,
+      status: balanceKes === 0 ? 'Paid' : paid > 0 ? 'Partially Paid' : 'Unpaid',
+      issueDate: today,
+      goodsCollectedDate: today,
+      lineItemsSummary: batches.length
+        ? batches.map((batch) => `${batch.availableQty} ${batch.unit} ${batch.productName}`).join(' · ')
+        : structured ? receipt.lines.map((line) => {
+            const item = target.lines!.find((candidate, index) => purchaseLineId(candidate, index) === line.lineId)!;
+            return `${line.quantity} ${item.unit} ${item.productName}`;
+          }).join(' · ') : target.itemsSummary,
+      createdAt: today,
     };
 
-    setSupplierPayables((prev) => [newPayable, ...prev]);
-
+    const complete = planned?.complete ?? true;
     const updatedPo: ProcurementOrderRecord = {
       ...target,
-      stage: 'Goods Collected',
-      goodsCollected: true,
-      collectionDate: todayStr,
-      actualPurchaseCostKes: actualCostKes,
+      stage: complete ? (bulk ? 'Stock Posted' : 'Goods Collected') : 'Partially Received',
+      goodsCollected: complete,
+      receipts: [...(target.receipts ?? []), receipt],
+      collectionDate: today,
+      actualPurchaseCostKes: Math.round(((target.actualPurchaseCostKes ?? 0) + totalKes) * 100) / 100,
       supplierPayableCreated: true,
-      supplierPayableId: payableId,
+      supplierPayableId: target.supplierPayableId ?? payableId,
     };
-    setProcurementOrders((prev) => prev.map((p) => (p.id === poId ? updatedPo : p)));
 
-    setSuppliers((prev) =>
-      prev.map((s) =>
-        s.id === target.supplierId
-          ? { ...s, payableBalanceKes: (s.payableBalanceKes || 0) + actualCostKes }
-          : s
-      )
-    );
+    setProcurementOrders((prev) => prev.map((po) => po.id === target.id ? updatedPo : po));
+    setSupplierPayables((prev) => [newPayable, ...prev]);
+    setSuppliers((prev) => prev.map((item) => item.id === target.supplierId ? {
+      ...item,
+      payableBalanceKes: Math.round(((item.payableBalanceKes ?? 0) + balanceKes) * 100) / 100,
+    } : item));
 
-    // Multi-supplier sourcing check: do not set customer order to Packed if other POs remain uncollected
-    if (target.customerOrderId) {
-      const remainingUncollectedPos = procurementOrders.filter(
-        (po) =>
-          po.id !== target.id &&
-          po.customerOrderId === target.customerOrderId &&
-          !po.goodsCollected &&
-          po.stage !== 'Goods Collected'
-      );
-
-      const allSuppliersCollected = remainingUncollectedPos.length === 0;
-
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === target.customerOrderId
-            ? {
-                ...o,
-                status: allSuppliersCollected ? 'Packed' : o.status,
-                nextStepLabel: allSuppliersCollected
-                  ? 'All Direct Procured Goods Collected · Ready for Dispatch'
-                  : `Goods Collected from ${target.supplierName} · Awaiting ${remainingUncollectedPos.length} Remaining Supplier(s)`,
-              }
-            : o
-        )
-      );
+    if (input.settlement && paymentRef) {
+      const payment: SupplierPaymentRecord = {
+        id: `SPAY-${receiptKey}`,
+        payableId,
+        supplierPayableId: payableId,
+        supplierId: target.supplierId,
+        supplierName: target.supplierName,
+        amountKes: paid,
+        paymentMethod: input.settlement.method,
+        referenceNumber: paymentRef,
+        paymentDate: today,
+        recordedBy: actor,
+      };
+      setSupplierPayments((prev) => [payment, ...prev]);
+    }
+    if (batches.length) {
+      setStockBatches((prev) => [...batches, ...prev]);
+      setStockMovements((prev) => [...batches.map((batch): StockMovementRecord => ({
+        id: `MOV-${batch.id}`,
+        timestamp: now.toISOString(),
+        type: 'Receipt (GRN)',
+        productName: batch.productName,
+        batchNumber: batch.batchNumber,
+        quantityDelta: batch.availableQty,
+        unit: batch.unit,
+        fromLocation: target.supplierName,
+        toLocation: batch.warehouseName,
+        actorName: actor,
+        reason: receipt.receiptRef || target.poNumber,
+      })), ...prev]);
+      const receivedByProduct = new Map<string, number>();
+      for (const batch of batches) {
+        receivedByProduct.set(batch.productId, (receivedByProduct.get(batch.productId) ?? 0) + batch.availableQty);
+      }
+      setProducts((prev) => prev.map((product) => {
+        const add = receivedByProduct.get(product.id);
+        return add ? { ...product, availableQty: product.availableQty + add } : product;
+      }));
     }
 
+    if (target.customerOrderId) {
+      setOrders((prev) => prev.map((order) => {
+        if (order.id !== target.customerOrderId || !['Confirmed', 'Picking', 'Partially Fulfilled'].includes(order.status)) return order;
+        const pending = getOrderSourcingLines(order, currentProcurementOrders.current).some((line) => line.outstanding > 0);
+        return { ...order, nextStepLabel: pending ? 'Source outstanding customer quantities' : 'Finish picking and pack for dispatch' };
+      }));
+    }
+
+    const action = bulk ? 'Warehouse receipt' : 'Goods collection';
     appendAudit(
       'Procurement',
       target.poNumber,
-      'Confirmed Goods Collection & Created Supplier Payable',
-      `PO Stage: ${target.stage}`,
-      `Goods Collected · Payable ${payableId} Created (KES ${actualCostKes.toLocaleString()})`
+      `${action} recorded`,
+      `PO stage ${target.stage}`,
+      `${updatedPo.stage} · KES ${totalKes.toLocaleString()} · KES ${balanceKes.toLocaleString()} outstanding`
     );
-
-    pushToast({
-      title: 'Goods Collected & Payable Created',
-      description: `Collection confirmed for ${target.poNumber}. Supplier payable ${payableId} for KES ${actualCostKes.toLocaleString()} generated for ${target.supplierName}.`,
-      tone: 'success',
-    });
-
-    return { ok: true, message: 'Goods collection confirmed and payable created.', payableId };
+    const message = `${action} recorded for ${target.poNumber}. Supplier balance on this receipt is KES ${balanceKes.toLocaleString()}.`;
+    pushToast({ title: `${action} recorded`, description: message, tone: 'success' });
+    return { ok: true, message, payableId };
   };
 
   const recordSupplierPayment: BosContextValue['recordSupplierPayment'] = async (input) => {
@@ -3441,33 +3578,32 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
       pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
       return { ok: false, message: msg };
     }
-    const payable = supplierPayables.find((p) => p.id === input.payableId);
+    const payable = currentSupplierPayables.current.find((record) => record.id === input.payableId);
     if (!payable) return { ok: false, message: 'Supplier payable not found.' };
 
-    if (input.amountKes <= 0) {
-      return { ok: false, message: 'Payment amount must be greater than zero.' };
-    }
-    if (input.amountKes > payable.balanceKes) {
-      return {
-        ok: false,
-        message: `Payment amount (KES ${input.amountKes.toLocaleString()}) exceeds outstanding balance (KES ${payable.balanceKes.toLocaleString()}).`,
-      };
-    }
+    const amountKes = Math.round(input.amountKes * 100) / 100;
+    const referenceNumber = input.referenceNumber.trim();
+    const validation = validateSupplierPayment(payable, amountKes, {
+      number: referenceNumber,
+      method: input.paymentMethod,
+      existing: currentSupplierPayments.current,
+    });
+    if (!validation.valid) return { ok: false, message: validation.message ?? 'Invalid supplier payment.' };
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const newPaidAmount = payable.paidAmountKes + input.amountKes;
-    const newBalance = payable.balanceKes - input.amountKes;
-    const newStatus = newBalance <= 0 ? 'Paid' : 'Partially Paid';
+    const paymentDate = getNairobiDate();
+    const paidAmountKes = Math.round((payable.paidAmountKes + amountKes) * 100) / 100;
+    const balanceKes = Math.round((payable.balanceKes - amountKes) * 100) / 100;
+    const status = balanceKes === 0 ? 'Paid' : 'Partially Paid';
 
     const newPayment: SupplierPaymentRecord = {
-      id: `SPAY-${Date.now().toString().slice(-6)}`,
+      id: `SPAY-${payable.id}-${currentSupplierPayments.current.length + 1}`,
       payableId: payable.id,
       supplierId: payable.supplierId,
       supplierName: payable.supplierName,
-      amountKes: input.amountKes,
-      paymentDate: todayStr,
+      amountKes,
+      paymentDate,
       paymentMethod: input.paymentMethod,
-      referenceNumber: input.referenceNumber,
+      referenceNumber,
       notes: input.notes,
       recordedBy: currentUser?.fullName || 'Finance Operations',
     };
@@ -3477,30 +3613,25 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     setSupplierPayables((prev) =>
       prev.map((p) =>
         p.id === input.payableId
-          ? { ...p, paidAmountKes: newPaidAmount, balanceKes: newBalance, status: newStatus }
+          ? { ...p, paidAmountKes, balanceKes, status }
           : p
       )
     );
 
-    setSuppliers((prev) =>
-      prev.map((s) =>
-        s.id === payable.supplierId
-          ? { ...s, payableBalanceKes: Math.max(0, (s.payableBalanceKes || 0) - input.amountKes) }
-          : s
-      )
-    );
+    const payableBalanceKes = calculateSupplierBalances(currentSupplierPayables.current, payable.supplierId).outstandingBalanceKes;
+    setSuppliers((prev) => prev.map((supplier) => supplier.id === payable.supplierId ? { ...supplier, payableBalanceKes } : supplier));
 
     appendAudit(
       'Finance',
       payable.poNumber,
       'Disbursed Supplier Payment',
       `Outstanding: KES ${payable.balanceKes.toLocaleString()}`,
-      `Paid KES ${input.amountKes.toLocaleString()} via ${input.paymentMethod} (${input.referenceNumber})`
+      `Paid KES ${amountKes.toLocaleString()} via ${input.paymentMethod} (${referenceNumber})`
     );
 
     pushToast({
       title: 'Supplier Payment Recorded',
-      description: `Disbursed KES ${input.amountKes.toLocaleString()} to ${payable.supplierName} (${input.paymentMethod} Ref: ${input.referenceNumber}).`,
+      description: `Disbursed KES ${amountKes.toLocaleString()} to ${payable.supplierName} (${input.paymentMethod} Ref: ${referenceNumber}).`,
       tone: 'success',
     });
 
@@ -3618,7 +3749,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
     vehicleIdOrDetails,
     driverIdArg
   ) => {
-    if (!can('fleet.manage') && !can('deliveries.dispatch')) {
+    if (!can('fleet.manage') && !can('deliveries.assign')) {
       const msg = 'Access Denied: Your role lacks permission to reassign delivery fleet.';
       pushToast({ title: 'Authorization Required', description: msg, tone: 'warning' });
       return { ok: false, message: msg };
@@ -3748,7 +3879,10 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
         recordStockMovement,
         createPurchaseOrder,
         advanceProcurementStage,
+        closePurchaseBalance,
         updateDeliveryStatus,
+        createDeliveryRun,
+        loadReplacementRun,
         recordPayment,
         reconcilePayment,
         resolveApproval,

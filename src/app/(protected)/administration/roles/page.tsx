@@ -50,9 +50,8 @@ export default function RolesAdministrationPage() {
           { label: 'Administration' },
           { label: 'RBAC Role Matrix' },
         ]}
-        kicker="ROLE-BASED ACCESS CONTROL & PERMISSION GOVERNANCE"
-        title="Roles & Granular Permission Matrix"
-        description="Inspect and govern the 9 internal operational roles across Agro-Deliveries Kenya. All UI views, navigation items, and server actions verify these exact permission keys."
+        title="Roles and permissions"
+        description="Choose a role to review what its members can see or do in AgroHub."
       />
 
       <FeedbackBanner
@@ -63,20 +62,19 @@ export default function RolesAdministrationPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <KPI
-          label="Configured Internal Roles"
+          label="Workspace roles"
           value={`${roles.length} Roles`}
           sublabel="Executive, Operations, Sales, Procurement, Warehouse, Finance, Driver, Admin"
           tone="positive"
         />
         <KPI
-          label="Granular Permission Keys"
-          value={`${ALL_PERMISSIONS.length} Keys`}
-          sublabel="Enforced in UI, API routes, and PostgreSQL RLS"
+          label="Available permissions"
+          value={String(ALL_PERMISSIONS.length)}
           tone="positive"
         />
         <KPI
-          label="Selected Role Scope"
-          value={`${selectedRole?.permissions.length || 0} Granted`}
+          label="Permissions granted"
+          value={String(selectedRole?.permissions.length ?? 0)}
           sublabel={selectedRole?.name || ''}
           tone="neutral"
         />
@@ -92,6 +90,7 @@ export default function RolesAdministrationPage() {
               <button
                 key={r.id}
                 type="button"
+                aria-pressed={active}
                 onClick={() => setSelectedRoleId(r.id)}
                 className={`w-full text-left p-4 rounded-[14px] border transition-all cursor-pointer ${
                   active
@@ -127,8 +126,8 @@ export default function RolesAdministrationPage() {
                       : 'border-[var(--border-subtle)] text-[var(--text-secondary)]'
                   }`}
                 >
-                  <span>{assignedCount} assigned operator(s)</span>
-                  <span>Updated {r.lastModified || '2026-09-30'}</span>
+                  <span>{assignedCount} {assignedCount === 1 ? 'member' : 'members'}</span>
+                  {r.lastModified && <span>Updated {r.lastModified}</span>}
                 </div>
               </button>
             );
@@ -144,18 +143,18 @@ export default function RolesAdministrationPage() {
                   <div className="flex items-center gap-2">
                     <Shield className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
                     <h2 className="font-heading text-lg font-semibold text-[var(--text-primary)]">
-                      {selectedRole.name} — Permission Matrix
+                      {selectedRole.name}
                     </h2>
                   </div>
                   <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                    Default Command Focus: {selectedRole.defaultFocus}
+                    {selectedRole.defaultFocus}
                   </p>
                 </div>
 
                 {!can('administration.roles.manage') && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
                     <Lock className="w-3.5 h-3.5" />
-                    <span>Read-Only (Requires Administrator)</span>
+                    <span>View only</span>
                   </span>
                 )}
               </div>
@@ -191,6 +190,8 @@ export default function RolesAdministrationPage() {
                             <button
                               key={p.key}
                               type="button"
+                              aria-pressed={granted}
+                              aria-label={p.description}
                               disabled={!editable}
                               onClick={() => handleToggle(p.key)}
                               className={`px-4 py-3 rounded-[12px] border text-left flex items-start justify-between gap-3 transition-colors ${
@@ -205,10 +206,10 @@ export default function RolesAdministrationPage() {
                             >
                               <div className="min-w-0">
                                 <div className="font-mono-tabular text-xs font-semibold text-[var(--text-primary)] truncate">
-                                  {p.key}
+                                  {p.description}
                                 </div>
                                 <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                                  {p.description}
+                                  {p.key}
                                 </div>
                               </div>
                               <div className="shrink-0 mt-0.5">

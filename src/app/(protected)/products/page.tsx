@@ -4,15 +4,13 @@ import React, { useMemo, useState } from 'react';
 import {
   Archive,
   Edit2,
-  ExternalLink,
-  History,
-  Info,
+  LayoutGrid,
   LineChart,
   Minus,
-  Package,
   Plus,
   RotateCcw,
   Search,
+  Table2,
   Trash2,
   TrendingDown,
   TrendingUp,
@@ -32,7 +30,6 @@ import {
   Card,
   FeedbackBanner,
   ImageUploadZone,
-  KPI,
   Modal,
   PageHeader,
   ResilientImage,
@@ -51,6 +48,15 @@ const CATEGORIES = [
   'Herbs & Greens',
 ] as const;
 
+const cardButton = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-sm font-semibold hover:bg-[var(--bg-canvas)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-accent)] disabled:opacity-50';
+const primaryButton = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#1F6A37] px-4 py-2 text-sm font-semibold text-white hover:bg-[#12512C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-accent)] disabled:opacity-50';
+const formControl = 'min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-accent)]';
+const formatKes = (amount: number) => `KES ${amount.toLocaleString('en-KE')}`;
+const formatStock = (amount: number, unit: UnitOfMeasure) => `${amount.toLocaleString('en-KE')} ${unit}`;
+
+type CatalogView = 'table' | 'grid';
+type LifecycleAction = 'archive' | 'restore' | 'delete';
+
 export default function ProductsPage() {
   const {
     products,
@@ -67,6 +73,11 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<CatalogView>('table');
+  const [detailProductId, setDetailProductId] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [lifecycleAction, setLifecycleAction] = useState<LifecycleAction | null>(null);
+  const [lifecycleError, setLifecycleError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editDetailsProduct, setEditDetailsProduct] = useState<ProductRecord | null>(
     null
@@ -100,6 +111,8 @@ export default function ProductsPage() {
   const [editRetKes, setEditRetKes] = useState(125);
   const [editOnlineKes, setEditOnlineKes] = useState(120);
   const [editCostKes, setEditCostKes] = useState(70);
+  const [editError, setEditError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // New Product state
   const [name, setName] = useState('');
@@ -162,6 +175,9 @@ export default function ProductsPage() {
       return matchCat && matchStatus && matchSearch;
     });
   }, [products, categoryFilter, statusFilter, search]);
+  const filterCategories = [...new Set(products.map((product) => product.category))].sort();
+  const detailProduct = products.find((product) => product.id === detailProductId);
+  const supplierCount = detailProduct ? getSuppliersForProduct(detailProduct.id).length : 0;
 
   // Derived Supplier Cost trend metrics and timeline chart data
   const supplierTrend = useMemo(() => {
@@ -243,6 +259,7 @@ export default function ProductsPage() {
   }, [historyProduct]);
 
   const openEditProduct = (prod: ProductRecord) => {
+    setEditError('');
     setEditDetailsProduct(prod);
     setEditName(prod.name);
     setEditSku(prod.sku);
@@ -263,7 +280,7 @@ export default function ProductsPage() {
 
   const handleSaveEditProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editDetailsProduct) return;
+    if (!editDetailsProduct || savingEdit) return;
     const fallback =
       editCategory === 'Dry Grains & Cereals'
         ? IMAGE_PATHS.dryGrains
@@ -271,42 +288,61 @@ export default function ProductsPage() {
         ? IMAGE_PATHS.warehouseColdChain
         : IMAGE_PATHS.freshProduce;
 
-    const res = await updateProduct(editDetailsProduct.id, {
-      name: editName.trim(),
-      sku: editSku.trim(),
-      category: editCategory,
-      unit: editUnit,
-      description: editDescription.trim(),
-      status: editStatus,
-      imageUrl: editImageUrl || fallback,
-      reorderPoint: Number(editReorderPoint),
-      batchTracked: editBatchTracked,
-      expiryTracked: editExpiryTracked,
-      pricing: {
-        institutionalKes: Number(editInstKes),
-        wholesaleKes: Number(editWhlKes),
-        retailKes: Number(editRetKes),
-        onlineKes: Number(editOnlineKes),
-        supplierCostKes: Number(editCostKes),
-      },
-    });
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-    if (res.ok) setEditDetailsProduct(null);
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      const res = await updateProduct(editDetailsProduct.id, {
+        name: editName.trim(),
+        sku: editSku.trim(),
+        category: editCategory,
+        unit: editUnit,
+        description: editDescription.trim(),
+        status: editStatus,
+        imageUrl: editImageUrl || fallback,
+        reorderPoint: Number(editReorderPoint),
+        batchTracked: editBatchTracked,
+        expiryTracked: editExpiryTracked,
+        pricing: {
+          institutionalKes: Number(editInstKes),
+          wholesaleKes: Number(editWhlKes),
+          retailKes: Number(editRetKes),
+          onlineKes: Number(editOnlineKes),
+          supplierCostKes: Number(editCostKes),
+        },
+      });
+      if (res.ok) {
+        setFeedback({ msg: res.message, type: 'success' });
+        setEditDetailsProduct(null);
+      } else setEditError(res.message);
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
-  const handleArchiveProduct = async (prod: ProductRecord) => {
-    const res = await archiveProduct(prod.id);
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+  const openProduct = (productId: string) => {
+    setLifecycleError('');
+    setDetailProductId(productId);
   };
 
-  const handleRestoreProduct = async (prod: ProductRecord) => {
-    const res = await restoreProduct(prod.id);
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
-  };
-
-  const handleDeleteProduct = async (prod: ProductRecord) => {
-    const res = await deleteProduct(prod.id);
-    setFeedback({ msg: res.message, type: res.ok ? 'success' : 'error' });
+  const updateProductLifecycle = async (action: LifecycleAction) => {
+    if (!detailProduct || lifecycleAction) return;
+    setLifecycleAction(action);
+    setLifecycleError('');
+    try {
+      const operation = { archive: archiveProduct, restore: restoreProduct, delete: deleteProduct }[action];
+      const result = await operation(detailProduct.id);
+      if (!result.ok) {
+        setLifecycleError(result.message);
+        return;
+      }
+      setFeedback({ msg: result.message, type: 'success' });
+      if (action === 'delete') {
+        setConfirmingDelete(false);
+        setDetailProductId(null);
+      }
+    } finally {
+      setLifecycleAction(null);
+    }
   };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
@@ -378,284 +414,230 @@ export default function ProductsPage() {
   };
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
-        kicker="CATALOG, UNITS OF MEASURE & MULTI-TIER PRICING"
-        title="Products & Pricing Architecture"
-        description="Manage fresh produce and dry foodstuff SKUs across kilograms, pieces, bunches, dozens, packs, and bags with preserved price history for future E-commerce, B2B, and POS channels."
-        actions={
-          can('products.create') && (
-            <button
-              type="button"
-              onClick={() => {
-                resetNewProductForm();
-                setCreateOpen(true);
-              }}
-              className="h-10 px-4 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer shadow-xs"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Product SKU</span>
-            </button>
-          )
-        }
+        title="Products"
+        description="Browse the catalogue, check availability and manage pricing."
+        actions={can('products.create') && (
+          <button type="button" className={primaryButton} onClick={() => { resetNewProductForm(); setCreateOpen(true); }}>
+            <Plus size={17} aria-hidden="true" /> New product
+          </button>
+        )}
       />
-
       <FeedbackBanner
-        message={feedback?.msg || null}
+        message={feedback?.msg ?? null}
         type={feedback?.type}
         onDismiss={() => setFeedback(null)}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KPI
-          label="Active Catalog SKUs"
-          value={`${products.length} Products`}
-          sublabel="100% Batch & Expiry Tracked"
-          tone="positive"
-        />
-        <KPI
-          label="Supported Units of Measure"
-          value="6 Units"
-          sublabel="kg · pieces · bunches · dozens · packs · bags"
-          tone="neutral"
-        />
-        <KPI
-          label="Channel Price Tiers"
-          value="5 Tiers"
-          sublabel="Institutional · Wholesale · Online · Retail · Cost"
-          tone="positive"
-        />
-        <KPI
-          label="Low Stock / Near Reorder"
-          value={`${
-            products.filter((p) => p.availableQty <= p.reorderPoint).length
-          } SKUs`}
-          sublabel="Organic Sukuma Wiki below 400 bunches"
-          tone="warning"
-        />
-      </div>
-
-      {/* Filter and Status Bar */}
-      <Card className="mb-6" padding="p-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            {/* Status Tabs */}
-            <div className="flex items-center gap-1.5 p-1 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] overflow-x-auto">
-              {(['All', 'Active', 'Seasonal Hold', 'Discontinued', 'Archived'] as const).map((st) => (
-                <button
-                  key={st}
-                  type="button"
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
-                    statusFilter === st
-                      ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
-                  }`}
-                >
-                  {st} {st === 'Archived' ? `(${products.filter((p) => p.status === 'Archived').length})` : ''}
-                </button>
-              ))}
+      <Card padding="p-4" className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <label className="block space-y-1 text-sm font-medium">
+            <span>Search products</span>
+            <div className="relative">
+              <Search size={17} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, SKU or unit"
+                className={`${formControl} pl-10`} />
             </div>
-
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search SKU, name, or unit..."
-                className="w-full h-9 pl-9 pr-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[#1F6A37]"
-              />
-            </div>
-          </div>
-
-          {/* Category Tabs */}
-          <div className="flex items-center gap-1.5 p-1 rounded-md bg-[var(--bg-canvas)] overflow-x-auto border border-[var(--border-subtle)]">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setCategoryFilter(cat)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${
-                  categoryFilter === cat
-                    ? 'bg-[#1F6A37] text-white'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          </label>
+          <label className="block space-y-1 text-sm font-medium">
+            <span>Category</span>
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={formControl}>
+              <option value="All">All categories</option>
+              {filterCategories.map((category) => <option key={category}>{category}</option>)}
+            </select>
+          </label>
+          <label className="block space-y-1 text-sm font-medium">
+            <span>Status</span>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={formControl}>
+              <option value="All">Current catalogue</option>
+              <option value="Active">Active</option>
+              <option value="Seasonal Hold">Seasonal hold</option>
+              <option value="Discontinued">Discontinued</option>
+              <option value="Archived">Archived</option>
+            </select>
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-[var(--text-secondary)]" role="status">
+            {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+          </p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Catalogue view">
+            <button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')}
+              className={`${cardButton} aria-pressed:bg-[var(--bg-subtle)] aria-pressed:text-[var(--brand-accent)]`}>
+              <Table2 size={16} aria-hidden="true" /> Table
+            </button>
+            <button type="button" aria-pressed={view === 'grid'} onClick={() => setView('grid')}
+              className={`${cardButton} aria-pressed:bg-[var(--bg-subtle)] aria-pressed:text-[var(--brand-accent)]`}>
+              <LayoutGrid size={16} aria-hidden="true" /> Grid
+            </button>
           </div>
         </div>
       </Card>
 
-      {/* Product Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredProducts.map((prod) => (
-          <Card key={prod.id} padding="p-0" className="overflow-hidden flex flex-col justify-between">
-            <div>
-              <div className="h-40 relative bg-[#08190C] overflow-hidden">
-                <ResilientImage
-                  src={prod.imageUrl}
-                  alt={prod.name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#08190C]/85 via-transparent to-transparent" />
-                <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white">
-                  <span className="font-mono-tabular text-xs font-semibold text-[#4EB462]">
-                    {prod.sku}
-                  </span>
-                  <span className="text-xs font-medium">
-                    Unit: {prod.unit}
-                  </span>
+      {filteredProducts.length === 0 ? (
+        <Card padding="p-6" className="space-y-3">
+          <p className="text-sm">No products match these filters.</p>
+          {(search || categoryFilter !== 'All' || statusFilter !== 'All') &&
+            <button type="button" className={cardButton} onClick={() => { setSearch(''); setCategoryFilter('All'); setStatusFilter('All'); }}>Clear filters</button>}
+        </Card>
+      ) : view === 'table' ? (
+        <Card padding="p-0" className="overflow-hidden">
+          <table className="w-full table-fixed text-left text-sm" aria-label="Product catalogue">
+            <thead className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-secondary)]">
+              <tr>
+                <th scope="col" className="px-3 py-3 sm:w-1/3 sm:px-4">Product</th>
+                <th scope="col" className="hidden px-3 py-3 lg:table-cell">Category</th>
+                <th scope="col" className="w-1/4 px-2 py-3 sm:w-auto sm:px-3">Available</th>
+                <th scope="col" className="hidden px-3 py-3 md:table-cell">Institutional</th>
+                <th scope="col" className="w-32 px-2 py-3 sm:px-4">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-subtle)]">
+              {filteredProducts.map((product) => (
+                <tr key={product.id} className="hover:bg-[var(--bg-canvas)]">
+                  <th scope="row" className="px-3 py-2 font-normal sm:px-4">
+                    <button type="button" onClick={() => openProduct(product.id)}
+                      className="block min-h-11 break-words rounded-md text-left text-sm font-semibold underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-accent)]">
+                      {product.name}
+                    </button>
+                    <span className="block break-words text-xs text-[var(--text-secondary)]">{product.sku}</span>
+                  </th>
+                  <td className="hidden break-words px-3 py-3 text-[var(--text-secondary)] lg:table-cell">{product.category}</td>
+                  <td className="px-2 py-3 tabular-nums sm:px-3">
+                    <span className="block break-words">{formatStock(product.availableQty, product.unit)}</span>
+                    {product.status === 'Active' && product.availableQty <= product.reorderPoint &&
+                      <span className="block text-xs text-amber-700 dark:text-amber-300">Reorder</span>}
+                  </td>
+                  <td className="hidden px-3 py-3 tabular-nums md:table-cell">{formatKes(product.pricing.institutionalKes)}</td>
+                  <td className="px-2 py-3 sm:px-4"><StatusBadge status={product.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      ) : (
+        <ul aria-label="Product catalogue" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filteredProducts.map((product) => (
+            <li key={product.id}>
+              <Card padding="p-0" className="flex h-full flex-col overflow-hidden">
+                <div className="aspect-[16/8] bg-[var(--bg-subtle)]">
+                  <ResilientImage key={product.imageUrl} src={product.imageUrl} alt="" fallbackLabel="Product image unavailable" className="h-full w-full object-cover" />
                 </div>
-              </div>
+                <div className="flex flex-1 flex-col gap-3 p-4">
+                  <div className="min-w-0">
+                    <p className="text-xs text-[var(--text-secondary)]">{product.sku} · {product.category}</p>
+                    <h2 className="mt-1 text-base font-semibold">{product.name}</h2>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="tabular-nums">{formatStock(product.availableQty, product.unit)} available</span>
+                    <StatusBadge status={product.status} />
+                  </div>
+                  <button type="button" onClick={() => openProduct(product.id)} className={`${cardButton} mt-auto self-start`}
+                    aria-label={`View product details for ${product.name}`}>View details</button>
+                </div>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
 
-              <div className="p-5">
-                <div className="text-xs text-[var(--text-secondary)]">
-                  {prod.category} · Batch & Expiry Tracked
+      <Modal
+        open={Boolean(detailProduct && !editDetailsProduct && !historyProduct && !sourcingModalProduct && !confirmingDelete)}
+        onClose={() => setDetailProductId(null)}
+        title={detailProduct?.name ?? 'Product details'}
+        subtitle={detailProduct && `${detailProduct.sku} · ${detailProduct.category}`}
+        size="2xl"
+      >
+        {detailProduct && (
+          <div className="space-y-5">
+            <div className="grid items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+              <div className="aspect-[16/10] overflow-hidden rounded-xl bg-[var(--bg-subtle)]">
+                <ResilientImage key={detailProduct.imageUrl} src={detailProduct.imageUrl} alt="" fallbackLabel="Product image unavailable" className="h-full w-full object-cover" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status={detailProduct.status} />
+                  <span className="text-sm text-[var(--text-secondary)]">Unit · {detailProduct.unit}</span>
                 </div>
-                <h3 className="font-heading text-base font-semibold text-[var(--text-primary)] mt-1">
-                  {prod.name}
-                </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">
-                  {prod.description}
+                {detailProduct.description && <p className="text-sm leading-relaxed">{detailProduct.description}</p>}
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Batch tracking {detailProduct.batchTracked ? 'on' : 'off'} · Expiry tracking {detailProduct.expiryTracked ? 'on' : 'off'}
                 </p>
-
-                {/* Multi-Tier Pricing Table */}
-                <div className="mt-4 p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">
-                      Institutional Contract
-                    </div>
-                    <div className="font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]">
-                      KES {prod.pricing.institutionalKes.toLocaleString()} /{' '}
-                      {prod.unit}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">
-                      Wholesale / B2B
-                    </div>
-                    <div className="font-mono-tabular font-semibold">
-                      KES {prod.pricing.wholesaleKes.toLocaleString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">
-                      Walk-In Retail / Online
-                    </div>
-                    <div className="font-mono-tabular">
-                      KES {prod.pricing.retailKes.toLocaleString()} /{' '}
-                      {prod.pricing.onlineKes.toLocaleString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">
-                      Last Supplier Cost
-                    </div>
-                    <div className="font-mono-tabular text-[var(--text-secondary)]">
-                      KES {prod.pricing.supplierCostKes.toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Stock Summary */}
-                <div className="mt-3 flex items-center justify-between text-xs text-[var(--text-secondary)]">
-                  <span>
-                    Available:{' '}
-                    <strong className="font-mono-tabular text-[var(--text-primary)]">
-                      {prod.availableQty.toLocaleString()} {prod.unit}
-                    </strong>
-                  </span>
-                  <span>
-                    Reserved:{' '}
-                    <strong className="font-mono-tabular">
-                      {prod.reservedQty.toLocaleString()}
-                    </strong>
-                  </span>
-                  <span>
-                    Incoming:{' '}
-                    <strong className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462]">
-                      +{prod.incomingQty.toLocaleString()}
-                    </strong>
-                  </span>
-                </div>
               </div>
             </div>
-
-            <div className="px-4 py-3 border-t border-[var(--border-subtle)] bg-[var(--bg-canvas)]/40 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setHistoryProduct(prod)}
-                  className="px-2.5 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] inline-flex items-center gap-1.5 cursor-pointer border border-transparent hover:border-[var(--border-subtle)] transition-colors"
-                  title="View supplier purchase price timeline graph and cost trend"
-                >
-                  <LineChart className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
-                  <span>Price History</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSourcingModalProduct(prod)}
-                  className="px-2.5 py-1.5 rounded-md text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 inline-flex items-center gap-1.5 cursor-pointer border border-emerald-200 dark:border-emerald-800 transition-colors"
-                  title="View suppliers sourcing this product, lead times, and quotes"
-                >
-                  <Truck className="w-3.5 h-3.5" />
-                  <span>Sourcing ({getSuppliersForProduct(prod.id).length})</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                {can('products.edit') && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => openEditProduct(prod)}
-                      className="px-3 py-1.5 rounded-md bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-                      title="Edit product details, SKU, specifications, and pricing"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      <span>Edit</span>
-                    </button>
-
-                    {prod.status === 'Archived' ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRestoreProduct(prod)}
-                        className="px-3 py-1.5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
-                        title="Restore product to active status"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Restore</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleArchiveProduct(prod)}
-                        className="px-2.5 py-1.5 rounded-md text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-amber-200 dark:border-amber-800 inline-flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Archive product (preserves historical data, hides from active ordering)"
-                      >
-                        <Archive className="w-3.5 h-3.5" />
-                        <span>Archive</span>
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteProduct(prod)}
-                      className="px-2 py-1.5 rounded-md text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900 inline-flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Permanently delete product if no orders/stock/PO references exist"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </>
-                )}
-              </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <section className="space-y-3 rounded-xl border border-[var(--border-subtle)] p-4">
+                <h3 className="text-base font-semibold">Stock</h3>
+                <dl className="grid grid-cols-2 gap-3 text-sm tabular-nums">
+                  <div><dt className="text-[var(--text-secondary)]">Available</dt><dd className="font-semibold">{formatStock(detailProduct.availableQty, detailProduct.unit)}</dd></div>
+                  <div><dt className="text-[var(--text-secondary)]">Reserved</dt><dd>{formatStock(detailProduct.reservedQty, detailProduct.unit)}</dd></div>
+                  <div><dt className="text-[var(--text-secondary)]">Incoming</dt><dd>{formatStock(detailProduct.incomingQty, detailProduct.unit)}</dd></div>
+                  <div><dt className="text-[var(--text-secondary)]">Reorder point</dt><dd>{formatStock(detailProduct.reorderPoint, detailProduct.unit)}</dd></div>
+                </dl>
+              </section>
+              <section className="space-y-3 rounded-xl border border-[var(--border-subtle)] p-4">
+                <h3 className="text-base font-semibold">Pricing per unit</h3>
+                <dl className="grid grid-cols-2 gap-3 text-sm tabular-nums">
+                  <div><dt className="text-[var(--text-secondary)]">Institutional</dt><dd className="font-semibold">{formatKes(detailProduct.pricing.institutionalKes)}</dd></div>
+                  <div><dt className="text-[var(--text-secondary)]">Wholesale</dt><dd>{formatKes(detailProduct.pricing.wholesaleKes)}</dd></div>
+                  <div><dt className="text-[var(--text-secondary)]">Retail</dt><dd>{formatKes(detailProduct.pricing.retailKes)}</dd></div>
+                  <div><dt className="text-[var(--text-secondary)]">Online</dt><dd>{formatKes(detailProduct.pricing.onlineKes)}</dd></div>
+                  <div><dt className="text-[var(--text-secondary)]">Catalogue supplier cost</dt><dd>{formatKes(detailProduct.pricing.supplierCostKes)}</dd></div>
+                </dl>
+              </section>
             </div>
-          </Card>
-        ))}
-      </div>
+            {lifecycleError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{lifecycleError}</p>}
+            <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
+              <button type="button" className={cardButton} onClick={() => setHistoryProduct(detailProduct)}>
+                <LineChart size={16} aria-hidden="true" /> Price history
+              </button>
+              <button type="button" className={cardButton} onClick={() => setSourcingModalProduct(detailProduct)}>
+                <Truck size={16} aria-hidden="true" /> Sourcing ({supplierCount})
+              </button>
+              {can('products.edit') && (
+                <>
+                  <button type="button" className={primaryButton} onClick={() => openEditProduct(detailProduct)}>
+                    <Edit2 size={16} aria-hidden="true" /> Edit product
+                  </button>
+                  {detailProduct.status === 'Archived' ? (
+                    <button type="button" className={cardButton} disabled={Boolean(lifecycleAction)} onClick={() => void updateProductLifecycle('restore')}>
+                      <RotateCcw size={16} aria-hidden="true" /> {lifecycleAction === 'restore' ? 'Restoring…' : 'Restore'}
+                    </button>
+                  ) : (
+                    <button type="button" className={cardButton} disabled={Boolean(lifecycleAction)} onClick={() => void updateProductLifecycle('archive')}>
+                      <Archive size={16} aria-hidden="true" /> {lifecycleAction === 'archive' ? 'Archiving…' : 'Archive'}
+                    </button>
+                  )}
+                  <button type="button" className={`${cardButton} text-red-700 dark:text-red-300`} disabled={Boolean(lifecycleAction)}
+                    onClick={() => { setLifecycleError(''); setConfirmingDelete(true); }}>
+                    <Trash2 size={16} aria-hidden="true" /> Delete
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(confirmingDelete && detailProduct)}
+        onClose={() => { if (!lifecycleAction) { setConfirmingDelete(false); setLifecycleError(''); } }}
+        title="Delete product?"
+        subtitle={detailProduct?.name}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm">Deleting permanently removes this product from the catalogue.</p>
+          {lifecycleError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{lifecycleError}</p>}
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" className={cardButton} disabled={Boolean(lifecycleAction)}
+              onClick={() => { setConfirmingDelete(false); setLifecycleError(''); }}>Cancel</button>
+            <button type="button" className={`${cardButton} text-red-700 dark:text-red-300`} disabled={Boolean(lifecycleAction)}
+              onClick={() => void updateProductLifecycle('delete')}>{lifecycleAction === 'delete' ? 'Deleting…' : 'Delete product'}</button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Supplier Purchase Price History Timeline Modal */}
       <Modal
@@ -1230,7 +1212,7 @@ export default function ProductsPage() {
       {/* Edit Product Modal */}
       <Modal
         open={Boolean(editDetailsProduct)}
-        onClose={() => setEditDetailsProduct(null)}
+        onClose={() => { if (!savingEdit) setEditDetailsProduct(null); }}
         title={`Edit Product · ${editDetailsProduct?.name}`}
         subtitle={`Update SKU details, unit of measure, active status, buffer target, and pricing tiers for ${editDetailsProduct?.sku}.`}
       >
@@ -1271,6 +1253,7 @@ export default function ProductsPage() {
                 }
                 className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
               >
+                {!CATEGORIES.some((option) => option === editCategory) && <option value={editCategory}>{editCategory}</option>}
                 {CATEGORIES.filter((c) => c !== 'All').map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -1465,9 +1448,11 @@ export default function ProductsPage() {
             </div>
           </div>
 
+          {editError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{editError}</p>}
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"
+              disabled={savingEdit}
               onClick={() => setEditDetailsProduct(null)}
               className="px-4 py-2 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
             >
@@ -1475,10 +1460,11 @@ export default function ProductsPage() {
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+              disabled={savingEdit}
+              className="px-5 py-2 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50"
             >
               <Edit2 className="w-3.5 h-3.5" />
-              <span>Save Changes</span>
+              <span>{savingEdit ? 'Saving…' : 'Save changes'}</span>
             </button>
           </div>
         </form>
@@ -1508,14 +1494,15 @@ export default function ProductsPage() {
               <div className="space-y-3">
                 {getSuppliersForProduct(sourcingModalProduct.id).map((sup) => {
                   const supplyItem = sup.suppliedProducts?.find(
-                    (p) => p.productId === sourcingModalProduct.id
+                    (p) => p.productId === sourcingModalProduct.id && p.unit === sourcingModalProduct.unit && p.availability !== 'Unavailable'
                   );
+                  const minimum = supplyItem?.moq ?? supplyItem?.minOrderQty;
                   return (
                     <div
                       key={sup.id}
                       className="rounded-lg border border-neutral-200 bg-white p-4 shadow-xs dark:border-neutral-800 dark:bg-neutral-900"
                     >
-                      <div className="flex items-start justify-between">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">
@@ -1531,7 +1518,7 @@ export default function ProductsPage() {
                         </div>
                         <div className="text-right">
                           <div className="text-sm font-bold text-emerald-700 dark:text-emerald-400 font-mono">
-                            KES {supplyItem?.currentCostKes.toLocaleString()} / {supplyItem?.unit || sourcingModalProduct.unit}
+                            {supplyItem && supplyItem.currentCostKes > 0 ? `${formatKes(supplyItem.currentCostKes)} / ${supplyItem.unit}` : 'Quote pending'}
                           </div>
                           <p className="text-[10px] text-neutral-500">Quoted Farmgate Cost</p>
                         </div>
@@ -1547,7 +1534,7 @@ export default function ProductsPage() {
                         <div>
                           <span className="text-neutral-400">Min Order Qty: </span>
                           <strong className="text-neutral-800 dark:text-neutral-200">
-                            {supplyItem?.moq ?? 10} {sourcingModalProduct.unit}
+                            {minimum !== undefined ? formatStock(minimum, sourcingModalProduct.unit) : 'Unrecorded'}
                           </strong>
                         </div>
                         <div>

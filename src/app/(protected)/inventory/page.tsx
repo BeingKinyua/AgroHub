@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
@@ -18,6 +19,7 @@ import {
   Warehouse,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
+import { getOrderSourcingLines } from '@/lib/services/procurement-rules';
 import {
   ActionableMetricCard,
   Card,
@@ -77,15 +79,13 @@ function InventoryContent() {
   }, [searchParams]);
 
   // Top Summary metrics (Section 23: Available, Reserved, Incoming, Low Stock, Expiring)
-  const totalAvailableKg = useMemo(
-    () => products.reduce((acc, p) => acc + p.availableQty, 0),
-    [products]
-  );
-  const totalReservedKg = useMemo(
-    () => stockBatches.reduce((acc, b) => acc + b.reservedQty, 0),
-    [stockBatches]
-  );
-  const incomingShipmentsUnits = 3800; // scheduled GRNs today
+  const availableSkus = products.filter((product) => product.availableQty > 0).length;
+  const reservedSkus = products.filter((product) => product.reservedQty > 0).length;
+  const inboundPurchaseOrders = procurementOrders.filter((po) => po.purpose === 'Bulk Stock Procurement' &&
+    ['PO Issued', 'Receiving (GRN)', 'Quality Check', 'Partially Received'].includes(po.stage));
+  const goodsFlow = orders.filter((order) => order.status !== 'Cancelled' && order.status !== 'Draft')
+    .flatMap((order) => getOrderSourcingLines(order, procurementOrders)
+      .filter((line) => line.directRequired > 0).map((line) => ({ order, ...line })));
   const lowStockProducts = useMemo(
     () => products.filter((p) => p.availableQty < p.reorderPoint),
     [products]
@@ -134,11 +134,10 @@ function InventoryContent() {
     <div className="space-y-6">
       {/* Page Header (Section 23 & 31) */}
       <PageHeader
-        kicker="FEFO COLD CHAIN & STOCK RISK GOVERNANCE"
-        title="Inventory & Stock Risk Command"
-        description="Identify stock risk, monitor First-Expired First-Out (FEFO) perishable lots, manage warehouse capacity, and prevent shrinkage across Kenyan hubs."
+        title="Inventory"
+        description="Track goods moving directly to customers and manage stock held at warehouses."
         actions={
-          (can('inventory.adjust') ||
+          activeTab !== 'direct-flow' && (can('inventory.adjust') ||
             can('inventory.transfer') ||
             can('inventory.receive')) && (
             <button
@@ -159,24 +158,83 @@ function InventoryContent() {
         onDismiss={() => setFeedback(null)}
       />
 
+      {/* View Switcher Tabs (Hybrid Operating Models: Direct Procurement vs FEFO Storage) */}
+      <div className="flex flex-wrap items-center gap-1 p-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTab('direct-flow')}
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+            activeTab === 'direct-flow'
+              ? 'bg-[#1F6A37] text-white shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          Direct goods flow
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('batches')}
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+            activeTab === 'batches'
+              ? 'bg-[#1F6A37] text-white shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          Stored stock ({stockBatches.length} batches)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('products')}
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+            activeTab === 'products'
+              ? 'bg-[#1F6A37] text-white shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          Product Stock Matrix ({products.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('movements')}
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+            activeTab === 'movements'
+              ? 'bg-[#1F6A37] text-white shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          Wastage & Movements ({stockMovements.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('warehouses')}
+          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+            activeTab === 'warehouses'
+              ? 'bg-[#1F6A37] text-white shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          Cold-Chain Facilities
+        </button>
+      </div>
+
       {/* Top Decision Summary Metrics (Section 23: Available, Reserved, Incoming, Low Stock, Expiring) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {activeTab !== 'direct-flow' && <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <KPI
           label="Available Stock"
-          value={`${totalAvailableKg.toLocaleString()} kg`}
+          value={`${availableSkus} SKUs`}
           sublabel="Net unreserved inventory"
           tone="positive"
         />
         <KPI
           label="Reserved for Orders"
-          value={`${totalReservedKg.toLocaleString()} kg`}
+          value={`${reservedSkus} SKUs`}
           sublabel="Allocated to active dispatches"
           tone="neutral"
         />
         <KPI
-          label="Incoming Today"
-          value={`${incomingShipmentsUnits.toLocaleString()} Units`}
-          sublabel="2 GRNs arriving before 11:30"
+          label="Inbound Purchases"
+          value={`${inboundPurchaseOrders.length} POs`}
+          sublabel="Awaiting warehouse receipt"
           tone="positive"
         />
         <KPI
@@ -191,10 +249,10 @@ function InventoryContent() {
           sublabel="FEFO priority countdown"
           tone={expiringBatches.length > 0 ? 'danger' : 'positive'}
         />
-      </div>
+      </div>}
 
       {/* Primary Section: Inventory at Risk (Section 23) */}
-      <section aria-label="Inventory Risk Workbench">
+      {activeTab !== 'direct-flow' && <section aria-label="Warehouse stock risks">
         <div className="p-4 sm:p-5 rounded-[20px] bg-[var(--bg-card)] border-2 border-amber-500/35 dark:border-amber-500/30">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
@@ -203,16 +261,13 @@ function InventoryContent() {
               </span>
               <div>
                 <h2 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
-                  Primary Risk Radar · Perishable Lots & Deficits
+                  Perishable batches and stock shortages
                 </h2>
                 <p className="text-[11px] text-[var(--text-secondary)]">
                   Take immediate operational action on stock before expiry threshold or school stockout occurs.
                 </p>
               </div>
             </div>
-            <span className="text-[11px] font-mono-tabular text-[var(--text-secondary)]">
-              Updated 4m ago · As of 07:45 EAT
-            </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -289,186 +344,44 @@ function InventoryContent() {
                   <span className="text-[10px] text-[var(--text-secondary)]">
                     Reorder Needed
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBatchId(stockBatches[0]?.id || '');
-                      setMovType('Receipt (GRN)');
-                      setModalOpen(true);
-                    }}
-                    className="h-7 px-3 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>Receive Stock</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
+                  {can('procurement.view') && <Link href="/procurement?filter=receiving"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-semibold hover:bg-[var(--bg-canvas)]">
+                    View purchase receipts <ArrowRight size={15} aria-hidden="true" />
+                  </Link>}
                 </div>
               </div>
             ))}
           </div>
         </div>
-      </section>
+      </section>}
 
-      {/* View Switcher Tabs (Hybrid Operating Models: Direct Procurement vs FEFO Storage) */}
-      <div className="flex flex-wrap items-center gap-1 p-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit">
-        <button
-          type="button"
-          onClick={() => setActiveTab('direct-flow')}
-          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'direct-flow'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          Direct Farm-to-Client Flow (Transit Staging)
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('batches')}
-          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'batches'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          FEFO Batch Lots ({stockBatches.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('products')}
-          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'products'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          Product Stock Matrix ({products.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('movements')}
-          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'movements'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          Wastage & Movements ({stockMovements.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('warehouses')}
-          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'warehouses'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          Cold-Chain Facilities
-        </button>
-      </div>
-
-      {/* Tab 0: Direct Farm-to-Client Transit & Staging (Operating Model A) */}
       {activeTab === 'direct-flow' && (
-        <Card padding="p-0" className="overflow-hidden">
-          <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/30">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h3 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
-                  Operating Model A: Demand-Driven Direct Procurement Flow
-                </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                  Goods sourced directly from smallholder farm cooperatives upon customer demand, staged at cross-docking bays, and delivered without permanent warehouse holding.
-                </p>
+        <section aria-labelledby="direct-goods-flow" className="space-y-3">
+          <h2 id="direct-goods-flow" className="font-heading text-lg font-semibold">Direct goods flow</h2>
+          {goodsFlow.length === 0 && <Card><p className="text-sm text-[var(--text-secondary)]">No customer order lines use direct sourcing.</p></Card>}
+          {goodsFlow.map(({ id, order, item, directRequired, collected, outstanding, uncommitted }) => (
+            <Card key={`${order.id}-${id}`} className="space-y-3">
+              <div className="flex flex-wrap justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold">{item.productName}</h3>
+                  <p className="text-sm text-[var(--text-secondary)]">{order.orderNumber} · {order.customerName} · Delivery {order.deliveryDate}</p>
+                </div>
+                <StatusBadge status={outstanding === 0 ? 'Collected' : collected > 0 ? 'Partially collected' : 'Awaiting collection'}
+                  tone={outstanding === 0 ? 'success' : 'warning'} />
               </div>
-              <span className="text-[11px] font-semibold text-[#1F6A37] dark:text-[#4EB462] bg-[#E5EFE6] dark:bg-[#122719] px-2.5 py-1 rounded-md shrink-0">
-                Zero-Warehouse Paradigm Active
-              </span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
-                  <th className="py-3 px-4">Customer Order</th>
-                  <th className="py-3 px-4">Destination Client</th>
-                  <th className="py-3 px-4">Commodity & Quantity</th>
-                  <th className="py-3 px-4">Origin Sourcing Farm</th>
-                  <th className="py-3 px-4">Transit & Staging Stage</th>
-                  <th className="py-3 px-4 text-right">Invoiced / Cost (KES)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
-                {orders.flatMap((ord) =>
-                  ord.items
-                    .filter((it) => it.sourcingMode === 'Direct Procurement' || it.sourcingMode === 'Mixed Sourcing' || ord.status === 'Confirmed' || ord.status === 'Picking')
-                    .map((item, idx) => {
-                      const linkedPo = procurementOrders.find(
-                        (po) => po.customerOrderId === ord.id || po.supplierName === item.supplierName
-                      );
-                      const isCollected = linkedPo?.goodsCollected || ord.status === 'Packed' || ord.status === 'Dispatched' || ord.status === 'Delivered';
-
-                      return (
-                        <tr key={`${ord.id}-${idx}`} className="hover:bg-[var(--bg-canvas)]/60 transition-colors">
-                          <td className="py-3.5 px-4 font-mono-tabular font-semibold text-[var(--text-primary)]">
-                            {ord.orderNumber}
-                            <div className="text-[11px] font-normal text-[var(--text-secondary)]">
-                              Target: {ord.deliveryDate}
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="font-semibold text-[var(--text-primary)]">
-                              {ord.customerName}
-                            </div>
-                            <div className="text-[11px] text-[var(--text-secondary)]">
-                              {ord.customerSegment} · {ord.warehouseName}
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="font-medium text-[var(--text-primary)]">
-                              {item.productName}
-                            </div>
-                            <div className="text-[11px] font-mono-tabular text-[var(--text-secondary)]">
-                              {item.quantity} {item.unit} @ KES {item.unitPriceKes}
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="font-medium text-[var(--text-primary)]">
-                              {item.supplierName || linkedPo?.supplierName || 'Kinangop Farmers Co-op'}
-                            </div>
-                            <div className="text-[11px] text-[var(--text-secondary)]">
-                              Farmgate Sourcing Cost: {item.purchaseCostKes ? `KES ${item.purchaseCostKes.toLocaleString()}/${item.unit}` : 'Awaiting Sourcing Quote'}
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            {isCollected ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>Collected & Staged for Route</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-                                <Clock className="w-3 h-3" />
-                                <span>Farmgate Collection Pending</span>
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 text-right">
-                            <div className="font-mono-tabular font-semibold text-[var(--text-primary)]">
-                              KES {item.lineTotalKes.toLocaleString()}
-                            </div>
-                            <div className="text-[10px] text-[var(--text-secondary)] font-mono-tabular">
-                              {item.purchaseCostKes ? `Est. Sourcing: KES ${Math.round(item.purchaseCostKes * item.quantity).toLocaleString()}` : 'Cost TBD'}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-3 text-sm">
+                <p>{collected.toLocaleString()} / {directRequired.toLocaleString()} {item.unit} collected
+                  {uncommitted > 0 && <span className="text-[var(--text-secondary)]"> · {uncommitted.toLocaleString()} {item.unit} still to order</span>}
+                </p>
+                {outstanding > 0 && can('procurement.view') && <Link
+                  href={`/procurement?order=${encodeURIComponent(order.id)}`}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 font-medium hover:bg-[var(--bg-canvas)]">
+                  View sourcing <ArrowRight size={16} aria-hidden="true" />
+                </Link>}
+              </div>
+            </Card>
+          ))}
+        </section>
       )}
 
       {/* Tab 1: FEFO Batch View (Operating Model B) */}
@@ -544,8 +457,8 @@ function InventoryContent() {
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-mono-tabular">
-                      <div>{b.expiryDate}</div>
-                      <div
+                      <div>{b.expiryDate || 'No expiry date'}</div>
+                      {b.expiryDate && <div
                         className={`text-[11px] font-semibold ${
                           b.daysToExpiry <= 5
                             ? 'text-red-600 dark:text-red-400'
@@ -553,7 +466,7 @@ function InventoryContent() {
                         }`}
                       >
                         {b.daysToExpiry}d remaining
-                      </div>
+                      </div>}
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono-tabular font-semibold text-[var(--text-primary)]">
                       {b.availableQty.toLocaleString()} {b.unit}
@@ -581,7 +494,7 @@ function InventoryContent() {
                 </div>
                 <div className="text-xs font-semibold">{b.productName}</div>
                 <div className="text-[11px] text-[var(--text-secondary)]">
-                  {b.warehouseName} ({b.binCode}) · Expires {b.expiryDate} ({b.daysToExpiry}d)
+                  {b.warehouseName} ({b.binCode}){b.expiryDate ? ` · Expires ${b.expiryDate} (${b.daysToExpiry}d)` : ''}
                 </div>
                 <div className="text-xs font-mono-tabular font-semibold">
                   Available: {b.availableQty.toLocaleString()} {b.unit}

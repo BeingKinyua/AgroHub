@@ -14,16 +14,20 @@ import {
   UserCheck,
   Users,
   Wrench,
-  X,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
 import { DriverRecord, VehicleRecord } from '@/types/domain/bos';
 import {
   Breadcrumbs,
   EmptyState,
+  Modal,
   PageHeader,
   StatusBadge,
 } from '@/components/ui/primitives';
+
+const fleetField = 'mt-1.5 min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 py-2 text-sm text-[var(--text-primary)]';
+const fleetCancel = 'min-h-11 rounded-lg border border-[var(--border-subtle)] px-4 text-sm font-medium hover:bg-[var(--bg-canvas)] disabled:opacity-50';
+const fleetSave = 'min-h-11 rounded-lg bg-green-800 px-4 text-sm font-semibold text-white hover:bg-green-900 disabled:opacity-50';
 
 export default function FleetPage() {
   const {
@@ -45,6 +49,8 @@ export default function FleetPage() {
   const [isOnboardDriverOpen, setIsOnboardDriverOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<VehicleRecord | null>(null);
   const [editingDriver, setEditingDriver] = useState<DriverRecord | null>(null);
+  const [statusSubmitting, setStatusSubmitting] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   // New vehicle form state
   const [vehReg, setVehReg] = useState('');
@@ -100,58 +106,82 @@ export default function FleetPage() {
 
   const handleRegisterVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vehReg.trim() || !vehMakeModel.trim()) return;
+    if (!vehReg.trim() || !vehMakeModel.trim()) {
+      setModalError('Enter the registration number and the vehicle’s make and model.');
+      return;
+    }
     setVehSubmitting(true);
-    const assignedDriver = drivers.find((d) => d.id === vehDriverId);
-    await createVehicle({
-      registration: vehReg.trim().toUpperCase(),
-      makeModel: vehMakeModel.trim(),
-      type: vehType,
-      capacityKg: Number(vehCapacity) || 1000,
-      fuelType: vehFuel,
-      status: 'Available',
-      assignedDriverId: vehDriverId || undefined,
-      assignedDriverName: assignedDriver?.fullName,
-      lastServiceDate: new Date().toISOString().split('T')[0],
-      insuranceExpiry: '2027-12-31',
-    });
-    setVehSubmitting(false);
-    setIsRegisterVehicleOpen(false);
-    setVehReg('');
-    setVehMakeModel('');
-    setVehDriverId('');
+    setModalError('');
+    try {
+      const assignedDriver = drivers.find((d) => d.id === vehDriverId);
+      const result = await createVehicle({
+        registration: vehReg.trim().toUpperCase(),
+        makeModel: vehMakeModel.trim(),
+        type: vehType,
+        capacityKg: Number(vehCapacity) || 1000,
+        fuelType: vehFuel,
+        status: 'Available',
+        assignedDriverId: vehDriverId || undefined,
+        assignedDriverName: assignedDriver?.fullName,
+        lastServiceDate: new Date().toISOString().split('T')[0],
+        insuranceExpiry: '2027-12-31',
+      });
+      if (!result.ok) {
+        setModalError(result.message);
+        return;
+      }
+      setIsRegisterVehicleOpen(false);
+      setVehReg('');
+      setVehMakeModel('');
+      setVehDriverId('');
+    } finally {
+      setVehSubmitting(false);
+    }
   };
 
   const handleOnboardDriver = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!drvName.trim() || !drvPhone.trim() || !drvLicense.trim()) return;
+    if (!drvName.trim() || !drvPhone.trim() || !drvLicense.trim() || !drvClasses.trim()) {
+      setModalError('Enter the driver’s name, phone number, licence number, and licence classes.');
+      return;
+    }
     setDrvSubmitting(true);
-    const assignedVeh = vehicles.find((v) => v.id === drvVehicleId);
-    await createDriver({
-      fullName: drvName.trim(),
-      phone: drvPhone.trim(),
-      licenseNumber: drvLicense.trim().toUpperCase(),
-      licenseClasses: drvClasses.trim(),
-      status: 'Available',
-      assignedVehicleId: drvVehicleId || undefined,
-      assignedVehicleReg: assignedVeh?.registration,
-    });
-    setDrvSubmitting(false);
-    setIsOnboardDriverOpen(false);
-    setDrvName('');
-    setDrvPhone('');
-    setDrvLicense('');
-    setDrvVehicleId('');
+    setModalError('');
+    try {
+      const assignedVeh = vehicles.find((v) => v.id === drvVehicleId);
+      const result = await createDriver({
+        fullName: drvName.trim(),
+        phone: drvPhone.trim(),
+        licenseNumber: drvLicense.trim().toUpperCase(),
+        licenseClasses: drvClasses.trim(),
+        status: 'Available',
+        assignedVehicleId: drvVehicleId || undefined,
+        assignedVehicleReg: assignedVeh?.registration,
+      });
+      if (!result.ok) {
+        setModalError(result.message);
+        return;
+      }
+      setIsOnboardDriverOpen(false);
+      setDrvName('');
+      setDrvPhone('');
+      setDrvLicense('');
+      setDrvVehicleId('');
+    } finally {
+      setDrvSubmitting(false);
+    }
   };
 
-  const handleUpdateVehicleStatus = async (veh: VehicleRecord, newStatus: VehicleRecord['status']) => {
-    await updateVehicle(veh.id, { status: newStatus });
-    setEditingVehicle(null);
-  };
-
-  const handleUpdateDriverStatus = async (drv: DriverRecord, newStatus: DriverRecord['status']) => {
-    await updateDriver(drv.id, { status: newStatus });
-    setEditingDriver(null);
+  const handleUpdateStatus = async (update: () => Promise<{ ok: boolean; message: string }>, onSaved: () => void) => {
+    setStatusSubmitting(true);
+    setModalError('');
+    try {
+      const result = await update();
+      if (result.ok) onSaved();
+      else setModalError(result.message);
+    } finally {
+      setStatusSubmitting(false);
+    }
   };
 
   return (
@@ -463,339 +493,185 @@ export default function FleetPage() {
         </div>
       )}
 
-      {/* Register Vehicle Modal */}
-      {isRegisterVehicleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-xl border border-neutral-200 bg-white p-6 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
-            <div className="flex items-center justify-between border-b border-neutral-200 pb-3 dark:border-neutral-800">
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">Register Fleet Vehicle</h3>
-              <button
-                type="button"
-                onClick={() => setIsRegisterVehicleOpen(false)}
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleRegisterVehicle} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                  Registration Number (e.g. KBZ 412M)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="KXX 123Y"
-                  value={vehReg}
-                  onChange={(e) => setVehReg(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                  Make & Model
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Toyota Hilux 4x4 or Isuzu FRR"
-                  value={vehMakeModel}
-                  onChange={(e) => setVehMakeModel(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                    Vehicle Type
-                  </label>
-                  <select
-                    value={vehType}
-                    onChange={(e) => setVehType(e.target.value as VehicleRecord['type'])}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                  >
-                    <option value="Ambient Pickup">Ambient Pickup</option>
-                    <option value="Refrigerated Van">Refrigerated Van</option>
-                    <option value="3-Ton Truck">3-Ton Truck</option>
-                    <option value="Motorbike Box">Motorbike Box</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                    Payload Capacity (KG)
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={50}
-                    max={15000}
-                    value={vehCapacity}
-                    onChange={(e) => setVehCapacity(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                    Fuel Type
-                  </label>
-                  <select
-                    value={vehFuel}
-                    onChange={(e) => setVehFuel(e.target.value as VehicleRecord['fuelType'])}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                  >
-                    <option value="Diesel">Diesel</option>
-                    <option value="Petrol">Petrol</option>
-                    <option value="Electric">Electric</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                    Assign Driver (Optional)
-                  </label>
-                  <select
-                    value={vehDriverId}
-                    onChange={(e) => setVehDriverId(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                  >
-                    <option value="">-- No driver assigned --</option>
-                    {drivers.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.fullName} ({d.status})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                <button
-                  type="button"
-                  onClick={() => setIsRegisterVehicleOpen(false)}
-                  className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={vehSubmitting}
-                  className="rounded-md bg-[#1F6A37] px-4 py-2 text-sm font-medium text-white hover:bg-[#12512C] disabled:opacity-50"
-                >
-                  {vehSubmitting ? 'Registering...' : 'Confirm Registration'}
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={isRegisterVehicleOpen}
+        onClose={() => {
+          if (vehSubmitting) return;
+          setModalError('');
+          setIsRegisterVehicleOpen(false);
+        }}
+        title="Register fleet vehicle"
+        size="lg"
+        allowEscapeClose={!vehSubmitting}
+        allowBackdropClose={!vehSubmitting}
+      >
+        <form onSubmit={handleRegisterVehicle} className="space-y-4 text-sm">
+          <div>
+            <label htmlFor="fleet-registration">Registration number</label>
+            <input id="fleet-registration" type="text" required placeholder="KBZ 412M" value={vehReg}
+              onChange={(event) => setVehReg(event.target.value)} className={fleetField} />
           </div>
-        </div>
-      )}
-
-      {/* Onboard Driver Modal */}
-      {isOnboardDriverOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-xl border border-neutral-200 bg-white p-6 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
-            <div className="flex items-center justify-between border-b border-neutral-200 pb-3 dark:border-neutral-800">
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">Onboard Delivery Driver</h3>
-              <button
-                type="button"
-                onClick={() => setIsOnboardDriverOpen(false)}
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleOnboardDriver} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                  Full Legal Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Samuel Omondi"
-                  value={drvName}
-                  onChange={(e) => setDrvName(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="+254 7XX XXX XXX"
-                    value={drvPhone}
-                    onChange={(e) => setDrvPhone(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                    Driver License Number
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="DL-XXXXX"
-                    value={drvLicense}
-                    onChange={(e) => setDrvLicense(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                    License Classes
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="B, C, E"
-                    value={drvClasses}
-                    onChange={(e) => setDrvClasses(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                    Assign Primary Vehicle
-                  </label>
-                  <select
-                    value={drvVehicleId}
-                    onChange={(e) => setDrvVehicleId(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
-                  >
-                    <option value="">-- Standby / Pool --</option>
-                    {vehicles.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.registration} ({v.type})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                <button
-                  type="button"
-                  onClick={() => setIsOnboardDriverOpen(false)}
-                  className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={drvSubmitting}
-                  className="rounded-md bg-[#1F6A37] px-4 py-2 text-sm font-medium text-white hover:bg-[#12512C] disabled:opacity-50"
-                >
-                  {drvSubmitting ? 'Onboarding...' : 'Confirm Driver Onboarding'}
-                </button>
-              </div>
-            </form>
+          <div>
+            <label htmlFor="fleet-make-model">Make and model</label>
+            <input id="fleet-make-model" type="text" required placeholder="Toyota Hilux 4x4" value={vehMakeModel}
+              onChange={(event) => setVehMakeModel(event.target.value)} className={fleetField} />
           </div>
-        </div>
-      )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="fleet-vehicle-type">Vehicle type</label>
+              <select id="fleet-vehicle-type" value={vehType}
+                onChange={(event) => setVehType(event.target.value as VehicleRecord['type'])} className={fleetField}>
+                <option value="Ambient Pickup">Ambient Pickup</option>
+                <option value="Refrigerated Van">Refrigerated Van</option>
+                <option value="3-Ton Truck">3-Ton Truck</option>
+                <option value="Motorbike Box">Motorbike Box</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="fleet-capacity">Payload capacity (kg)</label>
+              <input id="fleet-capacity" type="number" required min={50} max={15000} value={vehCapacity}
+                onChange={(event) => setVehCapacity(event.target.value)} className={fleetField} />
+            </div>
+            <div>
+              <label htmlFor="fleet-fuel">Fuel type</label>
+              <select id="fleet-fuel" value={vehFuel}
+                onChange={(event) => setVehFuel(event.target.value as VehicleRecord['fuelType'])} className={fleetField}>
+                <option value="Diesel">Diesel</option>
+                <option value="Petrol">Petrol</option>
+                <option value="Electric">Electric</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="fleet-primary-driver">Assigned driver (optional)</label>
+              <select id="fleet-primary-driver" value={vehDriverId} onChange={(event) => setVehDriverId(event.target.value)} className={fleetField}>
+                <option value="">No driver assigned</option>
+                {drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.fullName} ({driver.status})</option>)}
+              </select>
+            </div>
+          </div>
+          {modalError && <p role="alert" className="text-red-700 dark:text-red-300">{modalError}</p>}
+          <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
+            <button type="button" className={fleetCancel} disabled={vehSubmitting} onClick={() => {
+              setModalError('');
+              setIsRegisterVehicleOpen(false);
+            }}>Cancel</button>
+            <button type="submit" className={fleetSave} disabled={vehSubmitting}>{vehSubmitting ? 'Registering…' : 'Register vehicle'}</button>
+          </div>
+        </form>
+      </Modal>
 
-      {/* Edit Vehicle Status Modal */}
+      <Modal
+        open={isOnboardDriverOpen}
+        onClose={() => {
+          if (drvSubmitting) return;
+          setModalError('');
+          setIsOnboardDriverOpen(false);
+        }}
+        title="Onboard delivery driver"
+        size="lg"
+        allowEscapeClose={!drvSubmitting}
+        allowBackdropClose={!drvSubmitting}
+      >
+        <form onSubmit={handleOnboardDriver} className="space-y-4 text-sm">
+          <div>
+            <label htmlFor="fleet-driver-name">Full legal name</label>
+            <input id="fleet-driver-name" type="text" required autoComplete="name" value={drvName}
+              onChange={(event) => setDrvName(event.target.value)} className={fleetField} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="fleet-driver-phone">Phone number</label>
+              <input id="fleet-driver-phone" type="tel" required autoComplete="tel" placeholder="+254 7XX XXX XXX" value={drvPhone}
+                onChange={(event) => setDrvPhone(event.target.value)} className={fleetField} />
+            </div>
+            <div>
+              <label htmlFor="fleet-driver-license">Driver licence number</label>
+              <input id="fleet-driver-license" type="text" required placeholder="DL-XXXXX" value={drvLicense}
+                onChange={(event) => setDrvLicense(event.target.value)} className={fleetField} />
+            </div>
+            <div>
+              <label htmlFor="fleet-license-classes">Licence classes</label>
+              <input id="fleet-license-classes" type="text" required placeholder="B, C, E" value={drvClasses}
+                onChange={(event) => setDrvClasses(event.target.value)} className={fleetField} />
+            </div>
+            <div>
+              <label htmlFor="fleet-primary-vehicle">Assigned vehicle (optional)</label>
+              <select id="fleet-primary-vehicle" value={drvVehicleId} onChange={(event) => setDrvVehicleId(event.target.value)} className={fleetField}>
+                <option value="">No vehicle assigned</option>
+                {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.registration} ({vehicle.type})</option>)}
+              </select>
+            </div>
+          </div>
+          {modalError && <p role="alert" className="text-red-700 dark:text-red-300">{modalError}</p>}
+          <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
+            <button type="button" className={fleetCancel} disabled={drvSubmitting} onClick={() => {
+              setModalError('');
+              setIsOnboardDriverOpen(false);
+            }}>Cancel</button>
+            <button type="submit" className={fleetSave} disabled={drvSubmitting}>{drvSubmitting ? 'Saving…' : 'Onboard driver'}</button>
+          </div>
+        </form>
+      </Modal>
+
       {editingVehicle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-6 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
-            <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
-              Update Status: {editingVehicle.registration}
-            </h3>
-            <p className="mt-1 text-xs text-neutral-500">
-              Select current operational readiness status.
-            </p>
-
-            <div className="mt-4 space-y-2">
-              {(['Available', 'On Route', 'Maintenance', 'Out of Service'] as VehicleRecord['status'][]).map(
-                (status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => handleUpdateVehicleStatus(editingVehicle, status)}
-                    className={`w-full rounded-md border p-2.5 text-left text-sm font-medium transition-colors ${
-                      editingVehicle.status === status
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950/40 dark:text-emerald-300'
-                        : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200'
-                    }`}
-                  >
-                    {status}
-                  </button>
-                )
-              )}
-            </div>
-
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setEditingVehicle(null)}
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-300"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <FleetStatusDialog
+          title={`Update vehicle status · ${editingVehicle.registration}`}
+          statuses={['Available', 'On Route', 'Maintenance', 'Out of Service']}
+          selected={editingVehicle.status}
+          pending={statusSubmitting}
+          error={modalError}
+          onClose={() => {
+            setModalError('');
+            setEditingVehicle(null);
+          }}
+          onSelect={(status) => handleUpdateStatus(() => updateVehicle(editingVehicle.id, { status }), () => setEditingVehicle(null))}
+        />
       )}
 
-      {/* Edit Driver Status Modal */}
       {editingDriver && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-6 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
-            <h3 className="text-base font-semibold text-neutral-900 dark:text-white">
-              Update Status: {editingDriver.fullName}
-            </h3>
-            <p className="mt-1 text-xs text-neutral-500">
-              Select driver operational duty status.
-            </p>
-
-            <div className="mt-4 space-y-2">
-              {(['Available', 'On Delivery', 'Off Duty', 'Leave'] as DriverRecord['status'][]).map(
-                (status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => handleUpdateDriverStatus(editingDriver, status)}
-                    className={`w-full rounded-md border p-2.5 text-left text-sm font-medium transition-colors ${
-                      editingDriver.status === status
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950/40 dark:text-emerald-300'
-                        : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200'
-                    }`}
-                  >
-                    {status}
-                  </button>
-                )
-              )}
-            </div>
-
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setEditingDriver(null)}
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-300"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <FleetStatusDialog
+          title={`Update driver status · ${editingDriver.fullName}`}
+          statuses={['Available', 'On Delivery', 'Off Duty', 'Leave']}
+          selected={editingDriver.status}
+          pending={statusSubmitting}
+          error={modalError}
+          onClose={() => {
+            setModalError('');
+            setEditingDriver(null);
+          }}
+          onSelect={(status) => handleUpdateStatus(() => updateDriver(editingDriver.id, { status }), () => setEditingDriver(null))}
+        />
       )}
     </div>
+  );
+}
+
+function FleetStatusDialog<T extends string>({ title, statuses, selected, pending, error, onClose, onSelect }: {
+  title: string;
+  statuses: T[];
+  selected: T;
+  pending: boolean;
+  error: string;
+  onClose: () => void;
+  onSelect: (status: T) => void;
+}) {
+  return (
+    <Modal open title={title} size="sm" onClose={() => { if (!pending) onClose(); }}
+      allowBackdropClose={!pending} allowEscapeClose={!pending}>
+      <div className="space-y-2" aria-busy={pending}>
+        {statuses.map((status) => (
+          <button key={status} type="button" disabled={pending} aria-pressed={selected === status}
+            onClick={() => onSelect(status)}
+            className={`min-h-11 w-full rounded-lg border px-3 text-left text-sm font-medium disabled:opacity-60 ${
+              selected === status
+                ? 'border-emerald-600 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300'
+                : 'border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-canvas)]'
+            }`}>
+            {status}
+          </button>
+        ))}
+      </div>
+      {error && <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
+    </Modal>
   );
 }

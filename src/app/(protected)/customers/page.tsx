@@ -1,20 +1,36 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Plus, Users } from 'lucide-react';
+import React, { Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { Plus, Search } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
 import {
   Card,
+  EmptyState,
   FeedbackBanner,
   KPI,
+  LoadingSkeleton,
   Modal,
   PageHeader,
   StatusBadge,
 } from '@/components/ui/primitives';
 import { CustomerInstitutionRecord } from '@/types/domain/bos';
 
-export default function CustomersPage() {
+function CustomersDirectory() {
   const { customers, can, createCustomer } = useBos();
+  const searchParams = useSearchParams();
+  const accountType = searchParams.get('type');
+  const initialSearch = searchParams.get('q') ?? '';
+  const [search, setSearch] = useState(initialSearch);
+  useEffect(() => setSearch(initialSearch), [initialSearch]);
+  const query = search.trim().toLowerCase();
+  const visibleCustomers = customers.filter((customer) => {
+    if (accountType === 'institutional' && !customer.isInstitutional) return false;
+    if (accountType === 'retail' && customer.isInstitutional) return false;
+    return [customer.name, customer.code, customer.segment, customer.contractRef]
+      .some((value) => value.toLowerCase().includes(query));
+  });
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [segment, setSegment] =
@@ -58,9 +74,8 @@ export default function CustomersPage() {
   return (
     <div>
       <PageHeader
-        kicker="ACCOUNTS, CREDIT TERMS & PRICING TIERS"
-        title="Customers Directory"
-        description="Unified account registry across institutional buyers (schools, hospitals, hotels, restaurants) and direct walk-in retail desks."
+        title="Customers"
+        description="Find customer accounts, contract terms, and procurement contacts."
         actions={
           can('customers.create') && (
             <button
@@ -83,18 +98,18 @@ export default function CustomersPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPI
-          label="Total Active Accounts"
-          value={`${customers.length}`}
+          label="Accounts"
+          value={`${visibleCustomers.length}`}
           sublabel={`${
-            customers.filter((c) => c.isInstitutional).length
+            visibleCustomers.filter((c) => c.isInstitutional).length
           } Institutional · ${
-            customers.filter((c) => !c.isInstitutional).length
+            visibleCustomers.filter((c) => !c.isInstitutional).length
           } Retail`}
           tone="positive"
         />
         <KPI
           label="Total Credit Facility Extended"
-          value={`KES ${customers
+          value={`KES ${visibleCustomers
             .reduce((s, c) => s + c.creditLimitKes, 0)
             .toLocaleString()}`}
           sublabel="Governed Net 15 / Net 30 / Net 45 terms"
@@ -102,7 +117,7 @@ export default function CustomersPage() {
         />
         <KPI
           label="Current Receivables (AR)"
-          value={`KES ${customers
+          value={`KES ${visibleCustomers
             .reduce((s, c) => s + c.outstandingBalanceKes, 0)
             .toLocaleString()}`}
           sublabel="Across active contracts"
@@ -110,14 +125,45 @@ export default function CustomersPage() {
         />
         <KPI
           label="Overdue Receivables"
-          value={`KES ${customers
+          value={`KES ${visibleCustomers
             .reduce((s, c) => s + c.overdueBalanceKes, 0)
             .toLocaleString()}`}
-          sublabel="Alliance High School (Term 3 tranche)"
+          sublabel="For the selected accounts"
           tone="warning"
         />
       </div>
 
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <nav aria-label="Customer accounts" className="flex flex-wrap gap-2">
+          {[
+            { label: 'All accounts', type: null, href: '/customers' },
+            { label: 'Institutions', type: 'institutional', href: '/customers?type=institutional' },
+            { label: 'Retail', type: 'retail', href: '/customers?type=retail' },
+          ].map((filter) => {
+            const active = accountType === filter.type;
+            return (
+              <Link key={filter.href} href={filter.href} aria-current={active ? 'page' : undefined}
+                className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium ${active
+                  ? 'bg-[var(--bg-subtle)] text-[var(--brand-accent)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]'}`}
+              >
+                {filter.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <label className="relative flex w-full items-center sm:w-72">
+          <span className="sr-only">Search customer accounts</span>
+          <Search className="pointer-events-none absolute left-3 size-4 text-[var(--text-secondary)]" aria-hidden="true" />
+          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by name, code, or contract"
+            className="min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] pl-9 pr-3 text-sm" />
+        </label>
+      </div>
+
+      {visibleCustomers.length === 0 ? (
+        <EmptyState title="No matching customer accounts" description="Try another search or account type." />
+      ) : (
       <Card padding="p-0" className="overflow-hidden">
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -131,8 +177,8 @@ export default function CustomersPage() {
                 <th className="py-3 px-4">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
-              {customers.map((c) => (
+            <tbody className="divide-y divide-[var(--border-subtle)] text-sm">
+              {visibleCustomers.map((c) => (
                 <tr key={c.id} className="hover:bg-[var(--bg-canvas)]/60">
                   <td className="py-3.5 px-4">
                     <div className="font-mono-tabular text-[11px] text-[#1F6A37] dark:text-[#4EB462] font-semibold">
@@ -161,6 +207,7 @@ export default function CustomersPage() {
                     <div className="text-[11px] text-[var(--text-secondary)]">
                       {c.priceTier}
                     </div>
+                    {c.isInstitutional && c.contractRef && <div className="mt-0.5 text-xs">{c.contractRef}</div>}
                   </td>
                   <td className="py-3.5 px-4 text-right font-mono-tabular">
                     <div className="font-semibold">
@@ -180,7 +227,7 @@ export default function CustomersPage() {
         </div>
 
         <div className="md:hidden divide-y divide-[var(--border-subtle)]">
-          {customers.map((c) => (
+          {visibleCustomers.map((c) => (
             <div key={c.id} className="p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-mono-tabular text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462]">
@@ -188,10 +235,11 @@ export default function CustomersPage() {
                 </span>
                 <StatusBadge status={c.status} />
               </div>
-              <div className="text-xs font-semibold">{c.name}</div>
-              <div className="text-[11px] text-[var(--text-secondary)]">
+              <div className="text-sm font-semibold">{c.name}</div>
+              <div className="text-xs text-[var(--text-secondary)]">
                 {c.segment} · {c.procurementContact} ({c.phone})
               </div>
+              {c.isInstitutional && <div className="text-xs">{[c.contractRef, c.orderCadence, c.paymentTerms].filter(Boolean).join(' · ')}</div>}
               <div className="text-xs font-mono-tabular">
                 Balance: KES {c.outstandingBalanceKes.toLocaleString()} / Limit:{' '}
                 {c.creditLimitKes.toLocaleString()}
@@ -200,6 +248,7 @@ export default function CustomersPage() {
           ))}
         </div>
       </Card>
+      )}
 
       <Modal
         open={createOpen}
@@ -351,4 +400,8 @@ export default function CustomersPage() {
       </Modal>
     </div>
   );
+}
+
+export default function CustomersPage() {
+  return <Suspense fallback={<LoadingSkeleton />}><CustomersDirectory /></Suspense>;
 }

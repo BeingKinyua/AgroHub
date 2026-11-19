@@ -72,32 +72,30 @@ Return JSON with keys: headline (string), priorities (array of 3 concise strings
   }
 
   const priorities: string[] = [];
-  if (canSeeInventory) {
+  if (canSeeInventory && input.expiringBatchesCount > 0) {
     priorities.push(
-      `Prioritize FEFO dispatch for ${input.expiringBatchesCount} perishable cold-hub batches expiring within 72 hours (LOT-2609-SKM-C1 & LOT-2609-TOM-A1).`
+      `Review ${input.expiringBatchesCount} stock batches that are expired or nearing expiry.`
     );
   }
   if (canSeeApprovals && input.pendingApprovalsCount > 0) {
     priorities.push(
-      `Review ${input.pendingApprovalsCount} pending governance requests in the Approval Center to unblock Mwea rice replenishment and school boarding dispatch.`
+      `Review ${input.pendingApprovalsCount} pending requests in Approvals.`
     );
   }
-  if (canSeeFinance) {
+  if (canSeeFinance && (input.overdueReceivablesKes || input.upcomingPayablesKes)) {
     priorities.push(
       `Follow up on KES ${input.overdueReceivablesKes.toLocaleString()} overdue institutional receivables while scheduling KES ${input.upcomingPayablesKes.toLocaleString()} cooperative payables.`
     );
   }
-  if (priorities.length < 3) {
+  if (priorities.length < 3 && input.openOrdersCount > 0) {
     priorities.push(
-      `Coordinate ${input.openOrdersCount} active institutional orders across Nairobi Cold Hub A, Embakasi Dry Bulk B, and Westlands Cross-Dock C.`
+      `Review ${input.openOrdersCount} active customer orders.`
     );
   }
 
   return {
-    headline: `${user.roleName} Shift Brief · Nairobi Central Hub`,
+    headline: `${user.roleName} shift brief`,
     priorities: priorities.slice(0, 3),
-    riskAlert: canSeeInventory
-      ? 'Cold Chain Alert: Allocate LOT-2609-TOM-A1 (420 kg remaining) to tomorrow’s hospital & hotel orders before LOT-2609-TOM-A2.'
-      : 'Ensure all dispatched institutional runs have signed electronic Proof of Delivery (POD) before shift close.',
+    riskAlert: priorities[0] ?? 'No open work was reported for this brief.',
   };
 }
