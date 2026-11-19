@@ -23,7 +23,6 @@ export default function ReportsPage() {
   const report = getBillingReport(invalidDates ? [] : invoices, products, from, through);
   const selectedCategory = report.categories.find((row) => row.category === category);
   const rows = selectedCategory?.invoices ?? report.invoices;
-  const dateControl = 'min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-sm';
 
   const exportReport = () => {
     const csv = [
@@ -51,7 +50,7 @@ export default function ReportsPage() {
             type="button"
             disabled={!rows.length}
             onClick={exportReport}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#1F6A37] px-4 text-sm font-semibold text-white hover:bg-[#12512C] disabled:opacity-50"
+            className="ui-button ui-button-primary"
           >
             <Download className="size-4" aria-hidden="true" />
             Export invoices
@@ -61,25 +60,25 @@ export default function ReportsPage() {
 
       <Card padding="p-4">
         <fieldset>
-          <legend className="mb-3 font-heading text-base font-semibold">Invoice issue date</legend>
+          <legend className="ui-section-title mb-3">Invoice issue date</legend>
           <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-end">
-            <label className="grid gap-1 text-sm">
+            <label className="ui-label grid gap-1">
               From
-              <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className={dateControl} />
+              <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="ui-field w-full" />
             </label>
-            <label className="grid gap-1 text-sm">
+            <label className="ui-label grid gap-1">
               To
-              <input type="date" value={through} onChange={(event) => setThrough(event.target.value)} className={dateControl} />
+              <input type="date" value={through} onChange={(event) => setThrough(event.target.value)} className="ui-field w-full" />
             </label>
             <button
               type="button"
               onClick={() => { setFrom(offsetBusinessDate(today, -89)); setThrough(today); }}
-              className="min-h-11 justify-self-start px-2 text-sm font-medium text-[var(--brand-accent)] hover:underline"
+              className="ui-button ui-button-secondary justify-self-start"
             >
               Last 90 days
             </button>
           </div>
-          {invalidDates && <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-300">Enter a valid date range. The start date must be on or before the end date.</p>}
+          {invalidDates && <p role="alert" className="mt-2 text-sm text-[var(--status-danger-fg)]">Enter a valid date range. The start date must be on or before the end date.</p>}
         </fieldset>
       </Card>
 
@@ -94,11 +93,11 @@ export default function ReportsPage() {
           {report.invoices.length ? (
             <Card padding="p-4 sm:p-5">
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <h2 className="font-heading text-lg font-semibold">Invoice breakdown</h2>
-                <label className="grid gap-1 text-sm">
+                <h2 className="ui-section-title">Invoice breakdown</h2>
+                <label className="ui-label grid gap-1">
                   Product category
                   <select
-                    className={dateControl}
+                    className="ui-field w-full"
                     value={selectedCategory?.category ?? ''}
                     onChange={(event) => setCategory(event.target.value)}
                   >
@@ -119,24 +118,24 @@ export default function ReportsPage() {
               )}
 
               <div className="mt-4 hidden overflow-x-auto sm:block">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                <table className="ui-table text-left">
+                  <thead>
                     <tr>
-                      <th scope="col" className="py-2 pr-3 font-medium">Invoice</th>
+                      <th scope="col" className="py-2 pl-3 pr-3 font-medium">Invoice</th>
                       <th scope="col" className="py-2 pr-3 font-medium">Customer</th>
                       <th scope="col" className="py-2 pr-3 font-medium">Issued</th>
                       <th scope="col" className="py-2 pr-3 text-right font-medium">Invoiced</th>
-                      <th scope="col" className="py-2 text-right font-medium">Outstanding</th>
+                      <th scope="col" className="py-2 pr-3 text-right font-medium">Outstanding</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--border-subtle)]">
+                  <tbody>
                     {rows.map((invoice) => (
                       <tr key={invoice.id}>
-                        <th scope="row" className="py-3 pr-3 font-medium">{invoice.invoiceNumber}</th>
+                        <th scope="row" className="py-3 pl-3 pr-3 font-medium">{invoice.invoiceNumber}</th>
                         <td className="py-3 pr-3">{invoice.customerName}</td>
                         <td className="whitespace-nowrap py-3 pr-3">{invoice.issueDate}</td>
                         <td className="whitespace-nowrap py-3 pr-3 text-right font-mono-tabular">{kes(invoice.amountKes)}</td>
-                        <td className="whitespace-nowrap py-3 text-right font-mono-tabular">{kes(invoice.balanceKes)}</td>
+                        <td className="whitespace-nowrap py-3 pr-3 text-right font-mono-tabular">{kes(invoice.balanceKes)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -147,7 +146,7 @@ export default function ReportsPage() {
                   <li key={invoice.id} className="py-3 text-sm">
                     <p className="font-semibold">{invoice.invoiceNumber}</p>
                     <p>{invoice.customerName}</p>
-                    <p className="text-[var(--text-secondary)]">{invoice.issueDate} · {invoice.status}</p>
+                    <p className="ui-meta">{invoice.issueDate} · {invoice.status}</p>
                     <p className="mt-1 font-mono-tabular">{kes(invoice.amountKes)} invoiced · {kes(invoice.balanceKes)} outstanding</p>
                   </li>
                 ))}

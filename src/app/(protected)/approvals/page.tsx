@@ -76,7 +76,7 @@ function ApprovalsContent() {
     if (valueKes >= 500000) {
       return {
         level: 'High Financial Commitment',
-        color: 'text-amber-700 dark:text-amber-400 bg-amber-500/10',
+        color: 'text-[var(--status-warning-fg)] bg-[var(--status-warning-bg)]',
         detail: 'Significant cash-flow outlay. Exceeds standard procurement threshold of KES 250,000.',
         nextStepIfApproved: 'PO will be issued directly to the supplier; supplier receives dispatch notification.',
         nextStepIfRejected: 'Requisition returned to Procurement Officer for renegotiation or quantity downsizing.',
@@ -85,7 +85,7 @@ function ApprovalsContent() {
     if (category === 'Price Override') {
       return {
         level: 'Margin Compression Risk',
-        color: 'text-amber-700 dark:text-amber-400 bg-amber-500/10',
+        color: 'text-[var(--status-warning-fg)] bg-[var(--status-warning-bg)]',
         detail: 'Price concession reduces gross contract margin by 3.2% to win termly school volume.',
         nextStepIfApproved: 'Order pricing is unlocked; sales order proceeds immediately to warehouse picking.',
         nextStepIfRejected: 'Sales rep must invoice at standard tier pricing or seek bursar counter-offer.',
@@ -93,7 +93,7 @@ function ApprovalsContent() {
     }
     return {
       level: 'Standard Governance Review',
-      color: 'text-[#1F6A37] dark:text-[#4EB462] bg-[#E5EFE6] dark:bg-[#142B1B]',
+      color: 'ui-tone-success',
       detail: 'Standard operational protocol compliant with internal limits.',
       nextStepIfApproved: 'Immediate inventory release and invoice ledger posting.',
       nextStepIfRejected: 'Action halted and returned for operator re-verification.',
@@ -104,9 +104,8 @@ function ApprovalsContent() {
     <div className="space-y-6">
       {/* Page Header (Section 28 & 31) */}
       <PageHeader
-        kicker="EXECUTIVE & MANAGER GOVERNANCE"
-        title="Centralized Decision Center"
-        description="High-clarity decision environment: evaluate operational justifications, evaluate financial and supply risks, and authorize high-value procurement and pricing overrides."
+        title="Approvals"
+        description="Review purchase orders, pricing overrides, and other requests that require approval."
       />
 
       <FeedbackBanner
@@ -138,37 +137,28 @@ function ApprovalsContent() {
       </div>
 
       {/* Filter Switcher */}
-      <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit">
+      <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1 w-fit">
         <button
           type="button"
           onClick={() => setFilterMode('pending')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
-            filterMode === 'pending'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+          aria-pressed={filterMode === 'pending'}
+          className="ui-tab whitespace-nowrap"
         >
           Pending Decisions ({pendingApprovals.length})
         </button>
         <button
           type="button"
           onClick={() => setFilterMode('resolved')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
-            filterMode === 'resolved'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+          aria-pressed={filterMode === 'resolved'}
+          className="ui-tab whitespace-nowrap"
         >
           Resolved History ({approvals.filter((a) => a.status !== 'Pending').length})
         </button>
         <button
           type="button"
           onClick={() => setFilterMode('all')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
-            filterMode === 'all'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+          aria-pressed={filterMode === 'all'}
+          className="ui-tab whitespace-nowrap"
         >
           All Requests ({approvals.length})
         </button>
@@ -178,11 +168,11 @@ function ApprovalsContent() {
       <div className="space-y-5">
         {filteredApprovals.length === 0 ? (
           <Card padding="p-8" className="text-center">
-            <CheckCircle2 className="w-8 h-8 text-[#1F6A37] dark:text-[#4EB462] mx-auto mb-2" />
-            <h3 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+            <CheckCircle2 className="w-8 h-8 text-[var(--brand-accent)] mx-auto mb-2" />
+            <h3 className="ui-section-title">
               All Governance Approvals Cleared
             </h3>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
               There are no pending decisions requiring your authority right now.
             </p>
           </Card>
@@ -196,7 +186,7 @@ function ApprovalsContent() {
                 {/* Header & Badges */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono-tabular text-sm font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                    <span className="font-mono-tabular text-sm font-semibold text-[var(--brand-accent)]">
                       {apr.reference}
                     </span>
                     <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
@@ -206,7 +196,7 @@ function ApprovalsContent() {
                   </div>
 
                   <div className="text-right">
-                    <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">
+                    <div className="ui-meta uppercase tracking-wider">
                       Decision Value
                     </div>
                     <div className="font-mono-tabular text-lg font-bold text-[var(--text-primary)]">
@@ -216,11 +206,11 @@ function ApprovalsContent() {
                 </div>
 
                 {/* Structured Decision Framework (Section 28) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
                   {/* Left Column: What & Who & Why */}
                   <div className="space-y-3">
                     <div>
-                      <div className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                      <div className="ui-meta font-semibold uppercase tracking-wider">
                         1. What is being authorized?
                       </div>
                       <div className="font-heading text-sm font-semibold text-[var(--text-primary)] mt-0.5">
@@ -229,7 +219,7 @@ function ApprovalsContent() {
                     </div>
 
                     <div>
-                      <div className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                      <div className="ui-meta font-semibold uppercase tracking-wider">
                         2. Who requested this?
                       </div>
                       <div className="text-[var(--text-primary)] mt-0.5">
@@ -238,7 +228,7 @@ function ApprovalsContent() {
                     </div>
 
                     <div>
-                      <div className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                      <div className="ui-meta font-semibold uppercase tracking-wider">
                         3. Why? (Operational Justification)
                       </div>
                       <div className="text-[var(--text-secondary)] bg-[var(--bg-canvas)] p-2.5 rounded-xl border border-[var(--border-subtle)] mt-1">
@@ -250,25 +240,25 @@ function ApprovalsContent() {
                   {/* Right Column: Risk & What Happens Next */}
                   <div className="space-y-3">
                     <div>
-                      <div className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                      <div className="ui-meta font-semibold uppercase tracking-wider">
                         4. Operational & Financial Risk Evaluation
                       </div>
                       <div className={`mt-1 p-2.5 rounded-xl border border-[var(--border-subtle)] ${risk.color}`}>
-                        <div className="font-semibold text-xs">{risk.level}</div>
-                        <div className="text-[11px] mt-0.5">{risk.detail}</div>
+                        <div className="text-sm font-semibold">{risk.level}</div>
+                        <div className="text-xs mt-0.5">{risk.detail}</div>
                       </div>
                     </div>
 
                     <div>
-                      <div className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                      <div className="ui-meta font-semibold uppercase tracking-wider">
                         5. What happens next?
                       </div>
-                      <div className="bg-[var(--bg-canvas)] p-2.5 rounded-xl border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)] space-y-1 mt-1">
+                      <div className="bg-[var(--bg-canvas)] p-2.5 rounded-xl border border-[var(--border-subtle)] ui-meta space-y-1 mt-1">
                         <div>
-                          <strong className="text-[#1F6A37] dark:text-[#4EB462]">If Approved:</strong> {risk.nextStepIfApproved}
+                          <strong className="text-[var(--brand-accent)]">If Approved:</strong> {risk.nextStepIfApproved}
                         </div>
                         <div>
-                          <strong className="text-red-600 dark:text-red-400">If Rejected:</strong> {risk.nextStepIfRejected}
+                          <strong className="text-[var(--status-danger-fg)]">If Rejected:</strong> {risk.nextStepIfRejected}
                         </div>
                       </div>
                     </div>
@@ -282,12 +272,13 @@ function ApprovalsContent() {
                       <div className="flex-1">
                         <input
                           type="text"
+                          aria-label={`Decision comment for ${apr.reference}`}
                           placeholder="Add decision comment / condition (optional)..."
                           value={comments[apr.id] || ''}
                           onChange={(e) =>
                             setComments({ ...comments, [apr.id]: e.target.value })
                           }
-                          className="w-full h-9 px-3.5 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs focus:outline-none"
+                          className="ui-field w-full"
                         />
                       </div>
 
@@ -295,7 +286,7 @@ function ApprovalsContent() {
                         <button
                           type="button"
                           onClick={() => handleDecision(apr.id, 'Rejected')}
-                          className="h-9 px-4 rounded-full bg-red-600/10 text-red-600 hover:bg-red-600 hover:text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="ui-button ui-button-danger"
                         >
                           <XCircle className="w-4 h-4" />
                           <span>Reject</span>
@@ -304,7 +295,7 @@ function ApprovalsContent() {
                         <button
                           type="button"
                           onClick={() => handleDecision(apr.id, 'Approved')}
-                          className="h-9 px-5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="ui-button ui-button-primary"
                         >
                           <CheckCircle2 className="w-4 h-4" />
                           <span>Approve</span>

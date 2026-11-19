@@ -210,7 +210,7 @@ export default function DashboardPage() {
         title={isDriver ? 'Delivery workspace' : 'Operations overview'}
         description={new Intl.DateTimeFormat('en-KE', { dateStyle: 'full', timeZone: 'Africa/Nairobi' }).format(new Date())}
         actions={can('orders.create') && (
-          <Link href="/orders?action=new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#1F6A37] px-4 text-sm font-semibold text-white hover:bg-[#12512C]">
+          <Link href="/orders?action=new" className="ui-button ui-button-primary">
             <Plus className="size-4" aria-hidden="true" />
             New order
           </Link>
@@ -219,9 +219,9 @@ export default function DashboardPage() {
 
       <section aria-labelledby="dashboard-attention" className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="dashboard-attention" className="font-heading text-xl font-semibold">Needs your attention</h2>
+          <h2 id="dashboard-attention" className="ui-section-title">Needs your attention</h2>
           {can('reports.view') && (
-            <Link href="/reports" className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[var(--brand-accent)] hover:underline">
+            <Link href="/reports" className="ui-button ui-button-secondary">
               View reports <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
           )}
@@ -237,23 +237,23 @@ export default function DashboardPage() {
             <Card key={id} padding="p-4 sm:p-5" className="min-w-0 flex flex-col">
               <div className="flex items-start gap-3">
                 <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[var(--bg-subtle)] text-[var(--brand-accent)]">
-                  <Icon className="size-[18px]" aria-hidden="true" />
+                  <Icon className="size-4" aria-hidden="true" />
                 </span>
-                <h3 className="flex-1 self-center font-heading text-base font-semibold">{title}</h3>
-                <span className="self-center font-mono-tabular text-xl font-semibold">{rows.length}</span>
+                <h3 className="ui-section-title min-w-0 flex-1 self-center">{title}</h3>
+                <span className="ui-metric self-center text-xl">{rows.length}</span>
               </div>
               {rows.length > 0 && (
                 <ul className="mt-3 flex-1 divide-y divide-[var(--border-subtle)]">
                   {rows.slice(0, 3).map((row) => (
                     <li key={row.id} className="py-2.5">
-                      {row.href ? <Link href={row.href} className="text-sm font-medium hover:underline">{row.title}</Link>
+                      {row.href ? <Link href={row.href} className="ui-link text-sm">{row.title}</Link>
                         : <p className="text-sm font-medium">{row.title}</p>}
-                      <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{row.detail}</p>
+                      <p className="ui-meta mt-0.5">{row.detail}</p>
                     </li>
                   ))}
                 </ul>
               )}
-              <Link href={href} className="mt-auto inline-flex min-h-11 items-center gap-1.5 self-start text-sm font-semibold text-[var(--brand-accent)] hover:underline">
+              <Link href={href} className="ui-button ui-button-ghost mt-auto self-start px-0 text-[var(--brand-accent)]">
                 {action} <ArrowRight className="size-4" aria-hidden="true" />
               </Link>
             </Card>
@@ -264,14 +264,14 @@ export default function DashboardPage() {
       {!isDriver && relevantQueues.length > 0 && (
         <Card padding="p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-heading text-base font-semibold">
+            <h2 className="ui-section-title flex items-center gap-2">
               <Sparkles className="size-4 text-[var(--brand-accent)]" aria-hidden="true" /> Shift brief
             </h2>
-            <button type="button" onClick={loadBrief} disabled={briefStatus === 'loading'} className="min-h-11 rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-medium hover:bg-[var(--bg-subtle)] disabled:opacity-60">
+            <button type="button" onClick={loadBrief} disabled={briefStatus === 'loading'} className="ui-button ui-button-secondary">
               {briefStatus === 'loading' ? 'Generating…' : brief ? 'Refresh brief' : 'Generate brief'}
             </button>
           </div>
-          {briefStatus === 'error' && <p role="alert" className="mt-2 text-sm">The shift brief could not be loaded. Try again.</p>}
+          {briefStatus === 'error' && <p role="alert" className="mt-2 text-sm text-[var(--status-danger-fg)]">The shift brief could not be loaded. Try again.</p>}
           {brief && (
             <div className="mt-3 space-y-2 border-t border-[var(--border-subtle)] pt-3 text-sm" aria-live="polite">
               <p className="font-medium">{brief.headline}</p>

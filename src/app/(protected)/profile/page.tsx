@@ -115,7 +115,7 @@ export default function ProfilePage() {
         actions={
           <Link
             href="/settings"
-            className="h-10 px-4 rounded-[10px] border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+            className="ui-button ui-button-secondary"
           >
             <span>Workspace Settings</span>
           </Link>
@@ -169,7 +169,7 @@ export default function ProfilePage() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={currentUser.status} />
-                  <span className="font-mono-tabular text-xs px-2 py-0.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[#1F6A37] dark:text-[#4EB462]">
+                  <span className="font-mono-tabular text-xs px-2 py-0.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--brand-accent)]">
                     @{currentUser.nickname}
                   </span>
                 </div>
@@ -185,7 +185,7 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 gap-3 p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs">
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-2 text-[var(--text-secondary)]">
-                  <Mail className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <Mail className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                   <span>Work Email</span>
                 </span>
                 <span className="font-mono-tabular font-medium text-[var(--text-primary)]">
@@ -194,7 +194,7 @@ export default function ProfilePage() {
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-2 text-[var(--text-secondary)]">
-                  <Phone className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <Phone className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                   <span>Direct Phone</span>
                 </span>
                 <span className="font-mono-tabular font-medium text-[var(--text-primary)]">
@@ -203,7 +203,7 @@ export default function ProfilePage() {
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-2 text-[var(--text-secondary)]">
-                  <MapPin className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <MapPin className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                   <span>Assigned Hub</span>
                 </span>
                 <span className="font-medium text-[var(--text-primary)]">
@@ -212,7 +212,7 @@ export default function ProfilePage() {
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-2 text-[var(--text-secondary)]">
-                  <UserCheck className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <UserCheck className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                   <span>Provisioned By</span>
                 </span>
                 <span className="font-medium text-[var(--text-primary)]">
@@ -221,10 +221,10 @@ export default function ProfilePage() {
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-2 text-[var(--text-secondary)]">
-                  <Clock className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <Clock className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                   <span>Session Status</span>
                 </span>
-                <span className="font-medium text-[#1F6A37] dark:text-[#4EB462]">
+                <span className="font-medium text-[var(--brand-accent)]">
                   {currentUser.lastActiveAt}
                 </span>
               </div>
@@ -238,67 +238,67 @@ export default function ProfilePage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="profile-full-name" className="ui-label mb-1 block">
                     Full Name
                   </label>
-                  <input
+                  <input id="profile-full-name"
                     type="text"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+                    className="ui-field w-full"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="profile-nickname" className="ui-label mb-1 block">
                     Display Nickname
                   </label>
-                  <input
+                  <input id="profile-nickname"
                     type="text"
                     required
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
                     placeholder="e.g., Wanjiku"
-                    className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+                    className="ui-field w-full"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="profile-phone" className="ui-label mb-1 block">
                     Phone Number (KE)
                   </label>
-                  <input
+                  <input id="profile-phone"
                     type="text"
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+                    className="ui-field w-full font-mono-tabular"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="profile-department" className="ui-label mb-1 block">
                     Department
                   </label>
-                  <input
+                  <input id="profile-department"
                     type="text"
                     required
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+                    className="ui-field w-full"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="profile-branch" className="ui-label mb-1 block">
                   Assigned Distribution Hub / Branch
                 </label>
-                <select
+                <select id="profile-branch"
                   value={branch}
                   onChange={(e) => setBranch(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+                  className="ui-field w-full"
                 >
                   <option value="Nairobi HQ (Industrial Area)">
                     Nairobi HQ (Industrial Area)
@@ -313,17 +313,17 @@ export default function ProfilePage() {
                 </select>
               </div>
 
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                 <Link
                   href="/reset-password"
-                  className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] inline-flex items-center gap-1.5 hover:underline"
+                  className="ui-button ui-button-ghost text-[var(--brand-accent)]"
                 >
                   <KeyRound className="w-3.5 h-3.5" />
                   <span>Change Password</span>
                 </Link>
                 <button
                   type="submit"
-                  className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+                  className="ui-button ui-button-primary"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Save Profile Changes</span>
@@ -336,37 +336,34 @@ export default function ProfilePage() {
           <Card variant="raised" className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+                <h3 className="ui-section-title">
                   Workspace Appearance Preferences
                 </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                <p className="ui-meta mt-0.5">
                   Personalize theme contrast and OS system synchronization
                 </p>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold text-[var(--text-primary)]">
                   Color Theme Mode
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)]">
+                <div className="ui-meta">
                   Switch between light operational canvas and dark forest mode
                 </div>
               </div>
               <div
                 role="group"
                 aria-label="Theme Mode"
-                className="flex items-center p-1 rounded-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                className="flex flex-wrap gap-1"
               >
                 <button
                   type="button"
                   onClick={() => setTheme('light')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    theme === 'light'
-                      ? 'bg-[#1F6A37] text-white shadow-xs'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
+                  aria-pressed={theme === 'light'}
+                  className="ui-tab"
                 >
                   <Sun className="w-3.5 h-3.5" />
                   <span>Light</span>
@@ -374,11 +371,8 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => setTheme('dark')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    theme === 'dark'
-                      ? 'bg-[#1F6A37] text-white shadow-xs'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
+                  aria-pressed={theme === 'dark'}
+                  className="ui-tab"
                 >
                   <Moon className="w-3.5 h-3.5" />
                   <span>Dark</span>
@@ -386,11 +380,8 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => setTheme('system')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    theme === 'system'
-                      ? 'bg-[#1F6A37] text-white shadow-xs'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
+                  aria-pressed={theme === 'system'}
+                  className="ui-tab"
                 >
                   <Monitor className="w-3.5 h-3.5" />
                   <span>System</span>
@@ -406,16 +397,16 @@ export default function ProfilePage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--border-subtle)]">
               <div>
                 <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
-                  <h3 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+                  <Shield className="w-4 h-4 text-[var(--brand-accent)]" />
+                  <h3 className="ui-section-title">
                     Granted RBAC Authority Matrix ({currentUser.roleName})
                   </h3>
                 </div>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                <p className="ui-meta mt-0.5">
                   {roleDetails?.description}
                 </p>
               </div>
-              <span className="font-mono-tabular text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] shrink-0">
+              <span className="font-mono-tabular text-xs font-semibold px-2.5 py-1 rounded-lg bg-[var(--status-success-bg)] text-[var(--status-success-fg)] shrink-0">
                 {activePermissions.length} Permissions Active
               </span>
             </div>
@@ -430,7 +421,7 @@ export default function ProfilePage() {
                     <span className="font-heading text-xs font-semibold text-[var(--text-primary)]">
                       {moduleName}
                     </span>
-                    <span className="font-mono-tabular text-[11px] text-[#1F6A37] dark:text-[#4EB462]">
+                    <span className="font-mono-tabular text-xs text-[var(--brand-accent)]">
                       {perms.length} granted
                     </span>
                   </div>
@@ -439,9 +430,9 @@ export default function ProfilePage() {
                       <span
                         key={p.key}
                         title={p.description}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[11px] font-mono-tabular text-[var(--text-primary)]"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular text-[var(--text-primary)]"
                       >
-                        <CheckCircle2 className="w-3 h-3 text-[#1F6A37] dark:text-[#4EB462]" />
+                        <CheckCircle2 className="w-3 h-3 text-[var(--brand-accent)]" />
                         <span>{p.key}</span>
                       </span>
                     ))}
@@ -455,10 +446,10 @@ export default function ProfilePage() {
           <Card variant="raised" className="space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <div>
-                <h3 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+                <h3 className="ui-section-title">
                   Recent Operator Activity Log
                 </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                <p className="ui-meta mt-0.5">
                   Actions recorded under {currentUser.fullName} (
                   {currentUser.email})
                 </p>
@@ -482,15 +473,15 @@ export default function ProfilePage() {
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-[var(--text-primary)]">
                         {log.action} ·{' '}
-                        <span className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462]">
+                        <span className="font-mono-tabular text-[var(--brand-accent)]">
                           {log.entity}
                         </span>
                       </span>
-                      <span className="font-mono-tabular text-[11px] text-[var(--text-secondary)]">
+                      <span className="font-mono-tabular ui-meta">
                         {log.timestamp}
                       </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+                    <div className="flex flex-wrap items-center gap-2 ui-meta">
                       <span className="px-2 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-subtle)]">
                         {log.module}
                       </span>

@@ -17,13 +17,13 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-[22px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-8">
+    <main className="flex min-h-dvh items-center justify-center bg-[var(--bg-canvas)] p-4 text-[var(--text-primary)]">
+      <div className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-8">
         <div className="flex items-center gap-2.5 mb-6">
-          <div className="w-8 h-8 rounded-lg bg-[#08190C] text-[#4EB462] flex items-center justify-center">
-            <Leaf className="w-4 h-4" />
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--nav-bg)] text-[var(--nav-active)]">
+            <Leaf aria-hidden="true" className="size-4" />
           </div>
-          <span className="font-heading text-xs font-semibold">
+          <span className="font-heading text-sm font-semibold tracking-wide">
             AGRO-DELIVERIES KE.
           </span>
         </div>
@@ -31,14 +31,14 @@ export default function ResetPasswordPage() {
         <h1 className="font-heading text-2xl font-semibold">
           Set new workspace password
         </h1>
-        <p className="text-xs text-[var(--text-secondary)] mt-1">
+        <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
           Choose a strong password for your internal Agro-Deliveries operator account.
         </p>
 
         {completed ? (
-          <div className="mt-6 p-4 rounded-xl bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] text-xs space-y-2">
+          <div role="status" className="mt-6 space-y-2 rounded-lg border border-[var(--status-success-border)] bg-[var(--status-success-bg)] p-4 text-sm text-[var(--status-success-fg)]">
             <div className="flex items-center gap-2 font-semibold">
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 aria-hidden="true" className="size-4 shrink-0" />
               <span>Password updated</span>
             </div>
             <p>Your credentials have been updated. You may now sign in to the BOS.</p>
@@ -46,34 +46,38 @@ export default function ResetPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
-              <label className="block text-xs font-medium mb-1.5">
+              <label htmlFor="new-password" className="ui-label mb-1.5 block">
                 New password
               </label>
               <input
+                id="new-password"
                 type="password"
+                autoComplete="new-password"
                 required
                 minLength={6}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full h-11 px-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-sm"
+                className="ui-field w-full"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1.5">
+              <label htmlFor="confirm-password" className="ui-label mb-1.5 block">
                 Confirm password
               </label>
               <input
+                id="confirm-password"
                 type="password"
+                autoComplete="new-password"
                 required
                 minLength={6}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full h-11 px-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-sm"
+                className="ui-field w-full"
               />
             </div>
             <button
               type="submit"
-              className="w-full h-11 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-sm font-medium cursor-pointer"
+              className="ui-button ui-button-primary w-full"
             >
               Update password
             </button>
@@ -83,13 +87,13 @@ export default function ResetPasswordPage() {
         <div className="mt-6 pt-5 border-t border-[var(--border-subtle)]">
           <Link
             href="/login"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline"
+            className="ui-button ui-button-ghost text-[var(--brand-accent)]"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft aria-hidden="true" className="size-4" />
             <span>Back to Sign in</span>
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

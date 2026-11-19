@@ -95,19 +95,14 @@ export default function DocumentsPage() {
   return (
     <div>
       <PageHeader
-        breadcrumbs={[
-          { label: 'Workspace', href: '/dashboard' },
-          { label: 'Documents Vault' },
-        ]}
-        kicker="COMPLIANCE, PODS, GRNS & COMMERCIAL RECORDS"
-        title="Operational Documents & Compliance Vault"
-        description="Centralized repository for Goods Received Notes (GRN), signed Electronic Proofs of Delivery (ePOD), KEBS certificates, and commercial tax invoices."
+        title="Documents"
+        description="Find delivery proofs, goods received notes, certificates, and invoices."
         actions={
           can('documents.manage') && (
             <button
               type="button"
               onClick={() => setUploadOpen(true)}
-              className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               <Upload className="w-4 h-4" />
               <span>Upload Document</span>
@@ -157,17 +152,17 @@ export default function DocumentsPage() {
         activeFilterCount={categoryFilter !== 'All' ? 1 : 0}
         mobileDrawerContent={
           <div className="space-y-2">
-            <label className="block text-xs font-medium text-[var(--text-secondary)]">
+            <label htmlFor="documents-filter-category" className="ui-label block">
               Document Category
             </label>
-            <select
+            <select id="documents-filter-category"
               value={categoryFilter}
               onChange={(e) =>
                 setCategoryFilter(
                   e.target.value as 'All' | DocumentRecord['category']
                 )
               }
-              className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="ui-field w-full"
             >
               {CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
@@ -180,13 +175,14 @@ export default function DocumentsPage() {
       >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="pointer-events-none w-4 h-4 text-[var(--text-secondary)] absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
             <input
-              type="text"
+              type="search"
+              aria-label="Search documents by number, title, or reference"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by doc number, title, linked PO/Order/Batch..."
-              className="w-full h-10 pl-9 pr-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+              className="ui-field w-full pl-9 pr-3.5"
             />
           </div>
 
@@ -196,11 +192,8 @@ export default function DocumentsPage() {
                 key={cat}
                 type="button"
                 onClick={() => setCategoryFilter(cat)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                  categoryFilter === cat
-                    ? 'bg-[#1F6A37] text-white'
-                    : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
+                aria-pressed={categoryFilter === cat}
+                className="ui-tab whitespace-nowrap"
               >
                 {cat}
               </button>
@@ -223,9 +216,9 @@ export default function DocumentsPage() {
       ) : (
         <Card padding="p-0" className="overflow-hidden">
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="ui-table w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
+                <tr className="border-b border-[var(--border-subtle)]">
                   <th className="py-3.5 px-4">Document Ref & Title</th>
                   <th className="py-3.5 px-4">Category & Storage Bucket</th>
                   <th className="py-3.5 px-4">Linked Entity</th>
@@ -234,14 +227,14 @@ export default function DocumentsPage() {
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {filteredDocs.map((doc) => (
                   <tr
                     key={doc.id}
                     className="hover:bg-[var(--bg-canvas)]/60 transition-colors"
                   >
                     <td className="py-3.5 px-4">
-                      <div className="font-mono-tabular text-[11px] font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                      <div className="font-mono-tabular text-xs font-semibold text-[var(--brand-accent)]">
                         {doc.docNumber} · {doc.fileSize}
                       </div>
                       <div className="font-semibold text-[var(--text-primary)] mt-0.5">
@@ -250,7 +243,7 @@ export default function DocumentsPage() {
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="font-medium">{doc.category}</div>
-                      <div className="font-mono-tabular text-[11px] text-[var(--text-secondary)] flex items-center gap-1 mt-0.5">
+                      <div className="font-mono-tabular ui-meta flex items-center gap-1 mt-0.5">
                         <FolderLock className="w-3 h-3" />
                         <span>{doc.storageBucket}</span>
                       </div>
@@ -262,7 +255,7 @@ export default function DocumentsPage() {
                     </td>
                     <td className="py-3.5 px-4">
                       <div>{doc.uploadedBy}</div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">
+                      <div className="ui-meta">
                         {doc.uploadedAt}
                       </div>
                     </td>
@@ -276,7 +269,7 @@ export default function DocumentsPage() {
                         <button
                           type="button"
                           onClick={() => setPreviewDoc(doc)}
-                          className="px-3 py-1.5 rounded-full border border-[var(--border-subtle)] hover:bg-[var(--bg-canvas)] text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                          className="ui-button ui-button-secondary ui-button-compact"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>Inspect</span>
@@ -291,7 +284,7 @@ export default function DocumentsPage() {
                                 type: res.ok ? 'success' : 'error',
                               });
                             }}
-                            className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                            className="ui-button ui-button-primary ui-button-compact"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             <span>Verify</span>
@@ -302,7 +295,7 @@ export default function DocumentsPage() {
                             type="button"
                             onClick={() => setDeleteTarget(doc)}
                             aria-label={`Remove ${doc.docNumber}`}
-                            className="p-1.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-red-600 hover:border-red-500/30 cursor-pointer"
+                            className="ui-button ui-button-danger ui-button-icon"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -320,28 +313,28 @@ export default function DocumentsPage() {
             {filteredDocs.map((doc) => (
               <div key={doc.id} className="p-4 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono-tabular text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                  <span className="font-mono-tabular text-xs font-semibold text-[var(--brand-accent)]">
                     {doc.docNumber}
                   </span>
                   <StatusBadge
                     status={doc.verified ? 'Verified' : 'Pending Review'}
                   />
                 </div>
-                <div className="text-xs font-semibold text-[var(--text-primary)]">
+                <div className="text-sm font-semibold text-[var(--text-primary)]">
                   {doc.title}
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)]">
+                <div className="ui-meta">
                   {doc.category} · Linked: <strong>{doc.linkedEntity}</strong>
                 </div>
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-[11px] text-[var(--text-secondary)]">
+                  <span className="ui-meta">
                     By {doc.uploadedBy} ({doc.fileSize})
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setPreviewDoc(doc)}
-                      className="px-3 py-1.5 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+                      className="ui-button ui-button-secondary ui-button-compact"
                     >
                       Inspect
                     </button>
@@ -355,7 +348,7 @@ export default function DocumentsPage() {
                             type: res.ok ? 'success' : 'error',
                           });
                         }}
-                        className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
+                        className="ui-button ui-button-primary ui-button-compact"
                       >
                         Verify
                       </button>
@@ -377,30 +370,30 @@ export default function DocumentsPage() {
       >
         <form onSubmit={handleUpload} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium mb-1">
+            <label htmlFor="documents-title" className="ui-label block mb-1">
               Document Title
             </label>
-            <input
+            <input id="documents-title"
               type="text"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Signed Delivery Note — Alliance High Boarding Kitchen"
-              className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="ui-field w-full"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="documents-category" className="ui-label block mb-1">
                 Document Category
               </label>
-              <select
+              <select id="documents-category"
                 value={category}
                 onChange={(e) =>
                   setCategory(e.target.value as DocumentRecord['category'])
                 }
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 {CATEGORIES.filter((c) => c !== 'All').map((cat) => (
                   <option key={cat} value={cat}>
@@ -410,16 +403,16 @@ export default function DocumentsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="documents-reference" className="ui-label block mb-1">
                 Linked Entity Reference
               </label>
-              <input
+              <input id="documents-reference"
                 type="text"
                 required
                 value={linkedEntity}
                 onChange={(e) => setLinkedEntity(e.target.value)}
                 placeholder="e.g., ORD-2026-1084 or PO-2026-514"
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                className="ui-field w-full font-mono-tabular"
               />
             </div>
           </div>
@@ -428,13 +421,13 @@ export default function DocumentsPage() {
             <button
               type="button"
               onClick={() => setUploadOpen(false)}
-              className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               <Plus className="w-4 h-4" />
               <span>Index Document Record</span>
@@ -451,7 +444,7 @@ export default function DocumentsPage() {
         subtitle={`Reference: ${previewDoc?.docNumber}`}
       >
         {previewDoc && (
-          <div className="space-y-4 text-xs">
+          <div className="space-y-4 text-sm">
             <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-[var(--text-secondary)]">Category:</span>
@@ -461,7 +454,7 @@ export default function DocumentsPage() {
                 <span className="text-[var(--text-secondary)]">
                   Linked Record:
                 </span>
-                <span className="font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                <span className="font-mono-tabular font-semibold text-[var(--brand-accent)]">
                   {previewDoc.linkedEntity}
                 </span>
               </div>
@@ -494,11 +487,11 @@ export default function DocumentsPage() {
             </div>
 
             <div className="p-5 rounded-xl border border-dashed border-[var(--border-subtle)] text-center space-y-2">
-              <FileText className="w-7 h-7 text-[#1F6A37] dark:text-[#4EB462] mx-auto" />
+              <FileText className="w-7 h-7 text-[var(--brand-accent)] mx-auto" />
               <div className="font-semibold text-[var(--text-primary)]">
                 Digital Compliance Archive Preview
               </div>
-              <p className="text-[11px] text-[var(--text-secondary)] max-w-sm mx-auto">
+              <p className="ui-meta max-w-sm mx-auto">
                 Signed PDF/A artifact ({previewDoc.fileSize}) stored in private
                 bucket <code>{previewDoc.storageBucket}</code> with SHA-256
                 integrity checksum.

@@ -15,17 +15,17 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-[22px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-8">
+    <main className="flex min-h-dvh items-center justify-center bg-[var(--bg-canvas)] p-4 text-[var(--text-primary)]">
+      <div className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-8">
         <div className="flex items-center gap-2.5 mb-6">
-          <div className="w-8 h-8 rounded-lg bg-[#08190C] text-[#4EB462] flex items-center justify-center">
-            <Leaf className="w-4 h-4" />
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--nav-bg)] text-[var(--nav-active)]">
+            <Leaf aria-hidden="true" className="size-4" />
           </div>
           <div>
-            <div className="font-heading text-xs font-semibold">
+            <div className="font-heading text-sm font-semibold tracking-wide">
               AGRO-DELIVERIES KE.
             </div>
-            <div className="text-[11px] text-[var(--text-secondary)]">
+            <div className="ui-meta">
               CREDENTIAL RECOVERY
             </div>
           </div>
@@ -34,20 +34,20 @@ export default function ForgotPasswordPage() {
         <h1 className="font-heading text-2xl font-semibold text-[var(--text-primary)]">
           Reset workspace password
         </h1>
-        <p className="text-xs text-[var(--text-secondary)] mt-1.5 leading-relaxed">
+        <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
           Enter your Agro-Deliveries work email. If your account is active, a
           password recovery link will be dispatched via Supabase Auth.
         </p>
 
         {submitted ? (
-          <div className="mt-6 p-4 rounded-xl bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] text-xs space-y-2">
+          <div role="status" className="mt-6 space-y-2 rounded-lg border border-[var(--status-success-border)] bg-[var(--status-success-bg)] p-4 text-sm text-[var(--status-success-fg)]">
             <div className="flex items-center gap-2 font-semibold">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <CheckCircle2 aria-hidden="true" className="size-4 shrink-0" />
               <span>Recovery instructions dispatched</span>
             </div>
-            <p>
+            <p className="wrap-break-word">
               Check <strong>{email}</strong> for a time-limited link to{' '}
-              <Link href="/reset-password" className="underline font-medium">
+              <Link href="/reset-password" className="font-medium underline underline-offset-2">
                 complete password reset
               </Link>
               .
@@ -58,27 +58,28 @@ export default function ForgotPasswordPage() {
             <div>
               <label
                 htmlFor="recovery-email"
-                className="block text-xs font-medium mb-1.5"
+                className="ui-label mb-1.5 block"
               >
                 Work email
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-[var(--text-secondary)] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Mail aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-secondary)]" />
                 <input
                   id="recovery-email"
                   type="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@agrodeliveries.co.ke"
-                  className="w-full h-11 pl-10 pr-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-sm focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+                  className="ui-field w-full pl-10"
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full h-11 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-sm font-medium transition-colors cursor-pointer"
+              className="ui-button ui-button-primary w-full"
             >
               Send recovery link
             </button>
@@ -88,13 +89,13 @@ export default function ForgotPasswordPage() {
         <div className="mt-6 pt-5 border-t border-[var(--border-subtle)]">
           <Link
             href="/login"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline"
+            className="ui-button ui-button-ghost text-[var(--brand-accent)]"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft aria-hidden="true" className="size-4" />
             <span>Return to Sign in</span>
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

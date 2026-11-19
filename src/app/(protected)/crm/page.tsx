@@ -118,15 +118,14 @@ function CrmContent() {
     <div className="space-y-6">
       {/* Page Header (Section 27 & 31) */}
       <PageHeader
-        kicker="RELATIONSHIP RETENTION & CONTRACT RENEWALS"
-        title="CRM & Customer Action Center"
-        description="Drive proactive institutional customer success: resolve procurement inquiries, manage tender renewals, enforce payment collection follow-ups, and ensure account retention."
+        title="CRM"
+        description="Manage follow-ups, contract renewals, and customer actions."
         actions={
           can('crm.manage') && (
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               <Plus className="w-4 h-4" />
               <span>Log Relationship Action</span>
@@ -186,26 +185,20 @@ function CrmContent() {
       )}
 
       {/* View Switcher Tabs */}
-      <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit">
+      <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1 w-fit">
         <button
           type="button"
           onClick={() => setActiveTab('actions')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'actions'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+          aria-pressed={activeTab === 'actions'}
+          className="ui-tab whitespace-nowrap"
         >
           Relationship Action Queue ({crmTickets.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('customers')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'customers'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+          aria-pressed={activeTab === 'customers'}
+          className="ui-tab whitespace-nowrap"
         >
           Customer Portfolio & Contacts ({customers.length})
         </button>
@@ -215,32 +208,29 @@ function CrmContent() {
       {activeTab === 'actions' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-[var(--text-secondary)]">Filter:</span>
+            <span className="ui-meta font-semibold">Filter</span>
             <div className="flex items-center gap-1 p-0.5 rounded-full bg-[var(--bg-canvas)]">
               <button
                 type="button"
                 onClick={() => setFilterType('all')}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer ${
-                  filterType === 'all' ? 'bg-[#1F6A37] text-white' : 'text-[var(--text-secondary)]'
-                }`}
+                aria-pressed={filterType === 'all'}
+                className="ui-tab whitespace-nowrap"
               >
                 All
               </button>
               <button
                 type="button"
                 onClick={() => setFilterType('contracts')}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer ${
-                  filterType === 'contracts' ? 'bg-[#1F6A37] text-white' : 'text-[var(--text-secondary)]'
-                }`}
+                aria-pressed={filterType === 'contracts'}
+                className="ui-tab whitespace-nowrap"
               >
                 Contract Renewals
               </button>
               <button
                 type="button"
                 onClick={() => setFilterType('follow-up')}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer ${
-                  filterType === 'follow-up' ? 'bg-[#1F6A37] text-white' : 'text-[var(--text-secondary)]'
-                }`}
+                aria-pressed={filterType === 'follow-up'}
+                className="ui-tab whitespace-nowrap"
               >
                 Open Follow-Ups
               </button>
@@ -253,22 +243,22 @@ function CrmContent() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono-tabular text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                      <span className="font-mono-tabular text-xs font-semibold text-[var(--brand-accent)]">
                         {t.ticketNumber}
                       </span>
                       <StatusBadge status={t.status} />
-                      <span className="text-xs text-[var(--text-secondary)] font-medium">
+                      <span className="ui-meta font-medium">
                         {t.type}
                       </span>
                     </div>
 
-                    <h3 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+                    <h3 className="ui-section-title">
                       {t.customerName}
                     </h3>
 
-                    <p className="text-xs text-[var(--text-secondary)]">{t.summary}</p>
+                    <p className="text-sm text-[var(--text-secondary)]">{t.summary}</p>
 
-                    <div className="text-[11px] text-[var(--text-secondary)] flex items-center gap-2 pt-1">
+                    <div className="ui-meta flex items-center gap-2 pt-1">
                       <span>Due Date: <strong className="text-[var(--text-primary)]">{t.dueDate}</strong></span>
                       <span>·</span>
                       <span>Priority: <strong className="text-[var(--text-primary)]">{t.priority}</strong></span>
@@ -280,7 +270,7 @@ function CrmContent() {
                       <button
                         type="button"
                         onClick={() => handleResolve(t.id)}
-                        className="h-8 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                        className="ui-button ui-button-primary ui-button-compact"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Resolve Action</span>
@@ -298,9 +288,9 @@ function CrmContent() {
       {activeTab === 'customers' && (
         <Card padding="p-0" className="overflow-hidden">
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="ui-table w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
+                <tr className="border-b border-[var(--border-subtle)]">
                   <th className="py-3 px-4">Institution / Client</th>
                   <th className="py-3 px-4">Segment</th>
                   <th className="py-3 px-4">Procurement Officer</th>
@@ -309,21 +299,21 @@ function CrmContent() {
                   <th className="py-3 px-4 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {customers.map((c) => (
                   <tr key={c.id} className="hover:bg-[var(--bg-canvas)]/60 transition-colors">
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-[var(--text-primary)]">{c.name}</div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">{c.code} · {c.deliveryZone || c.county}</div>
+                      <div className="ui-meta">{c.code} · {c.deliveryZone || c.county}</div>
                     </td>
                     <td className="py-3.5 px-4 text-[var(--text-secondary)]">{c.segment}</td>
                     <td className="py-3.5 px-4">
                       <div className="font-medium">{c.procurementContact}</div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">{c.phone}</div>
+                      <div className="ui-meta">{c.phone}</div>
                     </td>
                     <td className="py-3.5 px-4 text-[var(--text-secondary)]">{c.paymentTerms}</td>
                     <td className="py-3.5 px-4 text-right font-mono-tabular font-semibold">
-                      <span className={c.overdueBalanceKes > 0 ? 'text-red-600 dark:text-red-400 font-bold' : ''}>
+                      <span className={c.overdueBalanceKes > 0 ? 'text-[var(--status-danger-fg)] font-bold' : ''}>
                         KES {c.outstandingBalanceKes.toLocaleString()}
                       </span>
                     </td>
@@ -335,7 +325,7 @@ function CrmContent() {
                           setType(c.overdueBalanceKes > 0 ? 'Tender Pricing Inquiry' : 'Contract Renewal');
                           setCreateOpen(true);
                         }}
-                        className="h-7 px-3 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                        className="ui-button ui-button-secondary ui-button-compact"
                       >
                         <span>Follow Up</span>
                         <ArrowRight className="w-3 h-3" />
@@ -358,11 +348,11 @@ function CrmContent() {
       >
         <form onSubmit={handleCreate} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium mb-1">Customer / Client</label>
-            <select
+            <label htmlFor="crm-customer" className="ui-label block mb-1">Customer / Client</label>
+            <select id="crm-customer"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="ui-field w-full"
             >
               {customers.map((c) => (
                 <option key={c.id} value={c.name}>
@@ -374,11 +364,11 @@ function CrmContent() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium mb-1">Action Type</label>
-              <select
+              <label htmlFor="crm-action" className="ui-label block mb-1">Action Type</label>
+              <select id="crm-action"
                 value={type}
                 onChange={(e) => setType(e.target.value as CrmTicketRecord['type'])}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 <option value="Contract Renewal">Contract Renewal</option>
                 <option value="Billing Inquiry">Billing Inquiry</option>
@@ -387,11 +377,11 @@ function CrmContent() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">Priority</label>
-              <select
+              <label htmlFor="crm-priority" className="ui-label block mb-1">Priority</label>
+              <select id="crm-priority"
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as CrmTicketRecord['priority'])}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 <option value="High">High (Immediate Action)</option>
                 <option value="Medium">Medium</option>
@@ -401,24 +391,24 @@ function CrmContent() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium mb-1">Follow-Up Due Date</label>
-            <input
+            <label htmlFor="crm-due-date" className="ui-label block mb-1">Follow-Up Due Date</label>
+            <input id="crm-due-date"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="ui-field w-full"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium mb-1">Action Summary / Notes</label>
-            <textarea
+            <label htmlFor="crm-summary" className="ui-label block mb-1">Action Summary / Notes</label>
+            <textarea id="crm-summary"
               required
               rows={3}
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               placeholder="e.g. Discuss termly vegetable pricing with Bursar, review delivery time window..."
-              className="w-full p-3 rounded-2xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs focus:outline-none"
+              className="ui-field w-full"
             />
           </div>
 
@@ -426,13 +416,13 @@ function CrmContent() {
             <button
               type="button"
               onClick={() => setCreateOpen(false)}
-              className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-10 px-5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               Save Action
             </button>

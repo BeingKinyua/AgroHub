@@ -26,9 +26,8 @@ export default function AdministrationOverviewPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="ENTERPRISE ACCESS GOVERNANCE & AUDIT"
-        title="Administration & System Governance"
-        description="Govern system operators, multi-role RBAC authorization policies, permission matrix, and immutable compliance audit trails."
+        title="Administration"
+        description="Manage workspace users, role permissions, and audit logs."
       />
 
       {/* Governance Summary Metrics */}
@@ -54,7 +53,7 @@ export default function AdministrationOverviewPage() {
         <KPI
           label="Audit Log Entries"
           value={`${auditLogs.length} Events`}
-          sublabel="Cryptographically signed events"
+          sublabel="Recorded workspace activity"
           tone="positive"
         />
       </div>
@@ -64,30 +63,30 @@ export default function AdministrationOverviewPage() {
         <Card padding="p-5" variant="raised" className="flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full ui-tone-success flex items-center justify-center">
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
+                <h2 className="ui-section-title">
                   Operator Management
-                </h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">
+                </h2>
+                <p className="ui-meta">
                   {users.length} registered system accounts
                 </p>
               </div>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
               Provision, invite, and maintain operational accounts across AgroHub logistics, cold storage, finance, and procurement desks.
             </p>
           </div>
 
-          <div className="mt-5 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between">
-            <span className="text-[11px] font-mono-tabular text-[var(--text-secondary)]">
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
+            <span className="ui-meta font-mono-tabular">
               {activeUsersCount} Active
             </span>
             <Link
               href="/administration/users"
-              className="h-8 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="ui-button ui-button-secondary ui-button-compact"
             >
               <span>Manage Users</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -98,30 +97,30 @@ export default function AdministrationOverviewPage() {
         <Card padding="p-5" variant="raised" className="flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full ui-tone-success flex items-center justify-center">
                 <Shield className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
+                <h2 className="ui-section-title">
                   RBAC Roles Matrix
-                </h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">
+                </h2>
+                <p className="ui-meta">
                   {roles.length} system authorization roles
                 </p>
               </div>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
               Configure fine-grained permissions for Executive, Storekeeper, Finance Clerk, Logistics Dispatcher, and Sales Representatives.
             </p>
           </div>
 
-          <div className="mt-5 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between">
-            <span className="text-[11px] font-mono-tabular text-[var(--text-secondary)]">
-              Strict Least Privilege
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
+            <span className="ui-meta font-mono-tabular">
+              Role-based access
             </span>
             <Link
               href="/administration/roles"
-              className="h-8 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="ui-button ui-button-secondary ui-button-compact"
             >
               <span>Inspect Roles</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -132,30 +131,30 @@ export default function AdministrationOverviewPage() {
         <Card padding="p-5" variant="raised" className="flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full ui-tone-success flex items-center justify-center">
                 <FileSpreadsheet className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
+                <h2 className="ui-section-title">
                   Compliance Audit Trail
-                </h3>
-                <p className="text-[11px] text-[var(--text-secondary)]">
-                  Immutable operational activity logs
+                </h2>
+                <p className="ui-meta">
+                  Recorded actions and changes
                 </p>
               </div>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-              Complete chronological audit trail capturing order approvals, pricing overrides, stock movements, and financial reconciliations.
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+              Review order approvals, pricing overrides, stock movements, and financial reconciliations.
             </p>
           </div>
 
-          <div className="mt-5 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between">
-            <span className="text-[11px] font-mono-tabular text-[var(--text-secondary)]">
-              Real-time Capture
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
+            <span className="ui-meta font-mono-tabular">
+              Recorded events
             </span>
             <Link
               href="/administration/audit-logs"
-              className="h-8 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="ui-button ui-button-secondary ui-button-compact"
             >
               <span>View Audit Logs</span>
               <ArrowRight className="w-3.5 h-3.5" />

@@ -13,9 +13,7 @@ import {
   KeyRound,
   Leaf,
   Lock,
-  Moon,
   ShieldAlert,
-  Sun,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
 import { IMAGE_PATHS } from '@/lib/services/initial-data';
@@ -28,8 +26,6 @@ export function LoginExperience() {
     isInitialized,
     loginWithCredentials,
     users,
-    theme,
-    setTheme,
   } = useBos();
 
   const [email, setEmail] = useState('w.mwangi@agrodeliveries.co.ke');
@@ -74,38 +70,38 @@ export function LoginExperience() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col justify-between p-4 sm:p-6 lg:p-10">
+    <div className="min-h-dvh bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col justify-between p-4 sm:p-6 lg:p-10">
       {/* Main Split Rounded Authentication Surface */}
       <main className="w-full max-w-[1280px] mx-auto my-auto py-4">
-        <div className="rounded-[24px] bg-[var(--bg-card)] border border-[var(--border-subtle)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[640px]">
+        <div className="rounded-[var(--radius-card)] bg-[var(--bg-card)] border border-[var(--border-subtle)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 lg:min-h-[640px]">
           {/* LEFT COLUMN: Branding, Heading, Authentication Form */}
           <div className="lg:col-span-6 xl:col-span-5 p-6 sm:p-10 lg:p-12 flex flex-col justify-between">
             <div>
-              <div className='flex flex-row align-center'>
-                  <div className="w-8 h-8 rounded-lg mr-4 bg-[#08190C] dark:bg-[#1F6A37] flex items-center justify-center text-[#4EB462]">
-                    <Leaf className="w-4 h-4" />
+              <div className="flex items-center gap-3">
+                  <div className="size-9 shrink-0 rounded-lg bg-[var(--nav-bg)] flex items-center justify-center text-[var(--nav-active)]">
+                    <Leaf aria-hidden="true" className="size-4" />
                   </div>
-                  <div className="text-xs font-semibold tracking-wider text-[#1F6A37] dark:text-[#4EB462]">
+                  <div className="font-heading text-sm font-semibold tracking-wide text-[var(--text-primary)]">
                     AGRO-DELIVERIES KE.
                   </div>
               </div>
               <h1 className="font-heading text-3xl sm:text-4xl font-semibold tracking-tight text-[var(--text-primary)] mt-8">
                 Welcome back.
               </h1>
-              <p className="text-sm text-[var(--text-secondary)] mt-2">
+              <p className="mt-2 text-base text-[var(--text-secondary)]">
                 Sign in to your workspace.
               </p>
 
               {/* Restricted Account Status Notice (Suspended / Disabled) */}
               {restrictedStatus && (
-                <div className="mt-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-900 dark:text-red-200">
+                <div role="alert" className="mt-6 rounded-lg border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] p-4 text-sm text-[var(--status-danger-fg)]">
                   <div className="flex items-start gap-2.5">
-                    <ShieldAlert className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                    <ShieldAlert aria-hidden="true" className="size-4 shrink-0 mt-0.5" />
                     <div>
-                      <div className="text-xs font-semibold">
+                      <div className="font-semibold">
                         Account Status: {restrictedStatus}
                       </div>
-                      <p className="text-xs mt-1 leading-relaxed">
+                      <p className="mt-1 leading-relaxed">
                         {errorMsg} Only active internal accounts authorized by an
                         Administrator may enter the Business Operating System.
                       </p>
@@ -116,8 +112,8 @@ export function LoginExperience() {
 
               {/* Standard Auth Error */}
               {errorMsg && !restrictedStatus && (
-                <div className="mt-6 p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-red-800 dark:text-red-300 flex items-start gap-2.5 text-xs">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div role="alert" className="mt-6 flex items-start gap-2.5 rounded-lg border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] p-4 text-sm text-[var(--status-danger-fg)]">
+                  <AlertCircle aria-hidden="true" className="size-4 shrink-0 mt-0.5" />
                   <span>{errorMsg}</span>
                 </div>
               )}
@@ -126,7 +122,7 @@ export function LoginExperience() {
                 <div>
                   <label
                     htmlFor="work-email"
-                    className="block text-xs font-medium text-[var(--text-primary)] mb-2"
+                    className="ui-label mb-1.5 block"
                   >
                     Work email
                   </label>
@@ -134,25 +130,25 @@ export function LoginExperience() {
                     id="work-email"
                     type="email"
                     required
-                    autoComplete="email"
+                    autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@agrodeliveries.co.ke"
-                    className="w-full h-11 px-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:ring-2 focus:ring-[#4EB462] transition-all"
+                    className="ui-field w-full"
                   />
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-2">
                     <label
                       htmlFor="work-password"
-                      className="block text-xs font-medium text-[var(--text-primary)]"
+                      className="ui-label"
                     >
                       Password
                     </label>
                     <Link
                       href="/forgot-password"
-                      className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline"
+                      className="inline-flex min-h-11 items-center rounded text-sm font-medium text-[var(--brand-accent)] hover:underline"
                     >
                       Forgot password?
                     </Link>
@@ -166,18 +162,18 @@ export function LoginExperience() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your workspace password"
-                      className="w-full h-11 pl-3.5 pr-10 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#4EB462] transition-all"
+                      className="ui-field w-full pr-12"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                      className="ui-button ui-button-ghost ui-button-icon absolute right-0 top-1/2 -translate-y-1/2"
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? (
-                        <EyeOff className="w-4 h-4" />
+                        <EyeOff aria-hidden="true" className="size-4" />
                       ) : (
-                        <Eye className="w-4 h-4" />
+                        <Eye aria-hidden="true" className="size-4" />
                       )}
                     </button>
                   </div>
@@ -186,10 +182,10 @@ export function LoginExperience() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full h-11 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white font-medium text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
+                  className="ui-button ui-button-primary w-full"
                 >
                   <span>{submitting ? 'Signing in...' : 'Sign in'}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight aria-hidden="true" className="size-4" />
                 </button>
               </form>
 
@@ -200,11 +196,11 @@ export function LoginExperience() {
                   alt="Agro-Deliveries Kenya distribution hub"
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#08190C]/90 via-[#08190C]/40 to-transparent p-4 flex flex-col justify-end">
-                  <div className="text-xs text-[#E5EFE6] font-medium">
+                <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-[var(--nav-bg)]/90 via-[var(--nav-bg)]/40 to-transparent p-4">
+                  <div className="text-xs font-medium text-[var(--nav-text)]">
                     Fresh Produce · Inventory · Distribution
                   </div>
-                  <div className="text-[11px] text-[#A9BEAE]">
+                  <div className="text-xs text-[var(--nav-text-muted)]">
                     Nairobi Cold Hub A · Embakasi Dry Bulk · Westlands Cross-Dock
                   </div>
                 </div>
@@ -213,29 +209,31 @@ export function LoginExperience() {
 
             {/* Governance Note + Evaluator Directory Quick-Fill */}
             <div className="mt-8 pt-5 border-t border-[var(--border-subtle)]">
-              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--text-secondary)]">
                 <span className="inline-flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <Lock aria-hidden="true" className="size-4 shrink-0 text-[var(--brand-accent)]" />
                   <span>Internal operator access only · Administrator onboarded</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowQuickFill((v) => !v)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-medium text-xs text-[#1F6A37] dark:text-[#4EB462] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors cursor-pointer"
+                  aria-expanded={showQuickFill}
+                  aria-controls={showQuickFill ? 'test-accounts' : undefined}
+                  className="ui-button ui-button-secondary"
                 >
-                  <KeyRound className="w-3.5 h-3.5" />
+                  <KeyRound aria-hidden="true" className="size-4" />
                   <span>Test Accounts</span>
                   {showQuickFill ? (
-                    <ChevronUp className="w-3.5 h-3.5" />
+                    <ChevronUp aria-hidden="true" className="size-4" />
                   ) : (
-                    <ChevronDown className="w-3.5 h-3.5" />
+                    <ChevronDown aria-hidden="true" className="size-4" />
                   )}
                 </button>
               </div>
 
               {showQuickFill && (
-                <div className="mt-3 p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] max-h-48 overflow-y-auto space-y-1.5">
-                  <div className="text-[11px] text-[var(--text-secondary)] mb-2">
+                <div id="test-accounts" className="mt-3 max-h-56 space-y-2 overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-3">
+                  <div className="ui-meta">
                     Click any internal operator account to populate credentials for RBAC evaluation:
                   </div>
                   {users.map((u) => (
@@ -243,16 +241,17 @@ export function LoginExperience() {
                       key={u.id}
                       type="button"
                       onClick={() => handleQuickFill(u.email)}
-                      className={`w-full text-left px-3 py-1.5 rounded-full text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                      aria-pressed={email.toLowerCase() === u.email.toLowerCase()}
+                      className={`ui-button ui-button-ghost w-full flex-col items-start justify-center gap-1 px-2 text-left sm:flex-row sm:items-center sm:justify-between ${
                         email.toLowerCase() === u.email.toLowerCase()
-                          ? 'bg-[#E5EFE6] text-[#12512C] dark:bg-[#142B1B] dark:text-[#4EB462] font-medium'
-                          : 'hover:bg-[#E5EFE6]/50 dark:hover:bg-[#122719]'
+                          ? 'bg-[var(--bg-subtle)] text-[var(--text-primary)]'
+                          : ''
                       }`}
                     >
-                      <span className="truncate">
-                        {u.fullName} · <span className="opacity-80">{u.roleName}</span>
+                      <span className="max-w-full truncate">
+                        {u.fullName} · <span className="text-[var(--text-secondary)]">{u.roleName}</span>
                       </span>
-                      <span className="font-mono-tabular text-[11px] opacity-75 shrink-0 ml-2">
+                      <span className="ui-meta shrink-0 font-mono-tabular">
                         {u.status === 'Suspended' ? 'Suspended' : u.email.split('@')[0]}
                       </span>
                     </button>
@@ -260,43 +259,43 @@ export function LoginExperience() {
                 </div>
               )}
             </div>
-            <footer className="w-full max-w-[1360px] mx-auto py-2 flex flex-col sm:flex-row items-center justify-center text-xs text-[var(--text-secondary)] gap-2">
+            <footer className="ui-meta mt-3 py-2 text-center">
               <span>© 2026 Agro-Deliveries Kenya Internal Business Operating System.</span>
             </footer>
           </div>
 
           {/* RIGHT COLUMN: Immersive Agricultural / Distribution Imagery */}
-          <div className="hidden lg:block lg:col-span-6 xl:col-span-7 relative bg-[#08190C] overflow-hidden">
+          <div className="relative hidden overflow-hidden bg-[var(--nav-bg)] lg:col-span-6 lg:block xl:col-span-7">
             <ResilientImage
               src={IMAGE_PATHS.loginHero}
               alt="Agro-Deliveries Kenya fresh produce and institutional foodstuff distribution center"
               className="w-full h-full object-cover opacity-90"
             />
             {/* Measured Scrim Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#08190C]/90 via-[#08190C]/35 to-[#08190C]/20" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--nav-bg)]/90 via-[var(--nav-bg)]/35 to-[var(--nav-bg)]/20" />
 
             {/* Subtle Floating Contextual Labels over the image */}
             <div className="absolute top-8 left-8 right-8 flex items-center justify-between pointer-events-none">
-              <div className="backdrop-blur-md bg-[#08190C]/65 border border-white/15 text-[#F4F6F3] px-3.5 py-2 rounded-xl text-xs font-medium">
+              <div className="rounded-xl border border-[var(--nav-border)] bg-[var(--nav-bg)]/65 px-3.5 py-2 text-xs font-medium text-[var(--nav-text)] backdrop-blur-md">
                 Fresh Produce
               </div>
-              <div className="backdrop-blur-md bg-[#08190C]/65 border border-white/15 text-[#F4F6F3] px-3.5 py-2 rounded-xl text-xs font-medium">
+              <div className="rounded-xl border border-[var(--nav-border)] bg-[var(--nav-bg)]/65 px-3.5 py-2 text-xs font-medium text-[var(--nav-text)] backdrop-blur-md">
                 Inventory
               </div>
-              <div className="backdrop-blur-md bg-[#08190C]/65 border border-white/15 text-[#F4F6F3] px-3.5 py-2 rounded-xl text-xs font-medium">
+              <div className="rounded-xl border border-[var(--nav-border)] bg-[var(--nav-bg)]/65 px-3.5 py-2 text-xs font-medium text-[var(--nav-text)] backdrop-blur-md">
                 Distribution
               </div>
             </div>
 
             {/* Bottom Operational Context Caption */}
-            <div className="absolute bottom-8 left-8 right-8 p-6 rounded-2xl backdrop-blur-md bg-[#08190C]/75 border border-white/12 text-[#F4F6F3]">
-              <div className="text-xs font-medium text-[#4EB462]">
+            <div className="absolute bottom-8 left-8 right-8 rounded-[var(--radius-card)] border border-[var(--nav-border)] bg-[var(--nav-bg)]/75 p-6 text-[var(--nav-text)] backdrop-blur-md">
+              <div className="text-xs font-medium text-[var(--nav-active)]">
                 UNIFIED BUSINESS OPERATING SYSTEM
               </div>
-              <h2 className="font-heading text-xl font-semibold mt-1 text-white">
+              <h2 className="mt-1 font-heading text-xl font-semibold">
                 Procurement, Cold-Chain FEFO Inventory, Fulfillment & Institutional Finance
               </h2>
-              <p className="text-xs text-[#A9BEAE] mt-1.5 leading-relaxed max-w-xl">
+              <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-[var(--nav-text-muted)]">
                 Serving schools, hospitals, hotels, restaurants, and retail hubs across Kenya
                 from a single permission-governed operational platform.
               </p>

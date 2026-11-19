@@ -143,7 +143,7 @@ function InventoryContent() {
             <button
               type="button"
               onClick={() => setModalOpen(true)}
-              className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               <Plus className="w-4 h-4" />
               <span>Record Movement / Wastage</span>
@@ -159,59 +159,44 @@ function InventoryContent() {
       />
 
       {/* View Switcher Tabs (Hybrid Operating Models: Direct Procurement vs FEFO Storage) */}
-      <div className="flex flex-wrap items-center gap-1 p-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] w-fit">
+      <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1 w-fit">
         <button
           type="button"
           onClick={() => setActiveTab('direct-flow')}
-          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'direct-flow'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+          aria-pressed={activeTab === 'direct-flow'}
+          className="ui-tab whitespace-nowrap"
         >
           Direct goods flow
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('batches')}
-          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'batches'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+          aria-pressed={activeTab === 'batches'}
+          className="ui-tab whitespace-nowrap"
         >
           Stored stock ({stockBatches.length} batches)
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('products')}
-          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'products'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+          aria-pressed={activeTab === 'products'}
+          className="ui-tab whitespace-nowrap"
         >
           Product Stock Matrix ({products.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('movements')}
-          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'movements'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+          aria-pressed={activeTab === 'movements'}
+          className="ui-tab whitespace-nowrap"
         >
           Wastage & Movements ({stockMovements.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('warehouses')}
-          className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
-            activeTab === 'warehouses'
-              ? 'bg-[#1F6A37] text-white shadow-sm'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+          aria-pressed={activeTab === 'warehouses'}
+          className="ui-tab whitespace-nowrap"
         >
           Cold-Chain Facilities
         </button>
@@ -253,17 +238,17 @@ function InventoryContent() {
 
       {/* Primary Section: Inventory at Risk (Section 23) */}
       {activeTab !== 'direct-flow' && <section aria-label="Warehouse stock risks">
-        <div className="p-4 sm:p-5 rounded-[20px] bg-[var(--bg-card)] border-2 border-amber-500/35 dark:border-amber-500/30">
+        <div className="ui-surface p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <span className="p-1 rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
+              <span className="p-1 rounded-full bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]">
                 <AlertTriangle className="w-4 h-4" />
               </span>
               <div>
-                <h2 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
+                <h2 className="ui-section-title">
                   Perishable batches and stock shortages
                 </h2>
-                <p className="text-[11px] text-[var(--text-secondary)]">
+                <p className="ui-meta">
                   Take immediate operational action on stock before expiry threshold or school stockout occurs.
                 </p>
               </div>
@@ -274,21 +259,21 @@ function InventoryContent() {
             {expiringBatches.map((batch) => (
               <div
                 key={batch.id}
-                className="p-3.5 rounded-xl border border-red-500/25 bg-red-500/[0.04] flex flex-col justify-between"
+                className="p-3.5 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono-tabular text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                    <span className="font-mono-tabular text-xs font-semibold text-[var(--brand-accent)]">
                       {batch.batchNumber}
                     </span>
-                    <span className="text-[11px] font-mono-tabular font-bold text-red-600 dark:text-red-400">
+                    <span className="text-xs font-mono-tabular font-bold text-[var(--status-danger-fg)]">
                       {batch.daysToExpiry}d to Expiry
                     </span>
                   </div>
-                  <div className="font-semibold text-xs text-[var(--text-primary)] mt-1">
+                  <div className="text-sm font-semibold text-[var(--text-primary)] mt-1">
                     {batch.productName}
                   </div>
-                  <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  <div className="ui-meta mt-0.5">
                     {batch.warehouseName} ({batch.binCode}) ·{' '}
                     <strong className="text-[var(--text-primary)]">
                       {batch.availableQty} {batch.unit}
@@ -298,7 +283,7 @@ function InventoryContent() {
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] flex items-center justify-between">
-                  <span className="text-[10px] text-[var(--text-secondary)]">
+                  <span className="ui-meta">
                     Earliest FIFO Pick
                   </span>
                   <button
@@ -308,7 +293,7 @@ function InventoryContent() {
                       setMovType('Transfer');
                       setModalOpen(true);
                     }}
-                    className="h-7 px-3 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                    className="ui-button ui-button-primary ui-button-compact"
                   >
                     <span>Fast-Track</span>
                     <ArrowRight className="w-3 h-3" />
@@ -321,31 +306,31 @@ function InventoryContent() {
             {lowStockProducts.slice(0, 1).map((p) => (
               <div
                 key={`low-${p.id}`}
-                className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/[0.04] flex flex-col justify-between"
+                className="p-3.5 rounded-xl border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono-tabular text-xs font-semibold text-amber-700 dark:text-amber-400">
+                    <span className="font-mono-tabular text-xs font-semibold text-[var(--status-warning-fg)]">
                       {p.sku} · Buffer Deficit
                     </span>
-                    <span className="text-[11px] font-mono-tabular font-bold text-amber-600 dark:text-amber-400">
+                    <span className="text-xs font-mono-tabular font-bold text-[var(--status-warning-fg)]">
                       Below Reorder Point
                     </span>
                   </div>
-                  <div className="font-semibold text-xs text-[var(--text-primary)] mt-1">
+                  <div className="text-sm font-semibold text-[var(--text-primary)] mt-1">
                     {p.name}
                   </div>
-                  <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  <div className="ui-meta mt-0.5">
                     Available: <strong>{p.availableQty} {p.unit}</strong> (Buffer target: {p.reorderPoint} {p.unit})
                   </div>
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] flex items-center justify-between">
-                  <span className="text-[10px] text-[var(--text-secondary)]">
+                  <span className="ui-meta">
                     Reorder Needed
                   </span>
                   {can('procurement.view') && <Link href="/procurement?filter=receiving"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-semibold hover:bg-[var(--bg-canvas)]">
+                    className="ui-button ui-button-secondary">
                     View purchase receipts <ArrowRight size={15} aria-hidden="true" />
                   </Link>}
                 </div>
@@ -357,13 +342,13 @@ function InventoryContent() {
 
       {activeTab === 'direct-flow' && (
         <section aria-labelledby="direct-goods-flow" className="space-y-3">
-          <h2 id="direct-goods-flow" className="font-heading text-lg font-semibold">Direct goods flow</h2>
+          <h2 id="direct-goods-flow" className="ui-section-title">Direct goods flow</h2>
           {goodsFlow.length === 0 && <Card><p className="text-sm text-[var(--text-secondary)]">No customer order lines use direct sourcing.</p></Card>}
           {goodsFlow.map(({ id, order, item, directRequired, collected, outstanding, uncommitted }) => (
             <Card key={`${order.id}-${id}`} className="space-y-3">
               <div className="flex flex-wrap justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold">{item.productName}</h3>
+                  <h3 className="ui-section-title">{item.productName}</h3>
                   <p className="text-sm text-[var(--text-secondary)]">{order.orderNumber} · {order.customerName} · Delivery {order.deliveryDate}</p>
                 </div>
                 <StatusBadge status={outstanding === 0 ? 'Collected' : collected > 0 ? 'Partially collected' : 'Awaiting collection'}
@@ -375,7 +360,7 @@ function InventoryContent() {
                 </p>
                 {outstanding > 0 && can('procurement.view') && <Link
                   href={`/procurement?order=${encodeURIComponent(order.id)}`}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 font-medium hover:bg-[var(--bg-canvas)]">
+                  className="ui-button ui-button-secondary">
                   View sourcing <ArrowRight size={16} aria-hidden="true" />
                 </Link>}
               </div>
@@ -394,22 +379,16 @@ function InventoryContent() {
                 <button
                   type="button"
                   onClick={() => setBatchFilter('all')}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer ${
-                    batchFilter === 'all'
-                      ? 'bg-[#1F6A37] text-white'
-                      : 'text-[var(--text-secondary)]'
-                  }`}
+                  aria-pressed={batchFilter === 'all'}
+                  className="ui-tab whitespace-nowrap"
                 >
                   All Batches
                 </button>
                 <button
                   type="button"
                   onClick={() => setBatchFilter('at-risk')}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer ${
-                    batchFilter === 'at-risk'
-                      ? 'bg-red-600 text-white'
-                      : 'text-[var(--text-secondary)]'
-                  }`}
+                  aria-pressed={batchFilter === 'at-risk'}
+                  className="ui-tab whitespace-nowrap"
                 >
                   At Risk (&lt;= 7d)
                 </button>
@@ -417,21 +396,22 @@ function InventoryContent() {
             </div>
 
             <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="pointer-events-none w-3.5 h-3.5 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input
-                type="text"
+                type="search"
+                aria-label="Search batches by number or product"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search batch # or produce..."
-                className="w-full h-8 pl-8 pr-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs focus:outline-none"
+                className="ui-field w-full pl-8 pr-3"
               />
             </div>
           </div>
 
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="ui-table w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
+                <tr className="border-b border-[var(--border-subtle)]">
                   <th className="py-3 px-4">Batch / Lot #</th>
                   <th className="py-3 px-4">Product & SKU</th>
                   <th className="py-3 px-4">Warehouse & Bin</th>
@@ -441,7 +421,7 @@ function InventoryContent() {
                   <th className="py-3 px-4">FEFO Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {filteredBatches.map((b) => (
                   <tr key={b.id} className="hover:bg-[var(--bg-canvas)]/60 transition-colors">
                     <td className="py-3.5 px-4 font-mono-tabular font-semibold text-[var(--text-primary)]">
@@ -452,16 +432,16 @@ function InventoryContent() {
                     </td>
                     <td className="py-3.5 px-4">
                       <div>{b.warehouseName}</div>
-                      <div className="font-mono-tabular text-[11px] text-[var(--text-secondary)]">
+                      <div className="font-mono-tabular ui-meta">
                         Bin: {b.binCode}
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-mono-tabular">
                       <div>{b.expiryDate || 'No expiry date'}</div>
                       {b.expiryDate && <div
-                        className={`text-[11px] font-semibold ${
+                        className={`text-xs font-semibold ${
                           b.daysToExpiry <= 5
-                            ? 'text-red-600 dark:text-red-400'
+                            ? 'text-[var(--status-danger-fg)]'
                             : 'text-[var(--text-secondary)]'
                         }`}
                       >
@@ -487,13 +467,13 @@ function InventoryContent() {
             {filteredBatches.map((b) => (
               <div key={b.id} className="p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono-tabular text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                  <span className="font-mono-tabular text-xs font-semibold text-[var(--brand-accent)]">
                     {b.batchNumber}
                   </span>
                   <StatusBadge status={b.status} />
                 </div>
                 <div className="text-xs font-semibold">{b.productName}</div>
-                <div className="text-[11px] text-[var(--text-secondary)]">
+                <div className="ui-meta">
                   {b.warehouseName} ({b.binCode}){b.expiryDate ? ` · Expires ${b.expiryDate} (${b.daysToExpiry}d)` : ''}
                 </div>
                 <div className="text-xs font-mono-tabular font-semibold">
@@ -509,9 +489,9 @@ function InventoryContent() {
       {activeTab === 'products' && (
         <Card padding="p-0" className="overflow-hidden">
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="ui-table w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
+                <tr className="border-b border-[var(--border-subtle)]">
                   <th className="py-3 px-4">SKU / Code</th>
                   <th className="py-3 px-4">Product Name</th>
                   <th className="py-3 px-4">Category</th>
@@ -521,7 +501,7 @@ function InventoryContent() {
                   <th className="py-3 px-4">Stock Posture</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {products.map((p) => {
                   const isLow = p.availableQty < p.reorderPoint;
                   return (
@@ -541,15 +521,15 @@ function InventoryContent() {
                       <td className="py-3.5 px-4 text-right font-mono-tabular text-[var(--text-secondary)]">
                         {p.reorderPoint.toLocaleString()} {p.unit}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                      <td className="py-3.5 px-4 text-right font-mono-tabular font-semibold text-[var(--brand-accent)]">
                         KES {p.pricing.institutionalKes}
                       </td>
                       <td className="py-3.5 px-4">
                         <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                          className={`ui-badge ${
                             isLow
-                              ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                              : 'bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]'
+                              ? 'ui-tone-warning'
+                              : 'ui-tone-success'
                           }`}
                         >
                           {isLow ? 'Safety Buffer Low' : 'Adequate'}
@@ -583,7 +563,7 @@ function InventoryContent() {
                       ({m.batchNumber})
                     </span>
                   </div>
-                  <div className="text-[11px] text-[var(--text-secondary)] mt-1">
+                  <div className="ui-meta mt-1">
                     {m.fromLocation} → {m.toLocation} · Operator: {m.actorName} · {m.reason}
                   </div>
                 </div>
@@ -591,13 +571,13 @@ function InventoryContent() {
                   <div
                     className={`font-mono-tabular text-sm font-semibold ${
                       m.quantityDelta >= 0
-                        ? 'text-[#1F6A37] dark:text-[#4EB462]'
-                        : 'text-red-700 dark:text-red-400'
+                        ? 'text-[var(--brand-accent)]'
+                        : 'text-[var(--status-danger-fg)]'
                     }`}
                   >
                     {m.quantityDelta > 0 ? `+${m.quantityDelta}` : m.quantityDelta} {m.unit}
                   </div>
-                  <div className="text-[11px] text-[var(--text-secondary)]">
+                  <div className="ui-meta">
                     {m.timestamp}
                   </div>
                 </div>
@@ -615,17 +595,17 @@ function InventoryContent() {
               <Card key={wh.id} className="flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono-tabular text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                    <span className="font-mono-tabular text-xs font-semibold text-[var(--brand-accent)]">
                       {wh.code}
                     </span>
                     <span className="text-xs text-[var(--text-secondary)]">
                       {wh.zoneType}
                     </span>
                   </div>
-                  <h3 className="font-heading text-base font-semibold mt-1">
+                  <h3 className="ui-section-title mt-1">
                     {wh.name}
                   </h3>
-                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  <p className="text-sm text-[var(--text-secondary)] mt-0.5">
                     {wh.location}
                   </p>
                 </div>
@@ -635,7 +615,7 @@ function InventoryContent() {
                   </span>
                   <span>
                     Utilization:{' '}
-                    <strong className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462]">
+                    <strong className="font-mono-tabular text-[var(--brand-accent)]">
                       {wh.utilizationPct}%
                     </strong>
                   </span>
@@ -654,14 +634,14 @@ function InventoryContent() {
                 alt="Nairobi Cold Hub A interior racking and barcoded fresh produce crates"
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#08190C]/90 via-[#08190C]/30 to-transparent p-6 flex flex-col justify-end text-white">
-                <div className="text-xs font-semibold text-[#4EB462]">
+              <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-[var(--nav-bg)]/95 via-[var(--nav-bg)]/55 to-transparent p-6 text-[var(--nav-text)]">
+                <div className="text-xs font-semibold text-[var(--nav-active)]">
                   NAIROBI COLD HUB A · INDUSTRIAL AREA
                 </div>
-                <h3 className="font-heading text-xl font-semibold mt-1">
+                <h3 className="ui-section-title mt-1 text-[var(--nav-text)]">
                   FEFO Barcoded Cold-Storage & Staging Racks (2°C – 6°C)
                 </h3>
-                <p className="text-xs text-[#A9BEAE] mt-1 max-w-2xl">
+                <p className="mt-1 max-w-2xl text-sm text-[var(--nav-text)]">
                   Every inbound cooperative lot receives a batch barcode at Goods Received Note (GRN) inspection. Order picking enforces earliest expiry allocation automatically.
                 </p>
               </div>
@@ -679,11 +659,11 @@ function InventoryContent() {
       >
         <form onSubmit={handleSubmitMovement} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium mb-1">Target Stock Batch</label>
-            <select
+            <label htmlFor="inventory-batch" className="ui-label block mb-1">Target Stock Batch</label>
+            <select id="inventory-batch"
               value={batchId}
               onChange={(e) => setBatchId(e.target.value)}
-              className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="ui-field w-full"
             >
               {stockBatches.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -695,11 +675,11 @@ function InventoryContent() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">Movement Type</label>
-              <select
+              <label htmlFor="inventory-movement" className="ui-label block mb-1">Movement Type</label>
+              <select id="inventory-movement"
                 value={movType}
                 onChange={(e) => setMovType(e.target.value as StockMovementRecord['type'])}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 <option value="Adjustment">Count Adjustment</option>
                 <option value="Transfer">Inter-Hub Transfer</option>
@@ -708,23 +688,23 @@ function InventoryContent() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">Quantity Delta</label>
-              <input
+              <label htmlFor="inventory-quantity" className="ui-label block mb-1">Quantity Delta</label>
+              <input id="inventory-quantity"
                 type="number"
                 value={qtyDelta}
                 onChange={(e) => setQtyDelta(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                className="ui-field w-full font-mono-tabular"
               />
             </div>
           </div>
 
           {movType === 'Transfer' && (
             <div>
-              <label className="block text-xs font-medium mb-1">Destination Facility</label>
-              <select
+              <label htmlFor="inventory-destination" className="ui-label block mb-1">Destination Facility</label>
+              <select id="inventory-destination"
                 value={toLocation}
                 onChange={(e) => setToLocation(e.target.value)}
-                className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 <option value="Westlands Cross-Dock C">Westlands Cross-Dock C</option>
                 <option value="Dry Bulk Hub B (Embakasi)">Dry Bulk Hub B (Embakasi)</option>
@@ -734,13 +714,13 @@ function InventoryContent() {
           )}
 
           <div>
-            <label className="block text-xs font-medium mb-1">Operational Reason / Notes</label>
-            <input
+            <label htmlFor="inventory-reason" className="ui-label block mb-1">Operational Reason / Notes</label>
+            <input id="inventory-reason"
               type="text"
               placeholder="e.g. Expired batch compost quarantine, school rush transfer..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full h-10 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="ui-field w-full"
             />
           </div>
 
@@ -748,13 +728,13 @@ function InventoryContent() {
             <button
               type="button"
               onClick={() => setModalOpen(false)}
-              className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-10 px-5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               Save Movement
             </button>

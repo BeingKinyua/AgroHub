@@ -13,9 +13,9 @@ const categories = [
 ];
 const paymentTerms = ['Net 7', 'Net 14', 'Net 30', 'COD / M-Pesa'];
 
-const fieldClass = 'mt-1 block min-h-11 w-full min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 py-2 text-base text-[var(--text-primary)] sm:text-sm';
+const fieldClass = 'ui-field mt-1 block w-full min-w-0';
 const sectionClass = 'space-y-4 rounded-xl border border-[var(--border-subtle)] p-4 sm:p-5';
-const buttonClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border-subtle)] px-4 text-sm font-semibold transition-colors hover:bg-[var(--bg-canvas)] disabled:opacity-60 not-disabled:cursor-pointer';
+const buttonClass = 'ui-button ui-button-secondary';
 
 interface OfferingDraft {
   key: number;
@@ -133,18 +133,18 @@ export function SupplierForm({ supplier, onClose, onSaved }: {
         <fieldset className={sectionClass} onChange={() => setDetailsDirty(true)}>
           <legend className="px-2 font-heading text-base font-semibold">Supplier details</legend>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label>Supplier name<input className={fieldClass} name="name" defaultValue={supplier?.name} required /></label>
-            <label>
+            <label className="ui-label">Supplier name<input className={fieldClass} name="name" defaultValue={supplier?.name} required /></label>
+            <label className="ui-label">
               Category
               <select className={fieldClass} name="category" defaultValue={supplier?.category ?? ''} required>
                 <option value="" disabled>Select a category</option>
                 {optionsWithCurrent(categories, supplier?.category).map((option) => <option key={option}>{option}</option>)}
               </select>
             </label>
-            <label>County or region<input className={fieldClass} name="region" defaultValue={supplier?.region} required /></label>
-            <label>Contact person<input className={fieldClass} name="contactPerson" defaultValue={supplier?.contactPerson} required /></label>
-            <label>Phone<input className={fieldClass} name="phone" type="tel" defaultValue={supplier?.phone} required /></label>
-            <label>Email <span className="text-[var(--text-secondary)]">(optional)</span><input className={fieldClass} name="email" type="email" defaultValue={supplier?.email} /></label>
+            <label className="ui-label">County or region<input className={fieldClass} name="region" defaultValue={supplier?.region} required /></label>
+            <label className="ui-label">Contact person<input className={fieldClass} name="contactPerson" defaultValue={supplier?.contactPerson} required /></label>
+            <label className="ui-label">Phone<input className={fieldClass} name="phone" type="tel" defaultValue={supplier?.phone} required /></label>
+            <label className="ui-label">Email <span className="text-[var(--text-secondary)]">(optional)</span><input className={fieldClass} name="email" type="email" defaultValue={supplier?.email} /></label>
           </div>
         </fieldset>
 
@@ -162,7 +162,7 @@ export function SupplierForm({ supplier, onClose, onSaved }: {
               <fieldset key={row.key} className="space-y-3 rounded-lg bg-[var(--bg-canvas)] p-3 sm:p-4">
                 <legend className="sr-only">Offering {index + 1}</legend>
                 <div className="flex items-end gap-2">
-                  <label className="min-w-0 flex-1">
+                  <label className="ui-label min-w-0 flex-1">
                     Catalogue product
                     <select className={fieldClass} required value={row.productId} onChange={(event) => {
                       const product = products.find((item) => item.id === event.target.value);
@@ -178,7 +178,7 @@ export function SupplierForm({ supplier, onClose, onSaved }: {
                     </select>
                   </label>
                   <button
-                    className="min-h-11 min-w-11 shrink-0 cursor-pointer rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-red-700 dark:hover:text-red-300"
+                    className="ui-button ui-button-danger ui-button-icon shrink-0"
                     type="button" aria-label={`Remove ${selected?.name ?? `offering ${index + 1}`}`}
                     onClick={() => { setOfferings((rows) => rows.filter((item) => item.key !== row.key)); setOfferingsDirty(true); }}
                   >
@@ -186,11 +186,11 @@ export function SupplierForm({ supplier, onClose, onSaved }: {
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                  <label>
+                  <label className="ui-label">
                     Supplier quote (KES)
                     <input className={fieldClass} type="number" min="0.01" step="0.01" inputMode="decimal" required value={row.quote} onChange={(event) => updateOffering(row.key, { quote: event.target.value })} />
                   </label>
-                  <label>
+                  <label className="ui-label">
                     Unit
                     {selected && previous && previous.unit !== selected.unit ? (
                       <select className={fieldClass} value={row.unit} onChange={(event) => updateOffering(row.key, { unit: event.target.value as UnitOfMeasure, quote: '' })}>
@@ -199,20 +199,20 @@ export function SupplierForm({ supplier, onClose, onSaved }: {
                       </select>
                     ) : <input className={fieldClass} value={row.unit} placeholder="From catalogue" readOnly />}
                   </label>
-                  <label>Minimum order quantity<input className={fieldClass} type="number" min="0.001" step="0.001" inputMode="decimal" required value={row.minOrder} onChange={(event) => updateOffering(row.key, { minOrder: event.target.value })} /></label>
-                  <label>Lead time in days<input className={fieldClass} type="number" min="0" step="1" placeholder="Supplier default" value={row.leadTime} onChange={(event) => updateOffering(row.key, { leadTime: event.target.value })} /></label>
-                  <label>
+                  <label className="ui-label">Minimum order quantity<input className={fieldClass} type="number" min="0.001" step="0.001" inputMode="decimal" required value={row.minOrder} onChange={(event) => updateOffering(row.key, { minOrder: event.target.value })} /></label>
+                  <label className="ui-label">Lead time in days<input className={fieldClass} type="number" min="0" step="1" placeholder="Supplier default" value={row.leadTime} onChange={(event) => updateOffering(row.key, { leadTime: event.target.value })} /></label>
+                  <label className="ui-label">
                     Availability
                     <select className={fieldClass} value={row.availability} onChange={(event) => updateOffering(row.key, { availability: event.target.value as OfferingDraft['availability'] })}>
                       <option>Available</option><option>Seasonal</option><option>Unavailable</option>
                     </select>
                   </label>
-                  <label className="flex min-h-11 items-center gap-2 self-end lg:col-span-2">
+                  <label className="ui-label flex min-h-11 items-center gap-2 self-end lg:col-span-2">
                     <input type="checkbox" className="h-4 w-4 accent-[var(--brand-accent)]" checked={row.preferred} onChange={(event) => updateOffering(row.key, { preferred: event.target.checked })} />
                     Preferred supplier for this product
                   </label>
-                  <label className="col-span-full">Offering notes<input className={fieldClass} value={row.notes} onChange={(event) => updateOffering(row.key, { notes: event.target.value })} /></label>
-                  {quoteChanged && <label className="col-span-full">Reason for quote change <span className="text-[var(--text-secondary)]">(optional)</span><input className={fieldClass} value={row.quoteReason} onChange={(event) => updateOffering(row.key, { quoteReason: event.target.value })} /></label>}
+                  <label className="ui-label col-span-full">Offering notes<input className={fieldClass} value={row.notes} onChange={(event) => updateOffering(row.key, { notes: event.target.value })} /></label>
+                  {quoteChanged && <label className="ui-label col-span-full">Reason for quote change <span className="text-[var(--text-secondary)]">(optional)</span><input className={fieldClass} value={row.quoteReason} onChange={(event) => updateOffering(row.key, { quoteReason: event.target.value })} /></label>}
                 </div>
               </fieldset>
             );
@@ -226,20 +226,20 @@ export function SupplierForm({ supplier, onClose, onSaved }: {
         <fieldset className={sectionClass} onChange={() => setDetailsDirty(true)}>
           <legend className="px-2 font-heading text-base font-semibold">Commercial terms</legend>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label>Default lead time in days<input className={fieldClass} name="leadTimeDays" type="number" min="0" step="1" required defaultValue={supplier?.leadTimeDays ?? 1} /></label>
-            <label>
+            <label className="ui-label">Default lead time in days<input className={fieldClass} name="leadTimeDays" type="number" min="0" step="1" required defaultValue={supplier?.leadTimeDays ?? 1} /></label>
+            <label className="ui-label">
               Payment terms
               <select className={fieldClass} name="paymentTerms" defaultValue={supplier?.paymentTerms ?? 'Net 14'} required>
                 {optionsWithCurrent(paymentTerms, supplier?.paymentTerms).map((option) => <option key={option}>{option}</option>)}
               </select>
             </label>
-            <label className="sm:col-span-2">Settlement instructions <span className="text-[var(--text-secondary)]">(optional)</span><textarea className={fieldClass} rows={2} name="paymentDetails" defaultValue={supplier?.paymentDetails} /></label>
+            <label className="ui-label sm:col-span-2">Settlement instructions <span className="text-[var(--text-secondary)]">(optional)</span><textarea className={fieldClass} rows={2} name="paymentDetails" defaultValue={supplier?.paymentDetails} /></label>
           </div>
         </fieldset>
 
         <footer className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--bg-card)] py-3">
-          {error && <p className="w-full text-red-700 dark:text-red-300" role="alert">{error}</p>}
-          <button className="min-h-11 cursor-pointer rounded-lg bg-[var(--brand-accent)] px-4 text-sm font-semibold text-white disabled:opacity-60 dark:text-[#08190C]" type="submit" disabled={saving}>
+          {error && <p className="w-full text-[var(--status-danger-fg)]" role="alert">{error}</p>}
+          <button className="ui-button ui-button-primary" type="submit" disabled={saving}>
             {saving ? 'Saving…' : supplier ? 'Save changes' : 'Create supplier'}
           </button>
         </footer>

@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Clock,
   FileCheck,
-  FileText,
   Image as ImageIcon,
   Inbox,
   Leaf,
@@ -24,7 +23,6 @@ import {
   ShieldAlert,
   SlidersHorizontal,
   Trash2,
-  Truck,
   UploadCloud,
   X,
   XCircle,
@@ -51,18 +49,16 @@ export function Card({
   interactive?: boolean;
 }) {
   const elevationStyles = {
-    base: 'border border-[var(--border-subtle)]',
-    raised:
-      'border border-[var(--border-subtle)] shadow-[var(--shadow-sm)]',
-    floating:
-      'border border-[var(--border-subtle)] shadow-[var(--shadow-md)]',
+    base: '',
+    raised: 'shadow-[var(--shadow-sm)]',
+    floating: 'shadow-[var(--shadow-md)]',
   };
 
   return (
     <div
-      className={`rounded-[18px] bg-[var(--bg-card)] ${elevationStyles[variant]} ${padding} transition-all duration-150 ${
+      className={`ui-surface ${elevationStyles[variant]} ${padding} ${
         interactive
-          ? 'hover:border-[#4EB462]/45 hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 cursor-pointer'
+          ? 'cursor-pointer transition-[border-color,box-shadow] hover:border-[var(--brand-accent)] hover:shadow-[var(--shadow-md)]'
           : ''
       } ${className}`}
     >
@@ -94,11 +90,11 @@ export function ChartCard({
     <Card variant="raised" className={className}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
         <div>
-          <h3 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+          <h3 className="ui-section-title">
             {title}
           </h3>
           {subtitle && (
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+            <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
               {subtitle}
             </p>
           )}
@@ -108,9 +104,9 @@ export function ChartCard({
       {mounted ? (
         children
       ) : (
-        <div className="h-64 w-full rounded-xl bg-[var(--bg-canvas)]/40 flex items-center justify-center text-xs text-[var(--text-secondary)]">
+        <div className="ui-meta flex h-64 w-full items-center justify-center rounded-xl bg-[var(--bg-subtle)]">
           <div className="flex items-center gap-2">
-            <div className="w-3.5 h-3.5 rounded-full border-2 border-[#1F6A37] border-t-transparent animate-spin" />
+            <div className="size-4 animate-spin rounded-full border-2 border-[var(--brand-accent)] border-t-transparent" />
             <span>Loading visualization...</span>
           </div>
         </div>
@@ -133,16 +129,16 @@ export function KPI({
   tone?: 'positive' | 'warning' | 'danger' | 'neutral';
 }) {
   const toneStyles = {
-    positive: 'text-[#1F6A37] dark:text-[#4EB462]',
-    warning: 'text-amber-700 dark:text-amber-400',
-    danger: 'text-red-700 dark:text-red-400',
+    positive: 'text-[var(--status-success-fg)]',
+    warning: 'text-[var(--status-warning-fg)]',
+    danger: 'text-[var(--status-danger-fg)]',
     neutral: 'text-[var(--text-secondary)]',
   };
 
   return (
     <Card padding="p-5" variant="raised">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-[var(--text-secondary)]">
+        <span className="ui-meta font-medium">
           {label}
         </span>
         {delta && (
@@ -153,10 +149,10 @@ export function KPI({
           </span>
         )}
       </div>
-      <div className="font-heading text-2xl sm:text-[26px] font-semibold tracking-tight text-[var(--text-primary)] tabular-nums mt-2">
+      <div className="ui-metric mt-2 wrap-break-word">
         {value}
       </div>
-      {sublabel && <div className="mt-1.5 text-xs text-[var(--text-secondary)]">{sublabel}</div>}
+      {sublabel && <div className="ui-meta mt-1.5">{sublabel}</div>}
     </Card>
   );
 }
@@ -186,32 +182,32 @@ export function ActionableMetricCard({
 }: ActionableMetric) {
   const statusConfig = {
     critical: {
-      border: 'border-red-500/35 hover:border-red-500/60',
-      badge: 'bg-red-500/10 text-red-600 dark:text-red-400',
+      border: 'border-[var(--status-danger-border)]',
+      badge: 'ui-tone-danger',
       icon: AlertTriangle,
       label: 'Critical Risk',
-      btn: 'bg-red-600 hover:bg-red-700 text-white',
+      btn: 'ui-button-danger',
     },
     warning: {
-      border: 'border-amber-500/35 hover:border-amber-500/60',
-      badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+      border: 'border-[var(--status-warning-border)]',
+      badge: 'ui-tone-warning',
       icon: AlertCircle,
       label: 'Attention Needed',
-      btn: 'bg-amber-600 hover:bg-amber-700 text-white',
+      btn: 'ui-button-secondary',
     },
     healthy: {
-      border: 'border-[#4EB462]/35 hover:border-[#4EB462]/65',
-      badge: 'bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]',
+      border: 'border-[var(--status-success-border)]',
+      badge: 'ui-tone-success',
       icon: CheckCircle2,
       label: 'Optimal',
-      btn: 'bg-[#1F6A37] hover:bg-[#12512C] text-white',
+      btn: 'ui-button-primary',
     },
     neutral: {
-      border: 'border-[var(--border-subtle)] hover:border-[#4EB462]/40',
-      badge: 'bg-[var(--bg-canvas)] text-[var(--text-secondary)]',
+      border: '',
+      badge: 'ui-tone-neutral',
       icon: Clock,
       label: 'Monitored',
-      btn: 'bg-[var(--bg-canvas)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)]',
+      btn: 'ui-button-secondary',
     },
   };
 
@@ -222,50 +218,47 @@ export function ActionableMetricCard({
     <Card
       padding="p-5"
       variant="raised"
-      className={`flex flex-col justify-between transition-all duration-200 ${current.border}`}
+      className={`flex flex-col justify-between ${current.border}`}
     >
       <div>
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <span className="text-xs font-semibold text-[var(--text-secondary)] tracking-wide uppercase">
+        <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+          <span className="ui-meta font-semibold">
             {metric}
           </span>
           <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${current.badge}`}
+            className={`ui-badge ${current.badge}`}
           >
-            <StatusIcon className="w-3 h-3" />
+            <StatusIcon className="size-3.5 shrink-0" aria-hidden="true" />
             <span>{current.label}</span>
           </span>
         </div>
 
-        <div className="font-heading text-2xl sm:text-[28px] font-semibold tracking-tight text-[var(--text-primary)] tabular-nums">
+        <div className="ui-metric wrap-break-word">
           {value}
         </div>
 
-        <div className="text-xs text-[var(--text-secondary)] mt-1.5 flex items-center justify-between gap-2">
+        <div className="ui-meta mt-1.5 flex flex-wrap items-center justify-between gap-2">
           <span className="font-medium text-[var(--text-primary)]">{context}</span>
           {delta && (
-            <span className="font-mono-tabular text-[11px] text-[var(--text-secondary)] shrink-0">
+            <span className="font-mono-tabular">
               {delta}
             </span>
           )}
         </div>
 
         {description && (
-          <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 line-clamp-1">
+          <p className="ui-meta mt-1.5">
             {description}
           </p>
         )}
       </div>
 
       {(actionLabel && (actionHref || onAction)) && (
-        <div className="mt-4 pt-3 border-t border-[var(--border-subtle)]/70 flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">
-            Decision Action
-          </span>
+        <div className="mt-4 flex justify-end border-t border-[var(--border-subtle)] pt-3">
           {actionHref ? (
             <Link
               href={actionHref}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-medium transition-colors cursor-pointer ${current.btn}`}
+              className={`ui-button ui-button-compact ${current.btn}`}
             >
               <span>{actionLabel}</span>
               <ArrowRight className="w-3 h-3" />
@@ -274,7 +267,7 @@ export function ActionableMetricCard({
             <button
               type="button"
               onClick={onAction}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-medium transition-colors cursor-pointer ${current.btn}`}
+              className={`ui-button ui-button-compact ${current.btn}`}
             >
               <span>{actionLabel}</span>
               <ArrowRight className="w-3 h-3" />
@@ -309,66 +302,52 @@ export function OperationalPulse({
   if (!items || items.length === 0) return null;
 
   return (
-    <div className="mb-6 rounded-[18px] bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-sm)] p-4 sm:p-5">
+    <Card padding="p-4 sm:p-5" variant="raised" className="mb-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-3.5 border-b border-[var(--border-subtle)]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-          <h2 className="font-heading text-sm font-semibold tracking-wide text-[var(--text-primary)]">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h2 className="ui-section-title">
             {title}
           </h2>
-          <span className="text-[11px] font-mono-tabular px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium">
+          <span className="ui-badge ui-tone-warning font-mono-tabular">
             {items.length} required
           </span>
         </div>
-        <span className="text-[11px] font-mono-tabular text-[var(--text-secondary)]">
+        <span className="ui-meta font-mono-tabular">
           {freshness}
         </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {items.map((item) => {
-          const isCritical = item.severity === 'critical';
+          const tone = item.severity === 'critical' ? 'ui-tone-danger' : item.severity === 'warning' ? 'ui-tone-warning' : 'ui-tone-success';
           return (
             <div
               key={item.id}
-              className={`p-3.5 rounded-[14px] border flex flex-col justify-between transition-all ${
-                isCritical
-                  ? 'bg-red-500/[0.04] border-red-500/25 dark:border-red-500/30'
-                  : 'bg-amber-500/[0.04] border-amber-500/25 dark:border-amber-500/30'
-              }`}
+              className={`flex flex-col justify-between rounded-xl border p-3.5 ${tone}`}
             >
               <div>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-1.5 font-semibold text-xs text-[var(--text-primary)]">
-                    <span
-                      className={`inline-block w-2 h-2 rounded-full shrink-0 ${
-                        isCritical ? 'bg-red-500' : 'bg-amber-500'
-                      }`}
-                    />
-                    <span className="truncate">{item.title}</span>
+                  <div className="flex items-center gap-1.5 text-sm font-semibold">
+                    <span>{item.title}</span>
                   </div>
                   {item.value && (
-                    <span className="font-mono-tabular text-xs font-bold text-[var(--text-primary)] shrink-0">
+                    <span className="shrink-0 font-mono-tabular text-xs font-semibold">
                       {item.value}
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 leading-relaxed">
+                <p className="mt-1.5 text-sm leading-relaxed">
                   {item.detail}
                 </p>
               </div>
 
-              <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px]">
-                <span className="text-[10px] text-[var(--text-secondary)] font-mono-tabular">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2.5">
+                <span className="font-mono-tabular text-xs">
                   {item.timestamp}
                 </span>
                 <Link
                   href={item.actionHref}
-                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-[10px] text-xs font-medium cursor-pointer transition-colors ${
-                    isCritical
-                      ? 'bg-red-600 hover:bg-red-700 text-white'
-                      : 'bg-amber-600 hover:bg-amber-700 text-white'
-                  }`}
+                  className="ui-button ui-button-secondary ui-button-compact"
                 >
                   <span>{item.actionLabel}</span>
                   <ArrowRight className="w-3 h-3" />
@@ -378,7 +357,7 @@ export function OperationalPulse({
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -417,17 +396,17 @@ export function WorkQueue({
         <div className="flex items-center justify-between gap-3 pb-3 mb-3 border-b border-[var(--border-subtle)]">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
+              <h3 className="ui-section-title">
                 {title}
               </h3>
               {typeof badgeCount === 'number' && (
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-mono-tabular font-semibold bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]">
+                <span className="ui-badge ui-tone-neutral font-mono-tabular">
                   {badgeCount}
                 </span>
               )}
             </div>
             {subtitle && (
-              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+              <p className="ui-meta mt-0.5">
                 {subtitle}
               </p>
             )}
@@ -435,7 +414,7 @@ export function WorkQueue({
           {viewAllHref && (
             <Link
               href={viewAllHref}
-              className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] hover:underline inline-flex items-center gap-1 shrink-0"
+              className="ui-button ui-button-ghost ui-button-compact text-[var(--brand-accent)]"
             >
               <span>{viewAllLabel}</span>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -444,8 +423,8 @@ export function WorkQueue({
         </div>
 
         {items.length === 0 ? (
-          <div className="py-6 text-center text-xs text-[var(--text-secondary)]">
-            <CheckCircle2 className="w-5 h-5 mx-auto text-[#1F6A37] dark:text-[#4EB462] mb-1.5 opacity-80" />
+          <div className="py-6 text-center text-sm text-[var(--text-secondary)]">
+            <CheckCircle2 className="mx-auto mb-1.5 size-5 text-[var(--status-success-fg)]" aria-hidden="true" />
             <span>{emptyMessage}</span>
           </div>
         ) : (
@@ -453,12 +432,12 @@ export function WorkQueue({
             {items.map((item) => {
               const dotColor =
                 item.severity === 'critical'
-                  ? 'bg-red-500'
+                  ? 'bg-[var(--status-danger-fg)]'
                   : item.severity === 'warning'
-                  ? 'bg-amber-500'
+                  ? 'bg-[var(--status-warning-fg)]'
                   : item.severity === 'healthy'
-                  ? 'bg-[#4EB462]'
-                  : 'bg-slate-400';
+                  ? 'bg-[var(--status-success-fg)]'
+                  : 'bg-[var(--text-secondary)]';
 
               return (
                 <div
@@ -467,22 +446,24 @@ export function WorkQueue({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
-                      <span className="font-semibold text-xs text-[var(--text-primary)] truncate">
+                      <span className={`size-2 shrink-0 rounded-full ${dotColor}`} aria-hidden="true" />
+                      {item.severity === 'critical' && <span className="sr-only">Critical</span>}
+                      {item.severity === 'warning' && <span className="sr-only">Attention needed</span>}
+                      <span className="text-sm font-semibold text-[var(--text-primary)]">
                         {item.title}
                       </span>
                       {item.tag && (
-                        <span className="text-[10px] font-mono-tabular px-1.5 py-0.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                        <span className="ui-badge ui-tone-neutral font-mono-tabular">
                           {item.tag}
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] text-[var(--text-secondary)] flex items-center gap-2 mt-0.5">
+                    <div className="ui-meta mt-0.5 flex flex-wrap items-center gap-2">
                       <span className="truncate">{item.subtitle}</span>
                       {item.metadata && (
                         <>
                           <span>·</span>
-                          <span className="font-mono-tabular shrink-0 text-[10px]">
+                          <span className="font-mono-tabular">
                             {item.metadata}
                           </span>
                         </>
@@ -494,7 +475,7 @@ export function WorkQueue({
                     {item.actionHref ? (
                       <Link
                         href={item.actionHref}
-                        className="h-8 px-3.5 rounded-[10px] bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        className="ui-button ui-button-secondary ui-button-compact"
                       >
                         <span>{item.actionLabel}</span>
                         <ArrowRight className="w-3 h-3" />
@@ -503,7 +484,7 @@ export function WorkQueue({
                       <button
                         type="button"
                         onClick={item.onAction}
-                        className="h-8 px-3.5 rounded-[10px] bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] hover:bg-[#1F6A37] hover:text-white dark:hover:bg-[#1F6A37] text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        className="ui-button ui-button-secondary ui-button-compact"
                       >
                         <span>{item.actionLabel}</span>
                         <ArrowRight className="w-3 h-3" />
@@ -562,7 +543,7 @@ export function Avatar({
   return (
     <div
       aria-label={fullName}
-      className={`bg-[#08190C] dark:bg-[#1F6A37] text-[#4EB462] dark:text-white font-heading font-semibold flex items-center justify-center shrink-0 select-none border border-[#4EB462]/25 ${sizeMap[size]} ${className}`}
+      className={`ui-tone-success flex shrink-0 select-none items-center justify-center border font-heading font-semibold ${sizeMap[size]} ${className}`}
     >
       {initials}
     </div>
@@ -583,7 +564,7 @@ export function Tooltip({
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 transition-opacity duration-150 z-[var(--z-dropdown)] whitespace-nowrap px-2.5 py-1 rounded-lg bg-[#08190C] text-[#F4F6F3] border border-white/12 text-[11px] font-medium shadow-md ${
+        className={`pointer-events-none z-[var(--z-dropdown)] whitespace-nowrap rounded-lg border border-[var(--nav-border)] bg-[var(--nav-bg)] px-2.5 py-1 text-xs font-medium text-[var(--nav-text)] opacity-0 shadow-md transition-opacity group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 ${
           side === 'right'
             ? 'absolute left-full top-1/2 -translate-y-1/2 ml-2.5'
             : 'absolute top-full left-1/2 -translate-x-1/2 mt-2'
@@ -640,6 +621,31 @@ export function Breadcrumbs({
   );
 }
 
+const statusStyles = {
+  success: { className: 'ui-tone-success', icon: CheckCircle2 },
+  warning: { className: 'ui-tone-warning', icon: AlertTriangle },
+  error: { className: 'ui-tone-danger', icon: XCircle },
+  info: { className: 'ui-tone-info', icon: Package },
+  neutral: { className: 'ui-tone-neutral', icon: Clock },
+};
+
+function statusTone(status: string): keyof typeof statusStyles {
+  const value = status.trim().toLowerCase();
+  if (/overdue|past due|cancell?ed|failed|rejected|suspended|disabled|quarantined|expired|archived|disputed/.test(value)) {
+    return 'error';
+  }
+  if (/pending|expiring|partial|watch|renewal|invited|fefo|hold|under review|unpaid|unverified|not verified|not submitted|not delivered|rescheduled|maintenance/.test(value)) {
+    return 'warning';
+  }
+  if (/approved|delivered|\bpaid\b|^active$|posted|resolved|nominal|verified|arrivals recorded|fully reconciled|completed/.test(value)) {
+    return 'success';
+  }
+  if (/picking|packed|confirmed|loaded|issued|receiving|progress|dispatched|on route|on delivery|in transit/.test(value)) {
+    return 'info';
+  }
+  return 'neutral';
+}
+
 export function StatusBadge({
   status,
   tone,
@@ -647,92 +653,12 @@ export function StatusBadge({
   status: string;
   tone?: 'success' | 'warning' | 'error' | 'info' | 'neutral' | string;
 }) {
-  const normalized = status.toLowerCase();
-
-  let icon = <Clock className="w-3.5 h-3.5 shrink-0" />;
-  let classes =
-    'bg-[#E5EFE6] text-[#12512C] dark:bg-[#122719] dark:text-[#A9BEAE]';
-
-  if (tone === 'success') {
-    icon = <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />;
-    classes =
-      'bg-[#E5EFE6] text-[#1F6A37] dark:bg-[#1F6A37]/25 dark:text-[#4EB462]';
-  } else if (tone === 'warning') {
-    icon = <AlertTriangle className="w-3.5 h-3.5 shrink-0" />;
-    classes =
-      'bg-amber-500/12 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300';
-  } else if (tone === 'error') {
-    icon = <XCircle className="w-3.5 h-3.5 shrink-0" />;
-    classes =
-      'bg-red-500/12 text-red-800 dark:bg-red-500/20 dark:text-red-300';
-  } else if (tone === 'info') {
-    icon = <Truck className="w-3.5 h-3.5 shrink-0" />;
-    classes =
-      'bg-[#1F6A37]/12 text-[#12512C] dark:bg-[#4EB462]/20 dark:text-[#4EB462]';
-  } else if (
-    normalized.includes('approved') ||
-    normalized.includes('delivered') ||
-    normalized.includes('paid') ||
-    normalized === 'active' ||
-    normalized.includes('posted') ||
-    normalized.includes('resolved') ||
-    normalized.includes('nominal') ||
-    normalized.includes('verified')
-  ) {
-    icon = <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />;
-    classes =
-      'bg-[#E5EFE6] text-[#1F6A37] dark:bg-[#1F6A37]/25 dark:text-[#4EB462]';
-  } else if (
-    normalized.includes('picking') ||
-    normalized.includes('packed') ||
-    normalized.includes('confirmed') ||
-    normalized.includes('loaded') ||
-    normalized.includes('issued') ||
-    normalized.includes('receiving') ||
-    normalized.includes('progress')
-  ) {
-    icon = <Package className="w-3.5 h-3.5 shrink-0" />;
-    classes =
-      'bg-emerald-950/5 text-[#12512C] dark:bg-emerald-950/50 dark:text-emerald-300';
-  } else if (normalized.includes('dispatched')) {
-    icon = <Truck className="w-3.5 h-3.5 shrink-0" />;
-    classes =
-      'bg-[#1F6A37]/12 text-[#12512C] dark:bg-[#4EB462]/20 dark:text-[#4EB462]';
-  } else if (
-    normalized.includes('pending') ||
-    normalized.includes('expiring') ||
-    normalized.includes('partial') ||
-    normalized.includes('watch') ||
-    normalized.includes('renewal') ||
-    normalized.includes('invited') ||
-    normalized.includes('fefo') ||
-    normalized.includes('hold') ||
-    normalized.includes('unverified')
-  ) {
-    icon = <AlertTriangle className="w-3.5 h-3.5 shrink-0" />;
-    classes =
-      'bg-amber-500/12 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300';
-  } else if (
-    normalized.includes('overdue') ||
-    normalized.includes('cancelled') ||
-    normalized.includes('failed') ||
-    normalized.includes('rejected') ||
-    normalized.includes('suspended') ||
-    normalized.includes('disabled') ||
-    normalized.includes('quarantined')
-  ) {
-    icon = <XCircle className="w-3.5 h-3.5 shrink-0" />;
-    classes =
-      'bg-red-500/12 text-red-800 dark:bg-red-500/20 dark:text-red-300';
-  } else if (normalized.includes('draft') || normalized.includes('planned')) {
-    icon = <FileText className="w-3.5 h-3.5 shrink-0" />;
-  }
+  const resolvedTone = tone && Object.hasOwn(statusStyles, tone) ? tone as keyof typeof statusStyles : statusTone(status);
+  const { className, icon: Icon } = statusStyles[resolvedTone];
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${classes}`}
-    >
-      {icon}
+    <span className={`ui-badge ${className}`}>
+      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
       <span>{status}</span>
     </span>
   );
@@ -753,15 +679,15 @@ export function PageHeader({
   return (
     <div
       data-gsap-reveal
-      className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-[var(--border-subtle)] mb-6"
+      className="mb-6 flex flex-col justify-between gap-4 border-b border-[var(--border-subtle)] pb-5 lg:flex-row lg:items-center"
     >
       <div>
         {kicker && (
-          <div className="text-xs font-medium text-[#1F6A37] dark:text-[#4EB462] mb-1">
+          <div className="ui-meta mb-1 font-medium">
             {kicker}
           </div>
         )}
-        <h1 className="font-heading text-2xl sm:text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
+        <h1 className="ui-page-title">
           {title}
         </h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1 max-w-2xl">
@@ -791,14 +717,14 @@ export function FilterBar({
   return (
     <Card className="mb-6" padding="p-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex-1">{children}</div>
+        <div className="min-w-0 flex-1">{children}</div>
         {mobileDrawerContent && (
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className="sm:hidden h-9 px-3 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-1.5 shrink-0 cursor-pointer"
+            className="ui-button ui-button-secondary shrink-0 sm:hidden"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+            <SlidersHorizontal className="size-4" aria-hidden="true" />
             <span>
               Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
             </span>
@@ -815,7 +741,7 @@ export function FilterBar({
             aria-label="Filters"
           >
             <div
-              className="fixed inset-0 bg-[#08190C]/70 backdrop-blur-xs"
+              className="fixed inset-0 bg-[var(--dialog-scrim)] backdrop-blur-xs"
               onClick={() => setDrawerOpen(false)}
             />
             <motion.div
@@ -823,17 +749,17 @@ export function FilterBar({
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-full rounded-t-[22px] bg-[var(--bg-card)] border-t border-[var(--border-subtle)] p-5 z-10 space-y-4"
+              className="relative z-10 max-h-[90dvh] w-full space-y-4 overflow-y-auto rounded-t-[var(--radius-modal)] border-t border-[var(--border-subtle)] bg-[var(--bg-card)] p-5"
             >
               <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
-                <span className="font-heading text-sm font-semibold">
+                <span className="ui-section-title">
                   Filter Records
                 </span>
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(false)}
                   aria-label="Close filter drawer"
-                  className="p-1.5 rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-canvas)]"
+                  className="ui-button ui-button-ghost ui-button-icon"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -842,7 +768,7 @@ export function FilterBar({
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="w-full h-10 rounded-full bg-[#1F6A37] text-white text-xs font-medium"
+                className="ui-button ui-button-primary w-full"
               >
                 Apply Filters
               </button>
@@ -856,7 +782,7 @@ export function FilterBar({
 
 export function RoleLabel({ roleName }: { roleName: string }) {
   return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-secondary)] whitespace-nowrap">
+    <span className="ui-badge ui-tone-neutral">
       {roleName}
     </span>
   );
@@ -874,21 +800,21 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <div className="rounded-[18px] border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] p-10 text-center">
-      <div className="w-11 h-11 rounded-xl bg-[#E5EFE6] dark:bg-[#122719] text-[#1F6A37] dark:text-[#4EB462] flex items-center justify-center mx-auto mb-3">
+    <div className="ui-surface border-dashed p-6 text-center sm:p-10">
+      <div className="ui-tone-neutral mx-auto mb-3 grid size-11 place-items-center rounded-xl">
         <Inbox className="w-5 h-5" />
       </div>
-      <h3 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+      <h3 className="ui-section-title">
         {title}
       </h3>
-      <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-md mx-auto mt-1">
+      <p className="mx-auto mt-1 max-w-md text-sm text-[var(--text-secondary)]">
         {description}
       </p>
       {actionLabel && onAction && (
         <button
           type="button"
           onClick={onAction}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-[10px] text-xs font-medium bg-[#1F6A37] text-white hover:bg-[#12512C] transition-colors cursor-pointer"
+          className="ui-button ui-button-primary mt-4"
         >
           {actionLabel}
         </button>
@@ -907,21 +833,21 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div className="rounded-[18px] border border-red-500/20 bg-[var(--bg-card)] p-8 text-center">
-      <div className="w-11 h-11 rounded-xl bg-red-500/10 text-red-700 dark:text-red-400 flex items-center justify-center mx-auto mb-3">
+    <div className="ui-surface border-[var(--status-danger-border)] p-6 text-center sm:p-8">
+      <div className="ui-tone-danger mx-auto mb-3 grid size-11 place-items-center rounded-xl">
         <AlertCircle className="w-5 h-5" />
       </div>
-      <h3 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+      <h3 className="ui-section-title">
         {title}
       </h3>
-      <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-md mx-auto mt-1">
+      <p className="mx-auto mt-1 max-w-md text-sm text-[var(--text-secondary)]">
         {description}
       </p>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-[10px] text-xs font-medium bg-[#1F6A37] text-white hover:bg-[#12512C] transition-colors cursor-pointer"
+          className="ui-button ui-button-primary mt-4"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Try again</span>
@@ -941,24 +867,24 @@ export function AccessDenied({
   return (
     <div className="my-8 max-w-lg mx-auto">
       <Card variant="raised" className="text-center p-8">
-        <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-800 dark:text-amber-300 flex items-center justify-center mx-auto mb-4">
+        <div className="ui-tone-warning mx-auto mb-4 grid size-12 place-items-center rounded-xl">
           <Lock className="w-6 h-6" />
         </div>
-        <div className="text-xs font-semibold tracking-wider text-amber-800 dark:text-amber-300 uppercase">
+        <div className="ui-meta font-semibold text-[var(--status-warning-fg)]">
           Access Restricted
         </div>
-        <h2 className="font-heading text-xl font-semibold text-[var(--text-primary)] mt-1">
+        <h2 className="ui-section-title mt-1">
           {moduleName}
         </h2>
-        <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-2 leading-relaxed">
+        <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
           Your current operator role does not hold authorization to view or
           modify this module. Agro-Deliveries enforces role-based access control
           across all operational records.
         </p>
         {requiredPermission && (
-          <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+          <div className="ui-badge ui-tone-neutral mt-4 flex-wrap">
             <span>Required authority:</span>
-            <code className="font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+            <code className="font-mono-tabular font-semibold text-[var(--brand-accent)]">
               {requiredPermission}
             </code>
           </div>
@@ -966,7 +892,7 @@ export function AccessDenied({
         <div className="mt-6 flex items-center justify-center gap-3">
           <Link
             href="/dashboard"
-            className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors"
+            className="ui-button ui-button-primary"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Return to Dashboard</span>
@@ -998,7 +924,7 @@ export function LoadingSkeleton({ rows = 4 }: { rows?: number }) {
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="h-10 rounded-lg bg-[#E5EFE6]/70 dark:bg-[#122719] animate-pulse"
+          className="h-10 animate-pulse rounded-lg bg-[var(--bg-subtle)]"
         />
       ))}
     </Card>
@@ -1026,14 +952,14 @@ export function ConfirmDiscardDialog({
         <button
           type="button"
           onClick={onKeepEditing}
-          className="min-h-11 rounded-lg border border-[var(--border-subtle)] px-3.5 text-sm font-medium hover:bg-[var(--bg-subtle)]"
+          className="ui-button ui-button-secondary"
         >
           Keep editing
         </button>
         <button
           type="button"
           onClick={onDiscard}
-          className="min-h-11 rounded-lg bg-red-700 px-3.5 text-sm font-semibold text-white hover:bg-red-800"
+          className="ui-button ui-button-danger"
         >
           Discard changes
         </button>
@@ -1143,7 +1069,7 @@ export function Modal({
   return (
         <dialog
           ref={dialogRef}
-          className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none border-0 bg-transparent p-3 text-[var(--text-primary)] backdrop:bg-[#08190C]/75 backdrop:backdrop-blur-xs open:flex open:items-center open:justify-center sm:p-5"
+          className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none border-0 bg-transparent p-3 text-[var(--text-primary)] backdrop:bg-[var(--dialog-scrim)] backdrop:backdrop-blur-xs open:flex open:items-center open:justify-center sm:p-5"
           aria-labelledby={titleId}
           aria-describedby={subtitle ? descriptionId : undefined}
           onCancel={(event) => {
@@ -1161,13 +1087,13 @@ export function Modal({
           <motion.div
             ref={panelRef}
             {...(reduceMotion ? {} : DROPDOWN_MOTION)}
-            className={`flex max-h-full w-full flex-col rounded-[20px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 shadow-[var(--shadow-lg)] sm:p-6 ${sizeClasses[size]}`}
+            className={`ui-surface flex max-h-full w-full flex-col rounded-[var(--radius-modal)] p-4 shadow-[var(--shadow-lg)] sm:p-6 ${sizeClasses[size]}`}
           >
             <div className="flex items-start justify-between gap-4 pb-4 border-b border-[var(--border-subtle)] mb-4 shrink-0">
               <div>
                 <h2
                   id={titleId}
-                  className="font-heading text-lg font-semibold text-[var(--text-primary)]"
+                  className="ui-section-title"
                 >
                   {title}
                 </h2>
@@ -1181,7 +1107,7 @@ export function Modal({
                 type="button"
                 onClick={handleAttemptClose}
                 aria-label="Close dialog"
-                className="grid size-11 shrink-0 place-items-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+                className="ui-button ui-button-ghost ui-button-icon"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1275,10 +1201,10 @@ export function ImageUploadZone({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-xs font-medium text-[var(--text-primary)]">
+        <span className="ui-label">
           {label}
-        </label>
-        <span className="text-[11px] text-[var(--text-secondary)]">
+        </span>
+        <span className="ui-meta">
           JPG, PNG, WebP · Max 5MB
         </span>
       </div>
@@ -1291,29 +1217,29 @@ export function ImageUploadZone({
               alt={productName || 'Uploaded Preview'}
               className="w-full h-full object-cover"
             />
-            <span className="absolute bottom-1 left-1 right-1 text-center text-[9px] font-mono-tabular bg-[#08190C]/85 text-[#4EB462] px-1 py-0.5 rounded font-medium">
+            <span className="absolute inset-x-1 bottom-1 rounded bg-[var(--nav-bg)]/90 px-1 py-0.5 text-center text-xs font-medium text-[var(--nav-active)]">
               Local Preview
             </span>
           </div>
 
           <div className="flex-1 space-y-1.5 text-center sm:text-left min-w-0">
-            <div className="text-xs font-semibold text-[var(--text-primary)] flex items-center justify-center sm:justify-start gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+            <div className="flex items-center justify-center gap-1.5 text-sm font-semibold text-[var(--text-primary)] sm:justify-start">
+              <CheckCircle2 className="size-3.5 text-[var(--status-success-fg)]" aria-hidden="true" />
               <span>Image Attached for Record</span>
             </div>
-            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+            <p className="ui-meta">
               Frontend preview active. In production, this image streams to Supabase Storage with CDN optimization.
             </p>
 
             <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-              <label className="h-8 px-3 rounded-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium hover:border-[#1F6A37] hover:text-[#1F6A37] dark:hover:text-[#4EB462] inline-flex items-center gap-1.5 cursor-pointer transition-colors">
+              <label aria-disabled={disabled} className="ui-button ui-button-secondary ui-button-compact focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus-ring)]">
                 <UploadCloud className="w-3.5 h-3.5" />
                 <span>Replace Image</span>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   disabled={disabled}
-                  className="hidden"
+                  className="sr-only"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) processFile(f);
@@ -1325,7 +1251,7 @@ export function ImageUploadZone({
                 type="button"
                 onClick={handleRemove}
                 disabled={disabled}
-                className="h-8 px-3 rounded-[10px] border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/10 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="ui-button ui-button-ghost ui-button-compact text-[var(--status-danger-fg)] hover:bg-[var(--status-danger-bg)]"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Remove</span>
@@ -1346,39 +1272,37 @@ export function ImageUploadZone({
             const f = e.dataTransfer.files?.[0];
             if (f) processFile(f);
           }}
-          className={`relative rounded-[16px] border-2 border-dashed p-6 text-center transition-all ${
+          className={`relative rounded-[var(--radius-card)] border border-dashed p-6 text-center transition-colors ${
             dragOver
-              ? 'border-[#1F6A37] bg-[#E5EFE6]/40 dark:bg-[#142B1B]/40'
-              : 'border-[var(--border-subtle)] bg-[var(--bg-canvas)]/60 hover:bg-[var(--bg-canvas)]'
+              ? 'border-[var(--brand-accent)] bg-[var(--action-selected-bg)]'
+              : 'border-[var(--control-border)] bg-[var(--bg-canvas)] hover:bg-[var(--bg-subtle)]'
           }`}
         >
-          <div className="w-10 h-10 rounded-xl bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462] flex items-center justify-center mx-auto mb-2">
+          <div className="ui-tone-neutral mx-auto mb-2 grid size-11 place-items-center rounded-xl">
             <UploadCloud className="w-5 h-5" />
           </div>
-          <p className="text-xs font-semibold text-[var(--text-primary)]">
-            Drag and drop product photo, or{' '}
-            <label className="text-[#1F6A37] dark:text-[#4EB462] hover:underline cursor-pointer">
-              browse files
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={disabled}
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) processFile(f);
-                }}
-              />
-            </label>
-          </p>
-          <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+          <p className="text-sm text-[var(--text-primary)]">Drag a product photo here</p>
+          <label aria-disabled={disabled} className="ui-button ui-button-secondary ui-button-compact mt-2 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus-ring)]">
+            Browse files
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={disabled}
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) processFile(f);
+              }}
+            />
+          </label>
+          <p className="ui-meta mt-2">
             Supports JPG, PNG, WebP up to 5MB. If omitted, default {fallbackCategory || 'category'} placeholder will be applied.
           </p>
         </div>
       )}
 
       {errorMsg && (
-        <div className="text-[11px] text-red-600 dark:text-red-400 flex items-center gap-1 pt-1">
+        <div className="flex items-center gap-1 pt-1 text-sm text-[var(--status-danger-fg)]" role="alert">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           <span>{errorMsg}</span>
         </div>
@@ -1411,23 +1335,22 @@ export function ConfirmDialog({
       open={open}
       onClose={onClose}
       title={title}
-      subtitle="Please verify this governance action before proceeding."
     >
       <div className="space-y-4">
-        <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs space-y-1">
-          <div className="text-[var(--text-secondary)]">Affected Record:</div>
+        <div className="ui-surface space-y-1 bg-[var(--bg-subtle)] p-3.5 text-sm">
+          <div className="ui-meta">Affected record</div>
           <div className="font-semibold text-[var(--text-primary)]">
             {affectedItem}
           </div>
         </div>
-        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+        <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
           {consequence}
         </p>
-        <div className="pt-2 flex items-center justify-end gap-2.5">
+        <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-[10px] border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+            className="ui-button ui-button-secondary"
           >
             Cancel
           </button>
@@ -1437,11 +1360,7 @@ export function ConfirmDialog({
               onConfirm();
               onClose();
             }}
-            className={`h-10 px-4 rounded-[10px] text-white text-xs font-medium cursor-pointer transition-colors ${
-              destructive
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-[#1F6A37] hover:bg-[#12512C]'
-            }`}
+            className={`ui-button ${destructive ? 'ui-button-danger' : 'ui-button-primary'}`}
           >
             {confirmLabel}
           </button>
@@ -1467,9 +1386,9 @@ export function ResilientImage({
   if (failed || !src) {
     return (
       <div
-        className={`flex flex-col items-center justify-center bg-gradient-to-br from-[#08190C] via-[#12512C] to-[#1F6A37] text-[#E5EFE6] p-4 text-center ${className}`}
+        className={`flex flex-col items-center justify-center bg-gradient-to-br from-[var(--agro-deep-forest)] via-[var(--agro-deep-green)] to-[var(--agro-forest-green)] p-4 text-center text-[var(--nav-text)] ${className}`}
       >
-        <Leaf className="w-6 h-6 text-[#4EB462] mb-1.5" />
+        <Leaf className="mb-1.5 size-6 text-[var(--nav-active)]" aria-hidden="true" />
         <span className="text-xs font-medium">{fallbackLabel}</span>
       </div>
     );
@@ -1498,24 +1417,23 @@ export function FeedbackBanner({
   if (!message) return null;
   return (
     <div
-      className={`mb-5 flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-xs sm:text-sm font-medium border ${
-        type === 'success'
-          ? 'bg-[#E5EFE6] border-[#4EB462]/40 text-[#12512C] dark:bg-[#142B1B] dark:text-[#4EB462]'
-          : 'bg-red-500/10 border-red-500/30 text-red-800 dark:text-red-300'
+      role={type === 'error' ? 'alert' : 'status'}
+      className={`mb-5 flex items-center justify-between gap-3 rounded-[var(--radius-control)] border py-1.5 pl-4 pr-1.5 text-sm font-medium ${
+        type === 'success' ? 'ui-tone-success' : 'ui-tone-danger'
       }`}
     >
       <div className="flex items-center gap-2">
         {type === 'success' ? (
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
         ) : (
-          <ShieldAlert className="w-4 h-4 shrink-0" />
+          <ShieldAlert className="size-4 shrink-0" aria-hidden="true" />
         )}
         <span>{message}</span>
       </div>
       <button
         type="button"
         onClick={onDismiss}
-        className="p-1 rounded-full hover:opacity-75 cursor-pointer"
+        className="ui-button ui-button-ghost ui-button-icon text-inherit"
         aria-label="Dismiss alert"
       >
         <X className="w-3.5 h-3.5" />

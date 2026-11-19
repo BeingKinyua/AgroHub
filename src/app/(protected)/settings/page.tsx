@@ -68,7 +68,7 @@ export default function SettingsPage() {
         actions={
           <Link
             href="/profile"
-            className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+            className="ui-button ui-button-primary"
           >
             <User className="w-4 h-4" />
             <span>My Operator Profile</span>
@@ -114,36 +114,33 @@ export default function SettingsPage() {
         <div className="lg:col-span-7 space-y-6">
           <Card variant="raised" className="space-y-4">
             <div>
-              <h2 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+              <h2 className="ui-section-title">
                 Interface Theme & Appearance
               </h2>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              <p className="ui-meta mt-0.5">
                 Customize workspace visual contrast and system theme synchronization
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold text-[var(--text-primary)]">
                   Color Theme Mode
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)]">
+                <div className="ui-meta">
                   Agro-Deliveries soft-mint light mode, deep forest dark mode, or OS system theme
                 </div>
               </div>
               <div
                 role="group"
                 aria-label="Theme Mode"
-                className="flex items-center p-1 rounded-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)]"
+                className="flex flex-wrap gap-1"
               >
                 <button
                   type="button"
                   onClick={() => setTheme('light')}
-                  className={`px-3.5 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    theme === 'light'
-                      ? 'bg-[#1F6A37] text-white shadow-xs'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
+                  aria-pressed={theme === 'light'}
+                  className="ui-tab"
                 >
                   <Sun className="w-3.5 h-3.5" />
                   <span>Light</span>
@@ -151,11 +148,8 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setTheme('dark')}
-                  className={`px-3.5 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    theme === 'dark'
-                      ? 'bg-[#1F6A37] text-white shadow-xs'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
+                  aria-pressed={theme === 'dark'}
+                  className="ui-tab"
                 >
                   <Moon className="w-3.5 h-3.5" />
                   <span>Dark</span>
@@ -163,11 +157,8 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setTheme('system')}
-                  className={`px-3.5 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    theme === 'system'
-                      ? 'bg-[#1F6A37] text-white shadow-xs'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
+                  aria-pressed={theme === 'system'}
+                  className="ui-tab"
                 >
                   <Monitor className="w-3.5 h-3.5" />
                   <span>System</span>
@@ -178,10 +169,10 @@ export default function SettingsPage() {
 
           <Card variant="raised" className="space-y-4">
             <div>
-              <h2 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+              <h2 className="ui-section-title">
                 Operational SLA & Governance Thresholds
               </h2>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              <p className="ui-meta mt-0.5">
                 Rules governing FEFO batch warnings, institutional delivery
                 cutoffs, and automatic approval routing
               </p>
@@ -190,34 +181,34 @@ export default function SettingsPage() {
             <form onSubmit={handleSaveOperationalPolicy} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="settings-fefo-days" className="ui-label mb-1 block">
                     FEFO Expiry Radar (Days)
                   </label>
-                  <input
+                  <input id="settings-fefo-days"
                     type="number"
                     min={1}
                     max={30}
                     value={fefoAlertDays}
                     onChange={(e) => setFefoAlertDays(Number(e.target.value))}
-                    className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                    className="ui-field w-full font-mono-tabular"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="settings-morning-cutoff" className="ui-label mb-1 block">
                     Morning Delivery SLA (EAT)
                   </label>
-                  <input
+                  <input id="settings-morning-cutoff"
                     type="time"
                     value={morningSlaCutoff}
                     onChange={(e) => setMorningSlaCutoff(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                    className="ui-field w-full font-mono-tabular"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="settings-price-override" className="ui-label mb-1 block">
                     Price Override Approval (%)
                   </label>
-                  <input
+                  <input id="settings-price-override"
                     type="number"
                     min={1}
                     max={25}
@@ -225,7 +216,7 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       setPriceOverrideThresholdPct(Number(e.target.value))
                     }
-                    className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                    className="ui-field w-full font-mono-tabular"
                   />
                 </div>
               </div>
@@ -233,7 +224,7 @@ export default function SettingsPage() {
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+                  className="ui-button ui-button-primary"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Save Governance Thresholds</span>
@@ -248,14 +239,14 @@ export default function SettingsPage() {
           <Card variant="raised" className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+                <h2 className="ui-section-title">
                   Configured Kenyan Distribution Hubs
                 </h2>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                <p className="ui-meta mt-0.5">
                   Active cold-chain, dry-bulk, and cross-dock facilities
                 </p>
               </div>
-              <Warehouse className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
+              <Warehouse className="w-4 h-4 text-[var(--brand-accent)]" />
             </div>
 
             <div className="space-y-3">
@@ -265,17 +256,17 @@ export default function SettingsPage() {
                   className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs space-y-1.5"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                    <span className="font-mono-tabular font-semibold text-[var(--brand-accent)]">
                       {wh.code}
                     </span>
-                    <span className="font-mono-tabular text-[11px]">
+                    <span className="font-mono-tabular text-xs">
                       {wh.utilizationPct}% Utilized · {wh.binsCount} Bins
                     </span>
                   </div>
                   <div className="font-semibold text-[var(--text-primary)]">
                     {wh.name}
                   </div>
-                  <div className="text-[11px] text-[var(--text-secondary)]">
+                  <div className="ui-meta">
                     {wh.zoneType} · {wh.location} · Lead: {wh.manager}
                   </div>
                 </div>
@@ -285,8 +276,8 @@ export default function SettingsPage() {
 
           <Card variant="raised" className="space-y-3.5">
             <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
-              <h2 className="font-heading text-base font-semibold text-[var(--text-primary)]">
+              <Shield className="w-4 h-4 text-[var(--brand-accent)]" />
+              <h2 className="ui-section-title">
                 Security & Data Governance Posture
               </h2>
             </div>
@@ -294,21 +285,21 @@ export default function SettingsPage() {
             <div className="space-y-2.5 text-xs">
               <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between">
                 <span className="inline-flex items-center gap-2">
-                  <Lock className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <Lock className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                   <span>Public Self-Registration</span>
                 </span>
                 <StatusBadge status="Disabled (Admin Invite Only)" />
               </div>
               <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between">
                 <span className="inline-flex items-center gap-2">
-                  <Database className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <Database className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                   <span>PostgreSQL Row Level Security</span>
                 </span>
                 <StatusBadge status="Active Schema Ready" />
               </div>
               <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between">
                 <span className="inline-flex items-center gap-2">
-                  <Building2 className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <Building2 className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                   <span>Active Operator Session</span>
                 </span>
                 <span className="font-mono-tabular font-semibold text-[var(--text-primary)]">

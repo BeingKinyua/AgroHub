@@ -517,29 +517,28 @@ function OrdersWorkbenchContent() {
     <div className="space-y-6">
       {/* Page Header (Section 22 & 31) */}
       <PageHeader
-        kicker="FULFILLMENT WORKBENCH & INSTITUTIONAL SUPPLY"
-        title="Order Fulfillment Workbench"
-        description="Move institutional contracts, termly school tenders, and commercial orders toward successful on-time fulfillment with FEFO inventory allocation."
+        title="Orders"
+        description="Create orders, review sourcing, and track fulfillment."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {can('orders.export') && (
               <button
                 type="button"
                 onClick={handleExportCsv}
-                className="h-10 px-4 rounded-[10px] bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium inline-flex items-center gap-2 hover:border-[#4EB462] cursor-pointer"
+                className="ui-button ui-button-secondary"
               >
-                <Download className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                <Download className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                 <span className="hidden sm:inline">Export Manifest</span>
               </button>
             )}
             {can('orders.create') && savedDraft && (
-              <button type="button" onClick={resumeOrderDraft} className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border-subtle)] px-4 text-sm font-semibold hover:bg-[var(--bg-canvas)]">Resume draft</button>
+              <button type="button" onClick={resumeOrderDraft} className="ui-button ui-button-secondary">Resume draft</button>
             )}
             {can('orders.create') && (
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
+                className="ui-button ui-button-primary"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Order</span>
@@ -602,17 +601,14 @@ function OrdersWorkbenchContent() {
       {/* Filter & Search Bar */}
       <Card className="mb-6" padding="p-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-[var(--bg-canvas)] overflow-x-auto border border-[var(--border-subtle)]">
+          <div className="flex items-center gap-1 overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-1">
             {STATUS_FILTERS.map((st) => (
               <button
                 key={st}
                 type="button"
                 onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                  statusFilter === st
-                    ? 'bg-[#1F6A37] text-white shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
+                aria-pressed={statusFilter === st}
+                className="ui-tab whitespace-nowrap"
               >
                 {st}
               </button>
@@ -620,13 +616,14 @@ function OrdersWorkbenchContent() {
           </div>
 
           <div className="relative w-full lg:w-72">
-            <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="pointer-events-none w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
             <input
-              type="text"
+              type="search"
+              aria-label="Search by order number or customer"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter by order # or customer..."
-              className="w-full h-9 pl-9 pr-3 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+              className="ui-field w-full pl-9 pr-3"
             />
           </div>
         </div>
@@ -643,9 +640,9 @@ function OrdersWorkbenchContent() {
       ) : (
         <Card padding="p-0" className="overflow-hidden">
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="ui-table w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
+                <tr className="border-b border-[var(--border-subtle)]">
                   <th className="py-3 px-4">Order Ref</th>
                   <th className="py-3 px-4">Customer & Segment</th>
                   <th className="py-3 px-4">Delivery & Hub</th>
@@ -655,12 +652,12 @@ function OrdersWorkbenchContent() {
                   <th className="py-3 px-4 text-right">Primary Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {filteredOrders.map((ord) => (
                   <tr key={ord.id} className="hover:bg-[var(--bg-canvas)]/60 transition-colors">
                     <td className="py-3.5 px-4 font-mono-tabular font-semibold text-[var(--text-primary)]">
                       {ord.orderNumber}
-                      <div className="text-[11px] font-normal text-[var(--text-secondary)]">
+                      <div className="ui-meta font-normal">
                         {ord.channel}
                       </div>
                     </td>
@@ -668,7 +665,7 @@ function OrdersWorkbenchContent() {
                       <div className="font-semibold text-[var(--text-primary)]">
                         {ord.customerName}
                       </div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">
+                      <div className="ui-meta">
                         {ord.customerSegment} · {ord.itemsCount} line item(s)
                       </div>
                     </td>
@@ -676,16 +673,16 @@ function OrdersWorkbenchContent() {
                       <div className="font-mono-tabular text-[var(--text-primary)]">
                         {ord.deliveryDate}
                       </div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">
+                      <div className="ui-meta">
                         {ord.warehouseName}
                       </div>
                     </td>
                     <td className="py-3.5 px-4">
                       <span
-                        className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                        className={`inline-flex items-center gap-1 text-xs font-medium ${
                           ord.paymentStatus === 'Paid'
-                            ? 'text-[#1F6A37] dark:text-[#4EB462]'
-                            : 'text-amber-600 dark:text-amber-400'
+                            ? 'text-[var(--brand-accent)]'
+                            : 'text-[var(--status-warning-fg)]'
                         }`}
                       >
                         {ord.paymentStatus}
@@ -703,7 +700,7 @@ function OrdersWorkbenchContent() {
                           <button
                             type="button"
                             onClick={() => handleQuickAdvance(ord)}
-                            className="h-8 px-3 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            className="ui-button ui-button-primary ui-button-compact"
                           >
                             <span>{getNextStageLabel(ord.status)}</span>
                             <ArrowRight className="w-3 h-3" />
@@ -712,7 +709,7 @@ function OrdersWorkbenchContent() {
                         <button
                           type="button"
                           onClick={() => setSelectedOrder(ord)}
-                          className="h-8 px-2.5 rounded-md border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] inline-flex items-center gap-1 cursor-pointer"
+                          className="ui-button ui-button-secondary ui-button-compact"
                           title="Inspect Details"
                           aria-label={`Inspect order ${ord.orderNumber}`}
                         >
@@ -737,15 +734,15 @@ function OrdersWorkbenchContent() {
                   <StatusBadge status={ord.status} />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-[var(--text-primary)]">
+                  <div className="text-sm font-semibold text-[var(--text-primary)]">
                     {ord.customerName}
                   </div>
-                  <div className="text-[11px] text-[var(--text-secondary)]">
+                  <div className="ui-meta">
                     Delivery: {ord.deliveryDate} · {ord.warehouseName}
                   </div>
                 </div>
                 <div className="flex items-center justify-between pt-1">
-                  <span className="font-mono-tabular text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                  <span className="font-mono-tabular text-xs font-semibold text-[var(--brand-accent)]">
                     KES {ord.totalKes.toLocaleString()}
                   </span>
                   <div className="flex items-center gap-1.5">
@@ -753,7 +750,7 @@ function OrdersWorkbenchContent() {
                       <button
                         type="button"
                         onClick={() => handleQuickAdvance(ord)}
-                        className="px-3 py-1 rounded-full bg-[#1F6A37] text-white text-xs font-semibold cursor-pointer"
+                        className="ui-button ui-button-primary ui-button-compact"
                       >
                         {getNextStageLabel(ord.status)}
                       </button>
@@ -761,7 +758,7 @@ function OrdersWorkbenchContent() {
                     <button
                       type="button"
                       onClick={() => setSelectedOrder(ord)}
-                      className="px-2.5 py-1 rounded-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+                      className="ui-button ui-button-secondary ui-button-compact"
                     >
                       Inspect
                     </button>
@@ -792,7 +789,7 @@ function OrdersWorkbenchContent() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
               <div>
-                <div className="text-[11px] text-[var(--text-secondary)]">
+                <div className="ui-meta">
                   Current Lifecycle State
                 </div>
                 <div className="mt-1">
@@ -800,7 +797,7 @@ function OrdersWorkbenchContent() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[11px] text-[var(--text-secondary)]">
+                <div className="ui-meta">
                   Next Operational Action
                 </div>
                 <div className="text-xs font-semibold text-[var(--text-primary)] mt-0.5">
@@ -833,20 +830,20 @@ function OrdersWorkbenchContent() {
                             {item.productName}
                           </span>
                           {isDirect ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            <span className="ui-badge ui-tone-success">
                               Direct Farm Procurement
                             </span>
                           ) : isMixed ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300">
+                            <span className="ui-badge ui-tone-info">
                               Mixed Sourcing
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-300">
+                            <span className="ui-badge ui-tone-neutral">
                               FEFO Hub Stock
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-[var(--text-secondary)]">
+                        <div className="ui-meta">
                           {isDirect ? (
                             <span>
                               {item.supplierName ? `Preferred supplier ${item.supplierName}` : 'Open supplier sourcing'}
@@ -858,11 +855,11 @@ function OrdersWorkbenchContent() {
                             </span>
                           ) : (
                             <span>
-                              Batch: <span className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462]">{item.allocatedBatch}</span>
+                              Batch: <span className="font-mono-tabular text-[var(--brand-accent)]">{item.allocatedBatch}</span>
                             </span>
                           )}
                           <span> · {item.quantity} {item.unit} @ KES {item.unitPriceKes} ({item.pricingTier})</span>
-                          {outstanding > 0 && <p className="mt-1 font-medium text-amber-800 dark:text-amber-300">{outstanding.toLocaleString()} {item.unit} still to collect</p>}
+                          {outstanding > 0 && <p className="mt-1 font-medium text-[var(--status-warning-fg)]">{outstanding.toLocaleString()} {item.unit} still to collect</p>}
                         </div>
                       </div>
                       <div className="font-mono-tabular font-semibold">
@@ -875,7 +872,7 @@ function OrdersWorkbenchContent() {
             </div>
 
             {can('procurement.view') && getOrderSourcingLines(selectedOrder, procurementOrders).some((line) => line.outstanding > 0) && (
-              <Link href={`/procurement?order=${encodeURIComponent(selectedOrder.id)}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-semibold hover:bg-[var(--bg-canvas)]">
+              <Link href={`/procurement?order=${encodeURIComponent(selectedOrder.id)}`} className="ui-button ui-button-secondary">
                 View sourcing <ArrowRight size={16} aria-hidden="true" />
               </Link>
             )}
@@ -883,19 +880,19 @@ function OrdersWorkbenchContent() {
             <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
               {can('fulfillment.manage') && getNextStageStatus(selectedOrder.status) && (
                 <button type="button" onClick={() => handleQuickAdvance(selectedOrder)}
-                  className="min-h-11 rounded-lg bg-[#1F6A37] px-3 text-sm font-semibold text-white hover:bg-[#12512C]">
+                  className="ui-button ui-button-primary">
                   {getNextStageLabel(selectedOrder.status)}
                 </button>
               )}
               {can('deliveries.view') && ['Packed', 'Dispatched', 'Partially Fulfilled'].includes(selectedOrder.status) && (
                 <Link href={`/deliveries?order=${encodeURIComponent(selectedOrder.orderNumber)}`}
-                  className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-semibold">
+                  className="ui-button ui-button-secondary">
                   View delivery runs
                 </Link>
               )}
               {can('approvals.view') && selectedOrder.status === 'On Hold' && (
                 <Link href="/approvals?status=pending"
-                  className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-semibold">
+                  className="ui-button ui-button-secondary">
                   Review approvals
                 </Link>
               )}
@@ -939,12 +936,12 @@ function OrdersWorkbenchContent() {
             {/* Section A: Customer & Order Details */}
             <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-[var(--text-primary)] inline-flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                <span className="ui-section-title inline-flex items-center gap-2">
+                  <Building2 className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                   <span>Customer & Logistics Schedule</span>
                 </span>
                 {selectedCustomer && (
-                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#E5EFE6] dark:bg-[#122719] text-[#1F6A37] dark:text-[#4EB462]">
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full ui-tone-success">
                     {selectedCustomer.segment} · {selectedCustomer.paymentTerms}
                   </span>
                 )}
@@ -952,13 +949,13 @@ function OrdersWorkbenchContent() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div className="lg:col-span-2">
-                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="orders-customer" className="ui-label block mb-1">
                     Select Customer / Institution *
                   </label>
-                  <select
+                  <select id="orders-customer"
                     value={customerId}
                     onChange={(e) => selectCustomer(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+                    className="ui-field w-full"
                   >
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -969,13 +966,13 @@ function OrdersWorkbenchContent() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="orders-channel" className="ui-label block mb-1">
                     Supply Channel *
                   </label>
-                  <select
+                  <select id="orders-channel"
                     value={channel}
                     onChange={(e) => setChannel(e.target.value as OrderRecord['channel'])}
-                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                    className="ui-field w-full"
                   >
                     <option value="Institutional Contract">Institutional Contract</option>
                     <option value="Recurring Weekly">Recurring Weekly</option>
@@ -985,27 +982,27 @@ function OrdersWorkbenchContent() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="orders-due-date" className="ui-label block mb-1">
                     Expected Delivery Date *
                   </label>
-                  <input
+                  <input id="orders-due-date"
                     type="date"
                     required
                     min={new Date().toISOString().split('T')[0]}
                     value={deliveryDate}
                     onChange={(e) => setDeliveryDate(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs"
+                    className="ui-field w-full"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="orders-hub" className="ui-label block mb-1">
                     Fulfillment Hub *
                   </label>
-                  <select
+                  <select id="orders-hub"
                     value={warehouseName}
                     onChange={(e) => setWarehouseName(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                    className="ui-field w-full"
                   >
                     {warehouses.map((w) => (
                       <option key={w.id} value={w.name}>
@@ -1016,28 +1013,28 @@ function OrdersWorkbenchContent() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="orders-reference" className="ui-label block mb-1">
                     Customer PO Reference
                   </label>
-                  <input
+                  <input id="orders-reference"
                     type="text"
                     value={orderReference}
                     onChange={(e) => setOrderReference(e.target.value)}
                     placeholder="e.g. PO-MOI-2026-441"
-                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                    className="ui-field w-full font-mono-tabular"
                   />
                 </div>
 
                 <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="orders-address" className="ui-label block mb-1">
                     Delivery Address & Receiving Point
                   </label>
-                  <input
+                  <input id="orders-address"
                     type="text"
                     value={deliveryAddress}
                     onChange={(e) => setDeliveryAddress(e.target.value)}
                     placeholder="Specific kitchen gate, stores receiving bay, or contact person"
-                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs"
+                    className="ui-field w-full"
                   />
                 </div>
               </div>
@@ -1047,18 +1044,18 @@ function OrdersWorkbenchContent() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-semibold text-[var(--text-primary)] inline-flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <span className="ui-section-title inline-flex items-center gap-2">
+                    <Layers className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                     <span>Order Products & Quantities ({formItems.length} Lines)</span>
                   </span>
-                  <p className="text-[11px] text-[var(--text-secondary)]">
+                  <p className="ui-meta">
                     Tier pricing auto-applies by customer profile. Override requires authorization.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={handleAddItem}
-                  className="h-8 px-3 rounded-lg bg-[#E5EFE6] dark:bg-[#122719] hover:bg-[#1F6A37] hover:text-white text-[#1F6A37] dark:text-[#4EB462] text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="ui-button ui-button-secondary ui-button-compact"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Line Item</span>
@@ -1076,22 +1073,22 @@ function OrdersWorkbenchContent() {
                       key={item.id}
                       className={`p-3.5 rounded-xl border transition-colors space-y-3 ${
                         item.hasShortage
-                          ? 'border-amber-500/40 bg-amber-50/40 dark:bg-amber-950/20'
+                          ? 'border-[var(--status-warning-border)] bg-[var(--status-warning-bg)]'
                           : 'border-[var(--border-subtle)] bg-[var(--bg-card)]'
                       }`}
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
                         {/* Line number and product selector */}
                         <div className="sm:col-span-5">
-                          <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1">
+                          <label htmlFor={`order-product-${item.id}`} className="ui-label block mb-1">
                             Line #{idx + 1} · Product SKU
                           </label>
-                          <select
+                          <select id={`order-product-${item.id}`}
                             value={item.productId}
                             onChange={(e) =>
                               handleUpdateItem(item.id, { productId: e.target.value, stockAllocatedQty: undefined, supplierId: undefined, supplierName: undefined, purchaseCostKes: undefined })
                             }
-                            className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+                            className="ui-field w-full"
                           >
                             {products.map((p) => (
                               <option key={p.id} value={p.id}>
@@ -1100,12 +1097,12 @@ function OrdersWorkbenchContent() {
                             ))}
                           </select>
                           {prod && (
-                            <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--text-secondary)]">
+                            <div className="flex items-center gap-2 mt-1 ui-meta">
                               <span>SKU: {prod.sku}</span>
                               <span>·</span>
                               <span>Available for this line {item.availableStock} {prod.unit}</span>
                               {item.hasShortage && (
-                                <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                                <span className="text-[var(--status-warning-fg)] font-semibold">
                                   Stock allocation exceeds this line’s limit
                                 </span>
                               )}
@@ -1115,10 +1112,10 @@ function OrdersWorkbenchContent() {
 
                         {/* Quantity */}
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1">
+                          <label htmlFor={`order-quantity-${item.id}`} className="ui-label block mb-1">
                             Qty ({prod?.unit || 'units'})
                           </label>
-                          <input
+                          <input id={`order-quantity-${item.id}`}
                             type="number"
                             min="0.1"
                             step="any"
@@ -1127,21 +1124,21 @@ function OrdersWorkbenchContent() {
                             onChange={(e) =>
                               handleUpdateItem(item.id, { quantity: Number(e.target.value) })
                             }
-                            className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                            className="ui-field w-full font-mono-tabular"
                           />
                         </div>
 
                         {/* Tier Price & Override */}
                         <div className="sm:col-span-3">
                           <div className="flex items-center justify-between mb-1">
-                            <label className="text-[10px] font-medium text-[var(--text-secondary)]">
+                            <label htmlFor={`order-unit-price-${item.id}`} className="ui-label">
                               Selling Price (KES/{prod?.unit || 'u'})
                             </label>
-                            <span className="text-[10px] text-[#1F6A37] dark:text-[#4EB462] font-semibold">
+                            <span className="text-xs text-[var(--brand-accent)] font-semibold">
                               {item.pricingTier}
                             </span>
                           </div>
-                          <input
+                          <input id={`order-unit-price-${item.id}`}
                             type="number"
                             placeholder={`Sched: ${item.defaultPrice}`}
                             value={item.overridePriceKes !== undefined ? item.overridePriceKes : ''}
@@ -1150,14 +1147,10 @@ function OrdersWorkbenchContent() {
                                 overridePriceKes: e.target.value ? Number(e.target.value) : undefined,
                               })
                             }
-                            className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-canvas)] border text-xs font-mono-tabular ${
-                              item.isPriceBelowSchedule
-                                ? 'border-amber-500 text-amber-700 dark:text-amber-300'
-                                : 'border-[var(--border-subtle)]'
-                            }`}
+                            className={`ui-field w-full font-mono-tabular ${item.isPriceBelowSchedule ? 'border-[var(--status-warning-border)] text-[var(--status-warning-fg)]' : ''}`}
                           />
                           {item.isPriceBelowSchedule && (
-                            <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
+                            <div className="text-xs text-[var(--status-warning-fg)] mt-0.5">
                               Below schedule (Needs approval)
                             </div>
                           )}
@@ -1166,7 +1159,7 @@ function OrdersWorkbenchContent() {
                         {/* Line Total & Remove */}
                         <div className="sm:col-span-2 flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-4">
                           <div className="text-right">
-                            <div className="text-[10px] text-[var(--text-secondary)]">Line Total</div>
+                            <div className="ui-meta">Line Total</div>
                             <div className="font-mono-tabular font-semibold text-xs text-[var(--text-primary)]">
                               KES {item.lineTotal.toLocaleString()}
                             </div>
@@ -1175,7 +1168,7 @@ function OrdersWorkbenchContent() {
                             type="button"
                             disabled={formItems.length <= 1}
                             onClick={() => handleRemoveItem(item.id)}
-                            className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            className="ui-button ui-button-ghost ui-button-icon ui-button-compact hover:bg-[var(--status-danger-bg)] hover:text-[var(--status-danger-fg)]"
                             aria-label="Remove item"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1186,10 +1179,10 @@ function OrdersWorkbenchContent() {
                       {/* Sourcing Strategy Row (Hybrid Operating Model) */}
                       <div className="pt-2.5 border-t border-[var(--border-subtle)]/70 grid grid-cols-1 sm:grid-cols-12 gap-3 items-center text-xs">
                         <div className="sm:col-span-4">
-                          <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1">
+                          <label htmlFor={`order-source-${item.id}`} className="ui-label block mb-1">
                             Sourcing Fulfillment Mode
                           </label>
-                          <select
+                          <select id={`order-source-${item.id}`}
                             value={item.sourcingMode}
                             onChange={(e) =>
                               handleUpdateItem(item.id, {
@@ -1197,7 +1190,7 @@ function OrdersWorkbenchContent() {
                                 stockAllocatedQty: undefined,
                               })
                             }
-                            className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px] font-medium cursor-pointer"
+                            className="ui-field w-full"
                           >
                             <option value="direct_procurement">Farm-to-Client Direct Procurement</option>
                             <option value="existing_stock">Warehouse FEFO Stock</option>
@@ -1209,10 +1202,10 @@ function OrdersWorkbenchContent() {
                         {(isDirect || isMixed) ? (
                           <>
                             <div className="sm:col-span-5">
-                              <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1">
+                              <label htmlFor={`order-supplier-${item.id}`} className="ui-label block mb-1">
                                 Sourcing Farm / Cooperative
                               </label>
-                              <select
+                              <select id={`order-supplier-${item.id}`}
                                 value={item.supplierId || ''}
                                 onChange={(e) => {
                                   const selectedSup = item.quotingSuppliers?.find((s) => s.supplierId === e.target.value);
@@ -1222,7 +1215,7 @@ function OrdersWorkbenchContent() {
                                     purchaseCostKes: selectedSup?.quotingPriceKes,
                                   });
                                 }}
-                                className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px] cursor-pointer"
+                                className="ui-field w-full"
                               >
                                 <option value="">No preferred supplier</option>
                                 {item.quotingSuppliers && item.quotingSuppliers.length > 0 && (
@@ -1236,10 +1229,10 @@ function OrdersWorkbenchContent() {
                             </div>
 
                             <div className="sm:col-span-3">
-                              <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1">
+                              <label htmlFor={`order-source-cost-${item.id}`} className="ui-label block mb-1">
                                 Est. Purchase Cost (KES/{prod?.unit})
                               </label>
-                              <input
+                              <input id={`order-source-cost-${item.id}`}
                                 type="number"
                                 value={item.purchaseCostKes || ''}
                                 onChange={(e) =>
@@ -1248,22 +1241,22 @@ function OrdersWorkbenchContent() {
                                   })
                                 }
                                 placeholder="Farmgate cost"
-                                className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px] font-mono-tabular"
+                                className="ui-field w-full font-mono-tabular"
                               />
                             </div>
                           </>
                         ) : (
-                          <div className="sm:col-span-8 flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
-                            <span className="font-semibold text-[#1F6A37] dark:text-[#4EB462]">FEFO Warehouse Allocation:</span>
+                          <div className="sm:col-span-8 flex items-center gap-2 ui-meta">
+                            <span className="font-semibold text-[var(--brand-accent)]">FEFO Warehouse Allocation:</span>
                             <span>{item.quantity} {prod?.unit} to reserve from available stock.</span>
                           </div>
                         )}
                         {isMixed && (
                           <div className="grid items-end gap-3 sm:col-span-12 sm:grid-cols-2">
-                            <label className="text-sm">Reserve from stock ({prod?.unit})
+                            <label className="ui-label">Reserve from stock ({prod?.unit})
                               <input type="number" min="0" step="any" max={Math.min(item.quantity, item.availableStock)}
                                 value={item.stockAllocatedQty} onChange={(e) => handleUpdateItem(item.id, { stockAllocatedQty: e.target.value === '' ? undefined : Number(e.target.value) })}
-                                className="mt-1 block h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-sm" />
+                                className="ui-field mt-1 block w-full" />
                             </label>
                             <p className="py-2 text-sm text-[var(--text-secondary)]">Source directly <strong className="text-[var(--text-primary)]">{item.directProcuredQty} {prod?.unit}</strong></p>
                           </div>
@@ -1276,34 +1269,34 @@ function OrdersWorkbenchContent() {
             </div>
 
             {/* Live Order Summary Bar (Section 3.3) */}
-            <div className="p-4 rounded-xl bg-[#08190C] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="ui-surface bg-[var(--bg-subtle)] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-6">
                 <div>
-                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Distinct SKUs</div>
+                  <div className="ui-meta">Distinct SKUs</div>
                   <div className="text-base font-semibold">{formItems.length} Products</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Direct Procurement</div>
-                  <div className="text-base font-semibold font-mono-tabular text-[#4EB462]">
+                  <div className="ui-meta">Direct Procurement</div>
+                  <div className="text-base font-semibold font-mono-tabular text-[var(--brand-accent)]">
                     {totalDirectProcuredUnits} Units
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Hub Stock Allocation</div>
-                  <div className="text-base font-semibold font-mono-tabular text-emerald-300">
+                  <div className="ui-meta">Hub Stock Allocation</div>
+                  <div className="text-base font-semibold font-mono-tabular text-[var(--status-success-fg)]">
                     {totalStockAllocatedUnits} Units
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Logistics Flow</div>
+                  <div className="ui-meta">Logistics Flow</div>
                   <div className="text-xs font-semibold flex items-center gap-1 mt-0.5">
                     {totalDirectProcuredUnits > 0 ? (
-                      <span className="text-[#4EB462] inline-flex items-center gap-1">
+                      <span className="text-[var(--brand-accent)] inline-flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Farm-to-Client Demand Flow</span>
                       </span>
                     ) : (
-                      <span className="text-emerald-300 inline-flex items-center gap-1">
+                      <span className="text-[var(--status-success-fg)] inline-flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>100% Stock Allocated</span>
                       </span>
@@ -1312,9 +1305,9 @@ function OrdersWorkbenchContent() {
                 </div>
               </div>
 
-              <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-white/10">
-                <div className="text-[10px] text-white/60 uppercase tracking-wider">Invoiced Total (KES)</div>
-                <div className="text-xl font-bold font-mono-tabular text-[#4EB462]">
+              <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border-subtle)]">
+                <div className="ui-meta">Invoiced Total (KES)</div>
+                <div className="text-xl font-bold font-mono-tabular text-[var(--brand-accent)]">
                   KES {orderSubtotalKes.toLocaleString()}
                 </div>
               </div>
@@ -1322,15 +1315,15 @@ function OrdersWorkbenchContent() {
 
             {/* Notes */}
             <div>
-              <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+              <label htmlFor="orders-notes" className="ui-label block mb-1">
                 Fulfillment Notes & Instructions
               </label>
-              <textarea
+              <textarea id="orders-notes"
                 rows={2}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Specific packing requirements, cold room segregation, or driver notes..."
-                className="w-full p-2.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
 
@@ -1339,13 +1332,13 @@ function OrdersWorkbenchContent() {
               <button
                 type="button"
                 onClick={() => setCreateOpen(false)}
-                className="h-10 px-4 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+                className="ui-button ui-button-secondary"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="h-10 px-5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-sm"
+                className="ui-button ui-button-primary"
               >
                 <span>Review Order & Allocations</span>
                 <ArrowRight className="w-4 h-4" />
@@ -1358,48 +1351,48 @@ function OrdersWorkbenchContent() {
             <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
                 <div>
-                  <div className="text-[11px] text-[var(--text-secondary)]">Client Institution</div>
+                  <div className="ui-meta">Client Institution</div>
                   <div className="font-semibold text-[var(--text-primary)] mt-0.5">
                     {selectedCustomer?.name}
                   </div>
-                  <div className="text-[10px] text-[var(--text-secondary)]">
+                  <div className="ui-meta">
                     {selectedCustomer?.segment} · {selectedCustomer?.paymentTerms}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[11px] text-[var(--text-secondary)]">Delivery Destination</div>
+                  <div className="ui-meta">Delivery Destination</div>
                   <div className="font-medium text-[var(--text-primary)] mt-0.5">
                     {deliveryAddress || 'Standard Warehouse Dispatch'}
                   </div>
-                  <div className="text-[10px] text-[var(--text-secondary)]">
+                  <div className="ui-meta">
                     Target: {deliveryDate} · Hub: {warehouseName}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[11px] text-[var(--text-secondary)]">Order Channel & PO</div>
+                  <div className="ui-meta">Order Channel & PO</div>
                   <div className="font-medium text-[var(--text-primary)] mt-0.5">
                     {channel}
                   </div>
-                  <div className="text-[10px] text-[var(--text-secondary)] font-mono-tabular">
+                  <div className="ui-meta font-mono-tabular">
                     Ref: {orderReference || 'N/A'}
                   </div>
                 </div>
               </div>
             </div>
 
-            {composerError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/30 dark:text-red-200">{composerError}</p>}
+            {composerError && <p role="alert" className="rounded-lg bg-[var(--status-danger-bg)] p-3 text-sm text-[var(--status-danger-fg)]">{composerError}</p>}
 
             {/* Warnings banner if shortage or overrides exist */}
             {(hasAnyShortage || hasAnyApprovalRequired) && (
-              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+              <div className="p-3.5 rounded-xl bg-[var(--status-warning-bg)] border border-[var(--status-warning-border)] text-xs space-y-1">
                 {hasAnyShortage && (
-                  <div className="text-amber-800 dark:text-amber-300 flex items-center gap-1.5 font-medium">
+                  <div className="text-[var(--status-warning-fg)] flex items-center gap-1.5 font-medium">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     <span>Adjust the stock quantities or switch the affected lines to mixed or direct sourcing.</span>
                   </div>
                 )}
                 {hasAnyApprovalRequired && (
-                  <div className="text-amber-800 dark:text-amber-300 flex items-center gap-1.5 font-medium">
+                  <div className="text-[var(--status-warning-fg)] flex items-center gap-1.5 font-medium">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     <span>Price overrides below schedule will trigger commercial supervisor sign-off.</span>
                   </div>
@@ -1408,10 +1401,10 @@ function OrdersWorkbenchContent() {
             )}
 
             {/* Itemized Table */}
-            <div className="border border-[var(--border-subtle)] rounded-xl overflow-hidden">
-              <table className="w-full text-left border-collapse text-xs">
+            <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
+              <table className="ui-table w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                  <tr className="border-b border-[var(--border-subtle)]">
                     <th className="py-2.5 px-3">#</th>
                     <th className="py-2.5 px-3">Product SKU</th>
                     <th className="py-2.5 px-3 text-right">Quantity</th>
@@ -1426,7 +1419,7 @@ function OrdersWorkbenchContent() {
                       <td className="py-2.5 px-3 text-[var(--text-secondary)]">{idx + 1}</td>
                       <td className="py-2.5 px-3">
                         <div className="font-medium text-[var(--text-primary)]">{item.product?.name}</div>
-                        <div className="text-[10px] text-[var(--text-secondary)] font-mono-tabular">
+                        <div className="ui-meta font-mono-tabular">
                           {item.product?.sku}
                         </div>
                       </td>
@@ -1434,7 +1427,7 @@ function OrdersWorkbenchContent() {
                         {item.quantity} {item.product?.unit}
                       </td>
                       <td className="py-2.5 px-3">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-medium">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-medium">
                           {item.pricingTier}
                         </span>
                       </td>
@@ -1452,7 +1445,7 @@ function OrdersWorkbenchContent() {
                     <td colSpan={5} className="py-3 px-3 text-right text-xs">
                       Grand Order Total:
                     </td>
-                    <td className="py-3 px-3 text-right font-mono-tabular text-sm text-[#1F6A37] dark:text-[#4EB462]">
+                    <td className="py-3 px-3 text-right font-mono-tabular text-sm text-[var(--brand-accent)]">
                       KES {orderSubtotalKes.toLocaleString()}
                     </td>
                   </tr>
@@ -1465,7 +1458,7 @@ function OrdersWorkbenchContent() {
               <button
                 type="button"
                 onClick={() => setComposerStep('compose')}
-                className="h-10 px-4 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+                className="ui-button ui-button-secondary"
               >
                 Back to Edit
               </button>
@@ -1474,7 +1467,7 @@ function OrdersWorkbenchContent() {
                   type="button"
                   onClick={() => handleCreateOrder(true)}
                   disabled={submittingOrder}
-                  className="h-10 px-4 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+                  className="ui-button ui-button-secondary"
                 >
                   Save as Draft
                 </button>
@@ -1482,7 +1475,7 @@ function OrdersWorkbenchContent() {
                   type="button"
                   onClick={() => handleCreateOrder(false)}
                   disabled={submittingOrder || hasAnyShortage}
-                  className="h-10 px-5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  className="ui-button ui-button-primary"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>{submittingOrder ? 'Creating order…' : 'Confirm order'}</span>

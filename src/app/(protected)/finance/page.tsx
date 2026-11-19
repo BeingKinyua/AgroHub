@@ -59,7 +59,7 @@ function FinanceContent() {
         title="Accounts"
         description="Review customer balances, supplier obligations, and recorded payments."
         actions={canRecordReceipts && (
-          <Link href="/payments" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#1F6A37] px-4 text-sm font-semibold text-white hover:bg-[#12512C]">
+          <Link href="/payments" className="ui-button ui-button-primary">
             <Plus className="size-4" aria-hidden="true" /> Record receipt
           </Link>
         )}
@@ -75,9 +75,7 @@ function FinanceContent() {
       <nav aria-label="Accounts" className="flex flex-wrap gap-2">
         {tabs.map((tab) => (
           <Link key={tab.id} href={tab.href} aria-current={activeTab === tab.id ? 'page' : undefined}
-            className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold ${activeTab === tab.id
-              ? 'bg-[var(--bg-subtle)] text-[var(--brand-accent)]'
-              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]'}`}
+            className="ui-tab"
           >
             {tab.label}
           </Link>
@@ -87,9 +85,9 @@ function FinanceContent() {
       {activeTab === 'payables' ? (
         <Card padding="p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-heading text-lg font-semibold">Open supplier payables</h2>
+            <h2 className="ui-section-title">Open supplier payables</h2>
             {can('suppliers.view') && (
-              <Link href="/suppliers?tab=payables" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--brand-accent)] hover:underline">
+              <Link href="/suppliers?tab=payables" className="ui-button ui-button-secondary">
                 Supplier accounts <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
             )}
@@ -102,7 +100,7 @@ function FinanceContent() {
                 <li key={payable.id} className="grid gap-1 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
                   <div>
                     <p className="text-sm font-semibold">{payable.supplierName}</p>
-                    <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{[payable.poNumber, payable.invoiceRef, payable.dueDate && 'Due ' + payable.dueDate].filter(Boolean).join(' · ')}</p>
+                    <p className="ui-meta mt-0.5">{[payable.poNumber, payable.invoiceRef, payable.dueDate && 'Due ' + payable.dueDate].filter(Boolean).join(' · ')}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-sm sm:justify-end">
                     <strong className="font-mono-tabular">{kes(payable.balanceKes)}</strong>
@@ -116,8 +114,8 @@ function FinanceContent() {
       ) : activeTab === 'payments' ? (
         <Card padding="p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-heading text-lg font-semibold">Recorded payments</h2>
-            <Link href="/payments" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--brand-accent)] hover:underline">
+            <h2 className="ui-section-title">Recorded payments</h2>
+            <Link href="/payments" className="ui-button ui-button-secondary">
               Customer payment register <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
           </div>
@@ -129,7 +127,7 @@ function FinanceContent() {
                 <li key={payment.id} className="grid gap-1 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">{payment.counterparty}</p>
-                    <p className="mt-0.5 break-words text-xs text-[var(--text-secondary)]">
+                    <p className="ui-meta mt-0.5 wrap-break-word">
                       {[payment.date, payment.reference, payment.allocation].filter(Boolean).join(' · ')}
                     </p>
                   </div>
@@ -145,12 +143,12 @@ function FinanceContent() {
       ) : (
         <Card padding="p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-heading text-lg font-semibold">Open customer invoices</h2>
-            <div className="flex flex-wrap items-center gap-3 text-sm font-semibold text-[var(--brand-accent)]">
-              <Link href={searchParams.get('status') === 'overdue' ? '/finance' : '/finance?status=overdue'} className="inline-flex min-h-11 items-center hover:underline">
+            <h2 className="ui-section-title">Open customer invoices</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href={searchParams.get('status') === 'overdue' ? '/finance' : '/finance?status=overdue'} className="ui-button ui-button-ghost">
                 {searchParams.get('status') === 'overdue' ? 'Show all open' : 'Show overdue'}
               </Link>
-              <Link href="/invoices" className="inline-flex min-h-11 items-center gap-2 hover:underline">
+              <Link href="/invoices" className="ui-button ui-button-secondary">
                 All invoices <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
             </div>
@@ -163,13 +161,13 @@ function FinanceContent() {
                 <li key={invoice.id} className="grid gap-1 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
                   <div>
                     <p className="text-sm font-semibold">{invoice.customerName}</p>
-                    <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{invoice.invoiceNumber} · Due {invoice.dueDate}</p>
+                    <p className="ui-meta mt-0.5">{invoice.invoiceNumber} · Due {invoice.dueDate}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-sm sm:justify-end">
                     <strong className="font-mono-tabular">{kes(invoice.balanceKes)}</strong>
                     <StatusBadge status={invoice.dueDate && invoice.dueDate < today ? 'Overdue' : invoice.status} />
                     {canRecordReceipts && (
-                      <Link href={'/payments?invoice=' + encodeURIComponent(invoice.invoiceNumber)} className="inline-flex min-h-11 items-center font-semibold text-[var(--brand-accent)] hover:underline">
+                      <Link href={'/payments?invoice=' + encodeURIComponent(invoice.invoiceNumber)} className="ui-button ui-button-secondary ui-button-compact">
                         Record receipt
                       </Link>
                     )}

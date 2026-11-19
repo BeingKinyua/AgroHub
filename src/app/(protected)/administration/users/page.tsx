@@ -109,11 +109,6 @@ export default function UsersAdministrationPage() {
   return (
     <div>
       <PageHeader
-        breadcrumbs={[
-          { label: 'Workspace', href: '/dashboard' },
-          { label: 'Administration' },
-          { label: 'Internal Operators' },
-        ]}
         title="Workspace users"
         description="Invite employees, assign roles, and manage account access."
         actions={
@@ -121,7 +116,7 @@ export default function UsersAdministrationPage() {
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
-              className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               <UserPlus className="w-4 h-4" />
               <span>Invite Internal Member</span>
@@ -175,15 +170,15 @@ export default function UsersAdministrationPage() {
         mobileDrawerContent={
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+              <label htmlFor="administration/users-status" className="ui-label block mb-1">
                 Account State
               </label>
-              <select
+              <select id="administration/users-status"
                 value={statusFilter}
                 onChange={(e) =>
                   setStatusFilter(e.target.value as 'All' | AccountStatus)
                 }
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 {STATUS_FILTERS.map((s) => (
                   <option key={s} value={s}>
@@ -193,13 +188,13 @@ export default function UsersAdministrationPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+              <label htmlFor="administration/users-role-filter" className="ui-label block mb-1">
                 RBAC Role
               </label>
-              <select
+              <select id="administration/users-role-filter"
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 <option value="All">All Roles</option>
                 {roles.map((r) => (
@@ -214,28 +209,26 @@ export default function UsersAdministrationPage() {
       >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="pointer-events-none w-4 h-4 text-[var(--text-secondary)] absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
             <input
-              type="text"
+              type="search"
+              aria-label="Search workspace users"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search operators by name, @nickname, work email, branch..."
-              className="w-full h-10 pl-9 pr-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+              className="ui-field w-full pl-9 pr-3.5"
             />
           </div>
 
           <div className="hidden sm:flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-canvas)]">
+            <div className="flex flex-wrap items-center gap-1 rounded-lg bg-[var(--bg-subtle)] p-1">
               {STATUS_FILTERS.map((st) => (
                 <button
                   key={st}
                   type="button"
                   onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                    statusFilter === st
-                      ? 'bg-[#1F6A37] text-white'
-                      : 'bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
+                  aria-pressed={statusFilter === st}
+                  className="ui-tab whitespace-nowrap"
                 >
                   {st}
                 </button>
@@ -246,7 +239,7 @@ export default function UsersAdministrationPage() {
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
               aria-label="Filter by Role"
-              className="h-9 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="ui-field"
             >
               <option value="All">All RBAC Roles</option>
               {roles.map((r) => (
@@ -267,9 +260,9 @@ export default function UsersAdministrationPage() {
       ) : (
         <Card padding="p-0" className="overflow-hidden">
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="ui-table w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
+                <tr className="border-b border-[var(--border-subtle)]">
                   <th className="py-3.5 px-4">Operator Identity</th>
                   <th className="py-3.5 px-4">RBAC Role</th>
                   <th className="py-3.5 px-4">Department & Hub Branch</th>
@@ -280,7 +273,7 @@ export default function UsersAdministrationPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {filteredUsers.map((u) => (
                   <tr
                     key={u.id}
@@ -296,11 +289,11 @@ export default function UsersAdministrationPage() {
                         <div>
                           <div className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
                             <span>{u.fullName}</span>
-                            <span className="font-mono-tabular text-[11px] text-[#1F6A37] dark:text-[#4EB462]">
+                            <span className="font-mono-tabular text-xs text-[var(--brand-accent)]">
                               @{u.nickname}
                             </span>
                           </div>
-                          <div className="font-mono-tabular text-[11px] text-[var(--text-secondary)]">
+                          <div className="font-mono-tabular ui-meta">
                             {u.email} · {u.phone}
                           </div>
                         </div>
@@ -313,12 +306,12 @@ export default function UsersAdministrationPage() {
                     </td>
                     <td className="py-3.5 px-4">
                       <div>{u.department}</div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">
+                      <div className="ui-meta">
                         {u.branch}
                       </div>
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="text-[11px] text-[var(--text-secondary)]">
+                      <div className="ui-meta">
                         By {u.invitedBy}
                       </div>
                       <div className="font-medium mt-0.5">{u.lastActiveAt}</div>
@@ -338,7 +331,7 @@ export default function UsersAdministrationPage() {
                                   nextStatus: 'Active',
                                 })
                               }
-                              className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                              className="ui-button ui-button-primary ui-button-compact"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               <span>Activate</span>
@@ -353,7 +346,7 @@ export default function UsersAdministrationPage() {
                                   nextStatus: 'Suspended',
                                 })
                               }
-                              className="px-3 py-1.5 rounded-full border border-amber-500/35 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 text-xs font-medium cursor-pointer"
+                              className="ui-button ui-button-secondary ui-button-compact hover:border-[var(--status-warning-border)] hover:bg-[var(--status-warning-bg)] hover:text-[var(--status-warning-fg)]"
                             >
                               Suspend
                             </button>
@@ -367,14 +360,14 @@ export default function UsersAdministrationPage() {
                                   nextStatus: 'Disabled',
                                 })
                               }
-                              className="px-3 py-1.5 rounded-full border border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-500/10 text-xs font-medium cursor-pointer"
+                              className="ui-button ui-button-danger ui-button-compact"
                             >
                               Disable
                             </button>
                           )}
                         </div>
                       ) : (
-                        <span className="text-[11px] text-[var(--text-secondary)] inline-flex items-center gap-1">
+                        <span className="ui-meta inline-flex items-center gap-1">
                           <Lock className="w-3 h-3" />
                           <span>Read-only</span>
                         </span>
@@ -401,7 +394,7 @@ export default function UsersAdministrationPage() {
                       <div className="text-xs font-semibold truncate">
                         {u.fullName} (@{u.nickname})
                       </div>
-                      <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                      <div className="ui-meta truncate">
                         {u.email}
                       </div>
                     </div>
@@ -409,7 +402,7 @@ export default function UsersAdministrationPage() {
                   <StatusBadge status={u.status} />
                 </div>
 
-                <div className="text-[11px] text-[var(--text-secondary)]">
+                <div className="ui-meta">
                   <strong>{u.roleName}</strong> · {u.department} ({u.branch})
                 </div>
 
@@ -421,7 +414,7 @@ export default function UsersAdministrationPage() {
                         onClick={() =>
                           setPendingAction({ user: u, nextStatus: 'Active' })
                         }
-                        className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
+                        className="ui-button ui-button-primary ui-button-compact"
                       >
                         Activate
                       </button>
@@ -435,7 +428,7 @@ export default function UsersAdministrationPage() {
                             nextStatus: 'Suspended',
                           })
                         }
-                        className="px-3 py-1.5 rounded-full border border-amber-500/35 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 text-xs font-medium cursor-pointer"
+                        className="ui-button ui-button-secondary ui-button-compact hover:border-[var(--status-warning-border)] hover:bg-[var(--status-warning-bg)] hover:text-[var(--status-warning-fg)]"
                       >
                         Suspend
                       </button>
@@ -449,7 +442,7 @@ export default function UsersAdministrationPage() {
                             nextStatus: 'Disabled',
                           })
                         }
-                        className="px-3 py-1.5 rounded-full border border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-500/10 text-xs font-medium cursor-pointer"
+                        className="ui-button ui-button-danger ui-button-compact"
                       >
                         Disable
                       </button>
@@ -472,68 +465,68 @@ export default function UsersAdministrationPage() {
         <form onSubmit={handleInviteSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="administration/users-name" className="ui-label block mb-1">
                 Full Name
               </label>
-              <input
+              <input id="administration/users-name"
                 type="text"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="e.g., Esther Nyambura"
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="administration/users-nickname" className="ui-label block mb-1">
                 Workspace Nickname
               </label>
-              <input
+              <input id="administration/users-nickname"
                 type="text"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 placeholder="e.g., Esther"
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="administration/users-email" className="ui-label block mb-1">
                 Work Email
               </label>
-              <input
+              <input id="administration/users-email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="e.nyambura@agrodeliveries.co.ke"
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="administration/users-phone" className="ui-label block mb-1">
                 Phone Number (KE)
               </label>
-              <input
+              <input id="administration/users-phone"
                 type="text"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                className="ui-field w-full font-mono-tabular"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium mb-1">
+            <label htmlFor="administration/users-role" className="ui-label block mb-1">
               Assign Internal RBAC Role
             </label>
-            <select
+            <select id="administration/users-role"
               value={roleId}
               onChange={(e) => setRoleId(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="ui-field w-full"
             >
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -545,25 +538,25 @@ export default function UsersAdministrationPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="administration/users-department" className="ui-label block mb-1">
                 Department
               </label>
-              <input
+              <input id="administration/users-department"
                 type="text"
                 required
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="administration/users-branch" className="ui-label block mb-1">
                 Assigned Hub Branch
               </label>
-              <select
+              <select id="administration/users-branch"
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 <option value="Nairobi HQ (Industrial Area)">
                   Nairobi HQ (Industrial Area)
@@ -581,13 +574,13 @@ export default function UsersAdministrationPage() {
             <button
               type="button"
               onClick={() => setInviteOpen(false)}
-              className="h-10 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               <Plus className="w-4 h-4" />
               <span>Send Workspace Invitation</span>

@@ -38,19 +38,19 @@ function CapturePOD({ run, order, onClose, onRecorded }: {
   return (
     <PODQuantityForm mode="capture" expected={getPODExpectedLines(order, podRecords)} onSubmit={save} onCancel={onClose}>
       <div className="grid gap-3 sm:grid-cols-3">
-        <label className="space-y-1 text-sm font-medium">
+        <label className="ui-label space-y-1">
           <span>Recipient name</span>
           <input className={podInputClass} value={recipient} onChange={(event) => setRecipient(event.target.value)} required />
         </label>
-        <label className="space-y-1 text-sm font-medium">
+        <label className="ui-label space-y-1">
           <span>Recipient role (optional)</span>
           <input className={podInputClass} value={role} onChange={(event) => setRole(event.target.value)} />
         </label>
-        <label className="space-y-1 text-sm font-medium">
+        <label className="ui-label space-y-1">
           <span>Receiving department (optional)</span>
           <input className={podInputClass} value={department} onChange={(event) => setDepartment(event.target.value)} />
         </label>
-        <label className="space-y-1 text-sm font-medium sm:col-span-3">
+        <label className="ui-label space-y-1 sm:col-span-3">
           <span>Delivery notes (optional)</span>
           <textarea className={podInputClass} rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
         </label>
@@ -86,7 +86,7 @@ function AssignFleet({ run, onClose, onSaved }: {
 
   return (
     <form className="space-y-4" onSubmit={save}>
-      <label className="block space-y-1 text-sm font-medium">
+      <label className="ui-label block space-y-1">
         <span>Vehicle</span>
         <select className={podInputClass} value={vehicleId} onChange={(event) => setVehicleId(event.target.value)} required>
           <option value="">Select a vehicle</option>
@@ -94,7 +94,7 @@ function AssignFleet({ run, onClose, onSaved }: {
             <option key={vehicle.id} value={vehicle.id}>{vehicle.registration} · {vehicle.makeModel}</option>)}
         </select>
       </label>
-      <label className="block space-y-1 text-sm font-medium">
+      <label className="ui-label block space-y-1">
         <span>Driver</span>
         <select className={podInputClass} value={driverId} onChange={(event) => setDriverId(event.target.value)} required>
           <option value="">Select a driver</option>
@@ -102,11 +102,11 @@ function AssignFleet({ run, onClose, onSaved }: {
             <option key={driver.id} value={driver.id}>{driver.fullName}</option>)}
         </select>
       </label>
-      <label className="block space-y-1 text-sm font-medium">
+      <label className="ui-label block space-y-1">
         <span>Transport cost (KES, optional)</span>
         <input className={podInputClass} type="number" min="0" step="0.01" value={cost} onChange={(event) => setCost(event.target.value)} />
       </label>
-      {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p role="alert" className="text-sm text-[var(--status-danger-fg)]">{error}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" className={podSecondaryClass} onClick={onClose} disabled={pending}>Cancel</button>
         <button type="submit" className={podPrimaryClass} disabled={pending}>{pending ? 'Saving…' : 'Save assignment'}</button>
@@ -142,19 +142,19 @@ function PlanRun({ orderNumber, onClose, onSaved }: { orderNumber?: string; onCl
 
   return (
     <form className="space-y-4" onSubmit={save}>
-      <label className="block space-y-1 text-sm font-medium"><span>Route name</span><input required className={podInputClass} value={routeZone} onChange={(event) => setRouteZone(event.target.value)} /></label>
+      <label className="ui-label block space-y-1"><span>Route name</span><input required className={podInputClass} value={routeZone} onChange={(event) => setRouteZone(event.target.value)} /></label>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block space-y-1 text-sm font-medium"><span>Delivery date</span><input type="date" required className={podInputClass} value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} /></label>
-        <label className="block space-y-1 text-sm font-medium"><span>Departure time (EAT)</span><input type="time" required className={podInputClass} value={departureTime} onChange={(event) => setDepartureTime(event.target.value)} /></label>
+        <label className="ui-label block space-y-1"><span>Delivery date</span><input type="date" required className={podInputClass} value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} /></label>
+        <label className="ui-label block space-y-1"><span>Departure time (EAT)</span><input type="time" required className={podInputClass} value={departureTime} onChange={(event) => setDepartureTime(event.target.value)} /></label>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block space-y-1 text-sm font-medium"><span>Vehicle</span>
+        <label className="ui-label block space-y-1"><span>Vehicle</span>
           <select required className={podInputClass} value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}>
             <option value="">Select a vehicle</option>
             {vehicles.filter((vehicle) => !['Maintenance', 'Out of Service'].includes(vehicle.status)).map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.registration}</option>)}
           </select>
         </label>
-        <label className="block space-y-1 text-sm font-medium"><span>Driver</span>
+        <label className="ui-label block space-y-1"><span>Driver</span>
           <select required className={podInputClass} value={driverId} onChange={(event) => setDriverId(event.target.value)}>
             <option value="">Select a driver</option>
             {drivers.filter((driver) => !['Leave', 'Off Duty'].includes(driver.status)).map((driver) => <option key={driver.id} value={driver.id}>{driver.fullName}</option>)}
@@ -165,14 +165,14 @@ function PlanRun({ orderNumber, onClose, onSaved }: { orderNumber?: string; onCl
         <legend className="px-1 text-sm font-semibold">Packed orders</legend>
         {available.length === 0 && <p className="text-sm text-[var(--text-secondary)]">No packed orders are available to add to a run.</p>}
         {available.map((order) => (
-          <label key={order.id} className="flex min-h-11 items-center gap-3 text-sm">
+          <label key={order.id} className="ui-label flex min-h-11 items-center gap-3">
             <input type="checkbox" checked={orderIds.includes(order.id)} className="size-5 shrink-0 accent-[var(--brand-accent)]"
               onChange={(event) => setOrderIds((current) => event.target.checked ? [...current, order.id] : current.filter((id) => id !== order.id))} />
             {order.orderNumber} · {order.customerName}
           </label>
         ))}
       </fieldset>
-      {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p role="alert" className="text-sm text-[var(--status-danger-fg)]">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2">
         <button type="button" disabled={pending} onClick={onClose} className={podSecondaryClass}>Cancel</button>
         <button type="submit" disabled={pending || !orderIds.length} className={podPrimaryClass}>{pending ? 'Saving…' : 'Plan run'}</button>
@@ -248,7 +248,7 @@ function DeliveriesContent() {
       <div className="flex flex-wrap gap-2" aria-label="Filter delivery runs" role="group">
         {filters.map((item) => (
           <Link key={item.id} href={`/deliveries?${new URLSearchParams({ filter: item.id, ...(orderFilter ? { order: orderFilter } : {}) })}`} aria-current={filter === item.id ? 'page' : undefined}
-            className={filter === item.id ? podPrimaryClass : podSecondaryClass}>
+            className="ui-tab">
             {item.label} ({item.list.length})
           </Link>
         ))}
@@ -267,7 +267,7 @@ function DeliveriesContent() {
                       <span className="text-sm font-semibold tabular-nums">{run.runNumber}</span>
                       <StatusBadge status={run.status === 'Delivered' ? 'Arrivals recorded' : run.status} />
                     </div>
-                    <h2 className="flex items-start gap-2 text-base font-semibold"><MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />{run.routeZone}</h2>
+                    <h2 className="ui-section-title flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />{run.routeZone}</h2>
                     <p className="text-sm text-[var(--text-secondary)]">{run.driverName} · {run.vehicleReg}</p>
                     <p className="text-sm text-[var(--text-secondary)]">{[run.scheduledDate, run.departureTime].filter(Boolean).join(' · ')} · {arrivals} of {stops.length} stops recorded</p>
                   </div>
@@ -299,7 +299,7 @@ function DeliveriesContent() {
               {isDispatch(activeRun) && (can('deliveries.assign') || can('fleet.manage')) &&
                 <button type="button" className={podSecondaryClass} onClick={() => { setActiveRunId(null); setAssignRunId(activeRun.id); }}>Assign fleet</button>}
             </div>
-            <h3 className="text-base font-semibold">Customer stops</h3>
+            <h3 className="ui-section-title">Customer stops</h3>
             <ul className="space-y-2">
               {getDeliveryRunStops(activeRun, orders, podRecords).map(({ identifier, order, stop, receipt, customer }) => (
                 <li key={identifier} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-[var(--border-subtle)] p-3">

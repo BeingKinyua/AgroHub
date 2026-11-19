@@ -13,7 +13,6 @@ import {
   PageHeader,
   StatusBadge,
 } from '@/components/ui/primitives';
-import { podInputClass, podPrimaryClass, podSecondaryClass } from '@/components/ui/PODQuantityForm';
 import { PaymentRecord } from '@/types/domain/bos';
 
 function PaymentsContent({ invoiceNumber }: { invoiceNumber: string }) {
@@ -69,14 +68,14 @@ function PaymentsContent({ invoiceNumber }: { invoiceNumber: string }) {
         description="Allocate customer receipts to invoices and reconcile recorded transactions."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {can('suppliers.view') && <Link href="/suppliers" className={podSecondaryClass}>Supplier accounts</Link>}
+            {can('suppliers.view') && <Link href="/suppliers" className="ui-button ui-button-secondary">Supplier accounts</Link>}
             {canAllocate && (
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className={podPrimaryClass}
+              className="ui-button ui-button-primary"
             >
-              <Plus className="mr-2 size-4" aria-hidden="true" />
+              <Plus className="size-4" aria-hidden="true" />
               <span>Record customer payment</span>
             </button>
             )}
@@ -118,37 +117,37 @@ function PaymentsContent({ invoiceNumber }: { invoiceNumber: string }) {
       </div>
 
       <Card padding="p-0" className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto" role="region" aria-label="Recorded payments" tabIndex={0}>
+          <table className="ui-table text-left">
             <thead>
-              <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
-                <th className="py-3 px-4">Transaction Reference</th>
-                <th className="py-3 px-4">Direction & Method</th>
-                <th className="py-3 px-4">Counterparty</th>
-                <th className="py-3 px-4">Allocated Document</th>
-                <th className="py-3 px-4 text-right">Amount (KES)</th>
-                <th className="py-3 px-4">Reconciliation</th>
+              <tr>
+                <th scope="col" className="px-4 py-3">Transaction Reference</th>
+                <th scope="col" className="px-4 py-3">Direction & Method</th>
+                <th scope="col" className="px-4 py-3">Counterparty</th>
+                <th scope="col" className="px-4 py-3">Allocated Document</th>
+                <th scope="col" className="px-4 py-3 text-right">Amount (KES)</th>
+                <th scope="col" className="px-4 py-3">Reconciliation</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+            <tbody>
               {payments.map((p) => (
-                <tr key={p.id} className="hover:bg-[var(--bg-canvas)]/60">
+                <tr key={p.id}>
                   <td className="py-3.5 px-4 font-mono-tabular font-semibold text-[var(--text-primary)]">
                     {p.referenceCode}
-                    <div className="text-[11px] font-normal text-[var(--text-secondary)]">
+                    <div className="ui-meta font-sans font-normal">
                       {p.date} · By {p.recordedBy}
                     </div>
                   </td>
                   <td className="py-3.5 px-4">
                     <div>{p.direction}</div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">
+                    <div className="ui-meta">
                       {p.method}
                     </div>
                   </td>
                   <td className="py-3.5 px-4 font-medium">
                     {p.counterpartyName}
                   </td>
-                  <td className="py-3.5 px-4 font-mono-tabular text-[#1F6A37] dark:text-[#4EB462] font-semibold">
+                  <td className="px-4 py-3.5 font-mono-tabular font-semibold text-[var(--brand-accent)]">
                     {p.allocatedToDoc}
                   </td>
                   <td className="py-3.5 px-4 text-right font-mono-tabular font-semibold">
@@ -167,7 +166,7 @@ function PaymentsContent({ invoiceNumber }: { invoiceNumber: string }) {
                             type: res.ok ? 'success' : 'error',
                           });
                         }}
-                        className="px-3 py-1.5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                        className="ui-button ui-button-secondary ui-button-compact"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Reconcile</span>
@@ -185,9 +184,9 @@ function PaymentsContent({ invoiceNumber }: { invoiceNumber: string }) {
 
       <Modal open={createOpen && canAllocate} onClose={() => setCreateOpen(false)} title="Record customer payment">
         <form onSubmit={handleRecord} className="space-y-4">
-          <label className="block space-y-1 text-sm font-medium">
+          <label className="ui-label block space-y-1">
             <span>Open invoice</span>
-            <select required className={podInputClass} value={selectedInvoice?.invoiceNumber ?? ''}
+            <select required className="ui-field w-full" value={selectedInvoice?.invoiceNumber ?? ''}
               onChange={(event) => { setAllocatedToDoc(event.target.value); setAllocationError(''); }}>
               <option value="">Select an invoice</option>
               {openInvoices.map((invoice) => (
@@ -196,29 +195,29 @@ function PaymentsContent({ invoiceNumber }: { invoiceNumber: string }) {
             </select>
           </label>
           {selectedInvoice && <p className="text-sm text-[var(--text-secondary)]">Available balance for allocation · KES {selectedInvoice.balanceKes.toLocaleString('en-KE')}</p>}
-          <label className="block space-y-1 text-sm font-medium">
+          <label className="ui-label block space-y-1">
             <span>Payment channel</span>
-            <select className={podInputClass} value={method} onChange={(event) => setMethod(event.target.value as PaymentRecord['method'])}>
+            <select className="ui-field w-full" value={method} onChange={(event) => setMethod(event.target.value as PaymentRecord['method'])}>
               <option value="M-Pesa Paybill">M-Pesa Paybill</option>
               <option value="Bank EFT / RTGS">Bank EFT / RTGS</option>
               <option value="Corporate Cheque">Corporate Cheque</option>
             </select>
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block space-y-1 text-sm font-medium">
+            <label className="ui-label block space-y-1">
               <span>Transaction reference</span>
-              <input required className={podInputClass} value={referenceCode} onChange={(event) => setReferenceCode(event.target.value)} />
+              <input required className="ui-field w-full" value={referenceCode} onChange={(event) => setReferenceCode(event.target.value)} />
             </label>
-            <label className="block space-y-1 text-sm font-medium">
+            <label className="ui-label block space-y-1">
               <span>Amount (KES)</span>
               <input required type="number" inputMode="decimal" min="0.01" max={selectedInvoice?.balanceKes} step="0.01"
-                className={podInputClass} value={amountKes} onChange={(event) => setAmountKes(event.target.value)} />
+                className="ui-field w-full" value={amountKes} onChange={(event) => setAmountKes(event.target.value)} />
             </label>
           </div>
-          {allocationError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{allocationError}</p>}
+          {allocationError && <p role="alert" className="text-sm text-[var(--status-danger-fg)]">{allocationError}</p>}
           <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" onClick={() => setCreateOpen(false)} disabled={submitting} className={podSecondaryClass}>Cancel</button>
-            <button type="submit" disabled={submitting || !selectedInvoice} className={podPrimaryClass}>{submitting ? 'Saving…' : 'Allocate payment'}</button>
+            <button type="button" onClick={() => setCreateOpen(false)} disabled={submitting} className="ui-button ui-button-secondary">Cancel</button>
+            <button type="submit" disabled={submitting || !selectedInvoice} className="ui-button ui-button-primary">{submitting ? 'Saving…' : 'Allocate payment'}</button>
           </div>
         </form>
       </Modal>

@@ -40,8 +40,8 @@ const statusOptions = ['All', 'Active', 'Under Review', 'Suspended', 'Archived']
 type DirectoryStatus = (typeof statusOptions)[number];
 type ProfileTab = 'overview' | 'products' | 'procurement' | 'payables' | 'contracts' | 'performance';
 
-const fieldClass = 'mt-1 min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 text-base text-[var(--text-primary)] sm:text-sm';
-const actionClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 text-sm font-semibold transition-colors hover:bg-[var(--bg-subtle)] cursor-pointer';
+const fieldClass = 'ui-field mt-1 w-full';
+const actionClass = 'ui-button ui-button-secondary';
 
 const currency = new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 2 });
 
@@ -401,7 +401,7 @@ function SupplierWorkspace() {
               <button
                 type="button"
                 onClick={() => setSupplierForm('create')}
-                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[var(--brand-accent)] px-4 text-sm font-semibold text-white dark:text-[var(--bg-canvas)]"
+                className="ui-button ui-button-primary"
               >
                 <Plus aria-hidden="true" className="h-4 w-4" /> New supplier
               </button>
@@ -414,7 +414,7 @@ function SupplierWorkspace() {
                 key={view.id}
                 href={view.id === 'payables' ? '/suppliers?tab=payables' : '/suppliers'}
                 aria-current={viewTab === view.id ? 'page' : undefined}
-                className={`${actionClass} ${viewTab === view.id ? 'bg-[var(--bg-subtle)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'}`}
+                className="ui-tab"
               >
                 {view.label}
               </Link>
@@ -423,20 +423,20 @@ function SupplierWorkspace() {
           {viewTab === 'directory' && (
             <section aria-label="Supplier directory" className="space-y-4">
               <div className="grid gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 text-sm sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                <label className="sm:col-span-2 lg:col-span-1">
+                <label className="ui-label sm:col-span-2 lg:col-span-1">
                   Search suppliers or products
                   <span className="relative block">
                     <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]" />
                     <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, county, product, or SKU" className={`${fieldClass} pl-9`} />
                   </span>
                 </label>
-                <label>
+                <label className="ui-label">
                   Status
                   <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as DirectoryStatus)} className={fieldClass}>
                     {statusOptions.map((status) => <option key={status} value={status}>{status === 'All' ? 'All statuses' : status}</option>)}
                   </select>
                 </label>
-                <label>
+                <label className="ui-label">
                   Category
                   <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={fieldClass}>
                     {categories.map((category) => <option key={category} value={category}>{category === 'All' ? 'All categories' : category}</option>)}
@@ -502,55 +502,55 @@ function SupplierWorkspace() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400">
+              <span className="text-xs font-mono font-bold text-[var(--status-warning-fg)]">
                 Outstanding {currency.format(totalApKes)}
               </span>
             </div>
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)]">
-            <table className="min-w-full divide-y divide-neutral-200 dark:divide-neutral-800">
-              <thead className="bg-neutral-50 dark:bg-neutral-800/50">
+            <table className="ui-table min-w-full">
+              <thead className="bg-[var(--bg-canvas)]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">Payable Ref & PO</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">Supplier Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">Due Date</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500">Total Obligation</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500">Settled (Paid)</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500">Outstanding Balance</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-neutral-500">Status</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Payable Ref & PO</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Supplier Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Due Date</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Total Obligation</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Settled (Paid)</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Outstanding Balance</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Status</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {supplierPayables.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-xs text-neutral-500">
+                    <td colSpan={8} className="py-8 text-center text-xs text-[var(--text-secondary)]">
                       No supplier payables recorded. Confirming goods collection on purchase orders creates payables automatically.
                     </td>
                   </tr>
                 ) : (
                   supplierPayables.map((p) => (
-                    <tr key={p.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30">
+                    <tr key={p.id} className="hover:bg-[var(--bg-canvas)]">
                       <td className="px-4 py-3 text-xs">
-                        <div className="font-semibold text-neutral-900 dark:text-white font-mono">{p.id}</div>
-                        <div className="text-neutral-500 font-mono">
+                        <div className="font-semibold text-[var(--text-primary)] font-mono">{p.id}</div>
+                        <div className="text-[var(--text-secondary)] font-mono">
                           {p.poNumber}{p.invoiceRef ? ` · ${p.invoiceRef}` : ''}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs font-medium text-neutral-900 dark:text-white">
+                      <td className="px-4 py-3 text-xs font-medium text-[var(--text-primary)]">
                         {p.supplierName}
                       </td>
-                      <td className="px-4 py-3 text-xs text-neutral-600 dark:text-neutral-300">
+                      <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
                         {p.dueDate}
                       </td>
-                      <td className="px-4 py-3 text-xs text-right font-mono font-medium text-neutral-900 dark:text-white">
+                      <td className="px-4 py-3 text-xs text-right font-mono font-medium text-[var(--text-primary)]">
                         KES {(p.totalAmountKes ?? p.amountKes ?? 0).toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 text-xs text-right font-mono text-emerald-600 dark:text-emerald-400">
+                      <td className="px-4 py-3 text-xs text-right font-mono text-[var(--status-success-fg)]">
                         KES {p.paidAmountKes.toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 text-xs text-right font-mono font-bold text-neutral-900 dark:text-white">
+                      <td className="px-4 py-3 text-xs text-right font-mono font-bold text-[var(--text-primary)]">
                         KES {p.balanceKes.toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-xs text-center">
@@ -564,13 +564,13 @@ function SupplierWorkspace() {
                           <button
                             type="button"
                             onClick={() => handleOpenRecordPayment(p)}
-                            className="rounded-md bg-[#1F6A37] px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-[#12512C]"
+                            className="ui-button ui-button-primary ui-button-compact"
                           >
                             Record Payment
                           </button>
                         )}
                         {p.balanceKes === 0 && (
-                          <span className="text-xs text-emerald-600 font-medium">Fully Settled</span>
+                          <span className="text-xs text-[var(--status-success-fg)] font-medium">Fully Settled</span>
                         )}
                       </td>
                     </tr>
@@ -619,7 +619,7 @@ function SupplierWorkspace() {
                   type="button"
                   aria-pressed={profileTab === t.id}
                   onClick={() => setProfileSelection({ supplierId: profileSupplier.id, tab: t.id })}
-                  className={`${actionClass} ${profileTab === t.id ? 'bg-[var(--bg-subtle)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'}`}
+                  className="ui-tab"
                 >
                   {t.label}
                 </button>
@@ -650,7 +650,7 @@ function SupplierWorkspace() {
                 </dl>
 
                 <Card className="space-y-4">
-                  <h2 className="font-heading text-lg font-semibold">Contact and commercial terms</h2>
+                  <h2 className="ui-section-title">Contact and commercial terms</h2>
                   <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                     <div><dt className="text-[var(--text-secondary)]">Contact person</dt><dd className="mt-1 font-medium">{profileSupplier.contactPerson}</dd></div>
                     <div><dt className="text-[var(--text-secondary)]">Phone</dt><dd className="mt-1 font-medium">{profileSupplier.phone}</dd></div>
@@ -663,7 +663,7 @@ function SupplierWorkspace() {
 
                 {(canArchive || (!profileSupplier.isArchived && (canApprove || canSuspend))) && (
                   <Card className="space-y-3">
-                    <h2 className="font-heading text-lg font-semibold">Supplier status</h2>
+                    <h2 className="ui-section-title">Supplier status</h2>
                     <div className="flex flex-wrap gap-2">
                       {profileSupplier.isArchived ? (
                         canArchive && <button className={actionClass} type="button" onClick={() => handleRestoreSupplier(profileSupplier)}>Restore supplier</button>
@@ -675,7 +675,7 @@ function SupplierWorkspace() {
                           {canArchive && <button className={actionClass} type="button" onClick={() => handleArchiveSupplier(profileSupplier)}>Archive supplier</button>}
                         </>
                       )}
-                      {canEdit && <button className={`${actionClass} text-red-700 dark:text-red-300`} type="button" onClick={() => handleDeleteSupplier(profileSupplier)}>Delete supplier</button>}
+                      {canEdit && <button className="ui-button ui-button-danger" type="button" onClick={() => handleDeleteSupplier(profileSupplier)}>Delete supplier</button>}
                     </div>
                   </Card>
                 )}
@@ -685,7 +685,7 @@ function SupplierWorkspace() {
             {profileTab === 'products' && (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="font-heading text-lg font-semibold">Products and supplier quotes</h2>
+                  <h2 className="ui-section-title">Products and supplier quotes</h2>
                   {canEdit && <button className={actionClass} type="button" onClick={() => setSupplierForm('edit')}>Manage offerings</button>}
                 </div>
                 {!profileSupplier.suppliedProducts.length && <p className="text-sm text-[var(--text-secondary)]">This supplier has no linked products.</p>}
@@ -735,8 +735,8 @@ function SupplierWorkspace() {
                   </div>
                 ) : (
                   <div className="border border-[var(--border-subtle)] rounded-md overflow-hidden">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                    <table className="ui-table w-full text-left border-collapse">
+                      <thead className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] ui-meta font-semibold text-[var(--text-secondary)]">
                         <tr>
                           <th className="py-2 px-3">PO Number</th>
                           <th className="py-2 px-3">Purpose</th>
@@ -753,7 +753,7 @@ function SupplierWorkspace() {
                               <td className="py-2.5 px-3 font-mono font-semibold text-[var(--text-primary)]">
                                 {po.poNumber}
                               </td>
-                              <td className="py-2.5 px-3 text-[11px] text-[var(--text-secondary)]">
+                              <td className="py-2.5 px-3 ui-meta text-[var(--text-secondary)]">
                                 {po.purpose || 'Direct Sourcing'}
                               </td>
                               <td className="py-2.5 px-3">{po.itemsSummary}</td>
@@ -761,7 +761,7 @@ function SupplierWorkspace() {
                                 KES {po.totalKes.toLocaleString()}
                               </td>
                               <td className="py-2.5 px-3 text-center">
-                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200">
+                                <span className="px-2 py-0.5 rounded ui-meta font-semibold bg-[var(--bg-canvas)] text-[var(--text-primary)]">
                                   {po.stage}
                                 </span>
                               </td>
@@ -781,7 +781,7 @@ function SupplierWorkspace() {
                   <span className="text-xs font-semibold text-[var(--text-primary)]">
                     Payables & Commercial Settlement Ledger
                   </span>
-                  <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400">
+                  <span className="text-xs font-mono font-bold text-[var(--status-warning-fg)]">
                     Outstanding {currency.format(profileBalance)}
                   </span>
                 </div>
@@ -792,8 +792,8 @@ function SupplierWorkspace() {
                   </div>
                 ) : (
                   <div className="border border-[var(--border-subtle)] rounded-md overflow-hidden">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                    <table className="ui-table w-full text-left border-collapse">
+                      <thead className="bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] ui-meta font-semibold text-[var(--text-secondary)]">
                         <tr>
                           <th className="py-2 px-3">Payable Ref / PO</th>
                           <th className="py-2 px-3">Due Date</th>
@@ -811,20 +811,20 @@ function SupplierWorkspace() {
                             <tr key={p.id} className="hover:bg-[var(--bg-canvas)]/50">
                               <td className="py-2.5 px-3">
                                 <div className="font-mono font-semibold text-[var(--text-primary)]">{p.id}</div>
-                                <div className="text-[10px] text-[var(--text-secondary)] font-mono">{p.poNumber}</div>
+                                <div className="ui-meta text-[var(--text-secondary)] font-mono">{p.poNumber}</div>
                               </td>
                               <td className="py-2.5 px-3 text-[var(--text-secondary)]">{p.dueDate}</td>
                               <td className="py-2.5 px-3 text-right font-mono font-medium">
                                 KES {(p.totalAmountKes ?? p.amountKes ?? 0).toLocaleString()}
                               </td>
-                              <td className="py-2.5 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400">
+                              <td className="py-2.5 px-3 text-right font-mono text-[var(--status-success-fg)]">
                                 KES {p.paidAmountKes.toLocaleString()}
                               </td>
-                              <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
+                              <td className="py-2.5 px-3 text-right font-mono font-bold text-[var(--status-warning-fg)]">
                                 KES {p.balanceKes.toLocaleString()}
                               </td>
                               <td className="py-2.5 px-3 text-center">
-                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200">
+                                <span className="px-2 py-0.5 rounded ui-meta font-semibold bg-[var(--bg-canvas)] text-[var(--text-primary)]">
                                   {p.status}
                                 </span>
                               </td>
@@ -833,7 +833,7 @@ function SupplierWorkspace() {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenRecordPayment(p)}
-                                    className="px-2.5 py-1 rounded bg-[#1F6A37] text-white text-[11px] font-semibold hover:bg-[#12512C]"
+                                    className="ui-button ui-button-primary ui-button-compact"
                                   >
                                     Pay
                                   </button>
@@ -853,7 +853,7 @@ function SupplierWorkspace() {
               <div className="space-y-4 text-sm">
                 <div>
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="font-heading text-lg font-semibold">Supply agreements</h2>
+                    <h2 className="ui-section-title">Supply agreements</h2>
                     {canManageContracts && <button className={actionClass} type="button" onClick={() => handleOpenContracts(profileSupplier)}>Manage contracts</button>}
                   </div>
                   {(profileSupplier.contracts || []).length === 0 ? (
@@ -866,11 +866,11 @@ function SupplierWorkspace() {
                         <div key={c.id} className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between">
                           <div>
                             <div className="font-semibold text-[var(--text-primary)]">{c.title} ({c.contractRef})</div>
-                            <div className="text-[10px] text-[var(--text-secondary)]">Validity: {c.startDate} to {c.endDate} · {c.deliveryCadence}</div>
+                            <div className="ui-meta text-[var(--text-secondary)]">Validity: {c.startDate} to {c.endDate} · {c.deliveryCadence}</div>
                           </div>
                           <div className="text-right">
                             <span className="font-mono font-bold text-[var(--text-primary)]">KES {c.valueKes.toLocaleString()}</span>
-                            <div><span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">{c.status}</span></div>
+                            <div><span className="px-2 py-0.5 rounded text-xs bg-[var(--status-success-bg)] text-[var(--status-success-fg)]">{c.status}</span></div>
                           </div>
                         </div>
                       ))}
@@ -880,7 +880,7 @@ function SupplierWorkspace() {
 
                 <div>
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="font-heading text-lg font-semibold">Compliance documents</h2>
+                    <h2 className="ui-section-title">Compliance documents</h2>
                     {canManageDocuments && <button className={actionClass} type="button" onClick={() => handleOpenDocuments(profileSupplier)}>Manage documents</button>}
                   </div>
                   {(profileSupplier.documents || []).length === 0 ? (
@@ -893,9 +893,9 @@ function SupplierWorkspace() {
                         <div key={d.id} className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between">
                           <div>
                             <div className="font-semibold text-[var(--text-primary)]">{d.title} ({d.docNumber})</div>
-                            <div className="text-[10px] text-[var(--text-secondary)]">{d.category} · Valid through {d.expiryDate}</div>
+                            <div className="ui-meta text-[var(--text-secondary)]">{d.category} · Valid through {d.expiryDate}</div>
                           </div>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-[var(--status-success-bg)] text-[var(--status-success-fg)]">
                             {d.status}
                           </span>
                         </div>
@@ -910,25 +910,25 @@ function SupplierWorkspace() {
             {profileTab === 'performance' && (
               <div className="space-y-4 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="font-heading text-lg font-semibold">Supplier performance</h2>
+                  <h2 className="ui-section-title">Supplier performance</h2>
                   {canEvaluate && <button className={actionClass} type="button" onClick={() => handleOpenEvaluation(profileSupplier)}>Record evaluation</button>}
                 </div>
                 <div className="grid grid-cols-3 gap-3 p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-center">
                   <div>
-                    <span className="text-[10px] text-[var(--text-secondary)]">Quality Compliance</span>
-                    <div className="font-mono font-bold text-base text-[#1F6A37] dark:text-[#4EB462] mt-0.5">
+                    <span className="ui-meta text-[var(--text-secondary)]">Quality Compliance</span>
+                    <div className="font-mono font-bold text-base text-[var(--brand-accent)] mt-0.5">
                       {profileSupplier.qualityScorePct}%
                     </div>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[var(--text-secondary)]">On-Time Farm Dispatch</span>
+                    <span className="ui-meta text-[var(--text-secondary)]">On-Time Farm Dispatch</span>
                     <div className="font-mono font-bold text-base text-[var(--text-primary)] mt-0.5">
                       {latestTimeliness === undefined ? '—' : `${latestTimeliness}%`}
                     </div>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[var(--text-secondary)]">Commercial Tier</span>
-                    <div className="font-bold text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    <span className="ui-meta text-[var(--text-secondary)]">Commercial Tier</span>
+                    <div className="font-bold text-sm text-[var(--status-success-fg)] mt-0.5">
                       {latestEvaluation?.packagingGrade ?? latestEvaluation?.grade ?? '—'}
                     </div>
                   </div>
@@ -946,10 +946,10 @@ function SupplierWorkspace() {
                         <div key={ev.id} className="p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-1">
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-[var(--text-primary)]">{ev.evaluationDate} · Grade: {ev.packagingGrade || ev.grade || 'Grade A'}</span>
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 font-semibold">{ev.recommendation}</span>
+                            <span className="px-2 py-0.5 rounded text-xs bg-[var(--status-success-bg)] text-[var(--status-success-fg)] font-semibold">{ev.recommendation}</span>
                           </div>
-                          <p className="text-[11px] text-[var(--text-secondary)]">{ev.notes}</p>
-                          <div className="text-[10px] text-[var(--text-secondary)]">Auditor: {ev.evaluator || ev.evaluatedBy || 'Operations Lead'} · Quality {ev.qualityScorePct ?? ev.qualityScore ?? 100}% · Timeliness {ev.timelinessScorePct ?? ev.timelinessScore ?? 100}% · Pricing {ev.pricingCompliancePct ?? ev.pricingScore ?? 100}%</div>
+                          <p className="ui-meta text-[var(--text-secondary)]">{ev.notes}</p>
+                          <div className="ui-meta text-[var(--text-secondary)]">Auditor: {ev.evaluator || ev.evaluatedBy || 'Operations Lead'} · Quality {ev.qualityScorePct ?? ev.qualityScore ?? 100}% · Timeliness {ev.timelinessScorePct ?? ev.timelinessScore ?? 100}% · Pricing {ev.pricingCompliancePct ?? ev.pricingScore ?? 100}%</div>
                         </div>
                       ))}
                     </div>
@@ -973,24 +973,24 @@ function SupplierWorkspace() {
         subtitle={`Grant authorized supply status to ${activeSupplier?.name} for PO issuance.`}
       >
         <div className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-[#E5EFE6] dark:bg-[#142B1B] border border-[#1F6A37]/30 text-xs">
-            <div className="font-semibold text-[#12512C] dark:text-[#4EB462]">
+          <div className="p-3.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--status-success-border)] text-xs">
+            <div className="font-semibold text-[var(--brand-accent)]">
               Onboarding Governance Verification
             </div>
-            <div className="text-[11px] text-[var(--text-secondary)] mt-1">
+            <div className="ui-meta text-[var(--text-secondary)] mt-1">
               Approving this vendor transitions their status from <strong>Under Review</strong> to <strong>Active</strong>, permitting purchase requisitions and purchase orders across cold chain and bulk grain hubs.
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+            <label htmlFor="suppliers-approval-audit-comment" className="ui-label block mb-1">
               Approval Audit Comment *
             </label>
-            <textarea
+            <textarea id="suppliers-approval-audit-comment"
               rows={3}
               value={approveComment}
               onChange={(e) => setApproveComment(e.target.value)}
-              className="w-full p-2.5 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+              className="ui-field w-full"
             />
           </div>
 
@@ -998,14 +998,14 @@ function SupplierWorkspace() {
             <button
               type="button"
               onClick={() => setApproveOpen(false)}
-              className="h-9 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleApproveSubmit}
-              className="h-9 px-5 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-sm inline-flex items-center gap-1.5"
+              className="ui-button ui-button-primary"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>Confirm & Activate Supplier</span>
@@ -1024,21 +1024,21 @@ function SupplierWorkspace() {
         subtitle={`Halt all operational ordering and deliveries with ${activeSupplier?.name}.`}
       >
         <form onSubmit={handleSuspendSubmit} className="space-y-4">
-          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-700 dark:text-red-400">
+          <div className="p-3 rounded-xl bg-[var(--status-danger-bg)] border border-[var(--status-danger-border)] text-xs text-[var(--status-danger-fg)]">
             <strong>Warning:</strong> Suspending a supplier halts all pending purchase orders and prevents receiving dock workers from accepting shipments until formally reinstated.
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+            <label htmlFor="suppliers-reason-for-suspension" className="ui-label block mb-1">
               Reason for Suspension *
             </label>
-            <textarea
+            <textarea id="suppliers-reason-for-suspension"
               required
               rows={3}
               placeholder="e.g. Repeated failure to maintain cold-chain temperature thresholds, pesticide audit violation, or pricing breach."
               value={suspendReason}
               onChange={(e) => setSuspendReason(e.target.value)}
-              className="w-full p-2.5 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-red-500"
+              className="ui-field w-full"
             />
           </div>
 
@@ -1046,13 +1046,13 @@ function SupplierWorkspace() {
             <button
               type="button"
               onClick={() => setSuspendOpen(false)}
-              className="h-9 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-9 px-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+              className="ui-button ui-button-danger"
             >
               <Ban className="w-4 h-4" />
               <span>Confirm Suspension</span>
@@ -1090,25 +1090,25 @@ function SupplierWorkspace() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                        <span className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462]">
+                        <span className="font-mono-tabular text-[var(--brand-accent)]">
                           {ctr.contractRef}
                         </span>
                         <span>· {ctr.title}</span>
                       </div>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                           ctr.status === 'Active'
-                            ? 'bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]'
+                            ? 'bg-[var(--bg-subtle)] text-[var(--brand-accent)]'
                             : ctr.status === 'Expiring Soon'
-                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-                            : 'bg-red-500/15 text-red-600 dark:text-red-400'
+                            ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-fg)]'
+                            : 'bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]'
                         }`}
                       >
                         {ctr.status}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-[var(--text-secondary)] pt-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 ui-meta text-[var(--text-secondary)] pt-1">
                       <div>Val: <strong>KES {ctr.valueKes.toLocaleString()}</strong></div>
                       <div>Terms: <strong>{ctr.paymentTerms}</strong></div>
                       <div>Start: <strong>{ctr.startDate}</strong></div>
@@ -1116,13 +1116,13 @@ function SupplierWorkspace() {
                     </div>
 
                     {ctr.notes && (
-                      <p className="text-[11px] text-[var(--text-secondary)] italic pt-0.5">
+                      <p className="ui-meta text-[var(--text-secondary)] italic pt-0.5">
                         {ctr.notes}
                       </p>
                     )}
 
                     {canEdit && (
-                      <div className="flex items-center gap-2 pt-1 border-t border-[var(--border-subtle)]/70 text-[10px]">
+                      <div className="flex items-center gap-2 pt-1 border-t border-[var(--border-subtle)]/70 text-xs">
                         <span className="text-[var(--text-secondary)]">Action status:</span>
                         {(['Active', 'Expiring Soon', 'Expired'] as const).map((st) => (
                           <button
@@ -1133,11 +1133,8 @@ function SupplierWorkspace() {
                               const sup = suppliers.find((s) => s.id === activeSupplier.id);
                               if (sup) setActiveSupplier(sup);
                             }}
-                            className={`px-2 py-0.5 rounded-full cursor-pointer ${
-                              ctr.status === st
-                                ? 'bg-[#1F6A37] text-white font-bold'
-                                : 'hover:bg-[var(--bg-card)] border border-[var(--border-subtle)]'
-                            }`}
+                            aria-pressed={ctr.status === st}
+                            className="ui-tab"
                           >
                             Mark {st}
                           </button>
@@ -1159,100 +1156,100 @@ function SupplierWorkspace() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="suppliers-contract-reference" className="ui-label block mb-1">
                     Contract Reference *
                   </label>
-                  <input
+                  <input id="suppliers-contract-reference"
                     type="text"
                     required
                     value={contractRef}
                     onChange={(e) => setContractRef(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                    className="ui-field w-full"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="suppliers-contract-title" className="ui-label block mb-1">
                     Contract Title *
                   </label>
-                  <input
+                  <input id="suppliers-contract-title"
                     type="text"
                     required
                     value={contractTitle}
                     onChange={(e) => setContractTitle(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                    className="ui-field w-full"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="suppliers-contract-value-kes" className="ui-label block mb-1">
                     Contract Value (KES) *
                   </label>
-                  <input
+                  <input id="suppliers-contract-value-kes"
                     type="number"
                     required
                     value={contractValue}
                     onChange={(e) => setContractValue(Number(e.target.value))}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                    className="ui-field w-full"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="suppliers-start-date" className="ui-label block mb-1">
                     Start Date
                   </label>
-                  <input
+                  <input id="suppliers-start-date"
                     type="date"
                     required
                     value={contractStart}
                     onChange={(e) => setContractStart(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                    className="ui-field w-full"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="suppliers-end-date" className="ui-label block mb-1">
                     End Date
                   </label>
-                  <input
+                  <input id="suppliers-end-date"
                     type="date"
                     required
                     value={contractEnd}
                     onChange={(e) => setContractEnd(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                    className="ui-field w-full"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                <label htmlFor="suppliers-delivery-cadence-volume-specifications" className="ui-label block mb-1">
                   Delivery Cadence & Volume Specifications
                 </label>
-                <input
+                <input id="suppliers-delivery-cadence-volume-specifications"
                   type="text"
                   value={contractCadence}
                   onChange={(e) => setContractCadence(e.target.value)}
                   placeholder="e.g. Tri-Weekly Scheduled Runs to Cold Hub A"
-                  className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className="ui-field w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                <label htmlFor="suppliers-contract-terms-notes" className="ui-label block mb-1">
                   Contract Terms & Notes
                 </label>
-                <textarea
+                <textarea id="suppliers-contract-terms-notes"
                   rows={2}
                   value={contractNotes}
                   onChange={(e) => setContractNotes(e.target.value)}
                   placeholder="Minimum monthly commitment, grading thresholds, dispute jurisdiction..."
-                  className="w-full p-2 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className="ui-field w-full"
                 />
               </div>
 
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="h-8 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+                  className="ui-button ui-button-primary"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Execute Contract Record</span>
@@ -1265,7 +1262,7 @@ function SupplierWorkspace() {
             <button
               type="button"
               onClick={() => setContractsOpen(false)}
-              className="h-8 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Close
             </button>
@@ -1304,18 +1301,18 @@ function SupplierWorkspace() {
                       <div className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
                         <span>{doc.title}</span>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                             doc.status === 'Verified'
-                              ? 'bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462]'
+                              ? 'bg-[var(--bg-subtle)] text-[var(--brand-accent)]'
                               : doc.status === 'Pending Verification'
-                              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-                              : 'bg-red-500/15 text-red-600 dark:text-red-400'
+                              ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-fg)]'
+                              : 'bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]'
                           }`}
                         >
                           {doc.status}
                         </span>
                       </div>
-                      <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                      <div className="ui-meta text-[var(--text-secondary)] mt-0.5">
                         Ref: {doc.docNumber} · {doc.category} · Valid to: {doc.expiryDate || 'N/A'} ({doc.fileSize || 'PDF'})
                       </div>
                     </div>
@@ -1329,7 +1326,7 @@ function SupplierWorkspace() {
                             const sup = suppliers.find((s) => s.id === activeSupplier.id);
                             if (sup) setActiveSupplier(sup);
                           }}
-                          className="h-7 px-3 rounded-full bg-[#1F6A37] text-white text-[11px] font-semibold cursor-pointer inline-flex items-center gap-1 shadow-sm"
+                          className="ui-button ui-button-primary ui-button-compact"
                         >
                           <CheckCircle2 className="w-3 h-3" />
                           <span>Verify</span>
@@ -1351,13 +1348,13 @@ function SupplierWorkspace() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="suppliers-document-category" className="ui-label block mb-1">
                     Document Category *
                   </label>
-                  <select
+                  <select id="suppliers-document-category"
                     value={docCategory}
                     onChange={(e) => setDocCategory(e.target.value as SupplierDocumentItem['category'])}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                    className="ui-field w-full"
                   >
                     <option value="KEBS Certificate">KEBS Certificate</option>
                     <option value="County Trade License">County Trade License</option>
@@ -1369,55 +1366,55 @@ function SupplierWorkspace() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="suppliers-certificate-license-number" className="ui-label block mb-1">
                     Certificate / License Number *
                   </label>
-                  <input
+                  <input id="suppliers-certificate-license-number"
                     type="text"
                     required
                     value={docNumber}
                     onChange={(e) => setDocNumber(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                    className="ui-field w-full"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                <label htmlFor="suppliers-document-title" className="ui-label block mb-1">
                   Document Title *
                 </label>
-                <input
+                <input id="suppliers-document-title"
                   type="text"
                   required
                   value={docTitle}
                   onChange={(e) => setDocTitle(e.target.value)}
-                  className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className="ui-field w-full"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="suppliers-issue-date" className="ui-label block mb-1">
                     Issue Date
                   </label>
-                  <input
+                  <input id="suppliers-issue-date"
                     type="date"
                     required
                     value={docIssueDate}
                     onChange={(e) => setDocIssueDate(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                    className="ui-field w-full"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                  <label htmlFor="suppliers-expiry-date" className="ui-label block mb-1">
                     Expiry Date
                   </label>
-                  <input
+                  <input id="suppliers-expiry-date"
                     type="date"
                     required
                     value={docExpiryDate}
                     onChange={(e) => setDocExpiryDate(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                    className="ui-field w-full"
                   />
                 </div>
               </div>
@@ -1425,7 +1422,7 @@ function SupplierWorkspace() {
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="h-8 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+                  className="ui-button ui-button-primary"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>Upload & Attach Document</span>
@@ -1438,7 +1435,7 @@ function SupplierWorkspace() {
             <button
               type="button"
               onClick={() => setDocumentsOpen(false)}
-              className="h-8 px-4 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Close
             </button>
@@ -1458,60 +1455,60 @@ function SupplierWorkspace() {
         <form onSubmit={handleEvaluationSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+              <label htmlFor="suppliers-produce-quality-score" className="ui-label block mb-1">
                 Produce Quality Score ({evalQuality}%)
               </label>
-              <input
+              <input id="suppliers-produce-quality-score"
                 type="range"
                 min="50"
                 max="100"
                 value={evalQuality}
                 onChange={(e) => setEvalQuality(Number(e.target.value))}
-                className="w-full accent-[#1F6A37]"
+                className="w-full accent-[var(--brand-accent)]"
               />
-              <span className="text-[10px] text-[var(--text-secondary)]">Washing, grading, ripeness</span>
+              <span className="ui-meta text-[var(--text-secondary)]">Washing, grading, ripeness</span>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+              <label htmlFor="suppliers-delivery-timeliness" className="ui-label block mb-1">
                 Delivery Timeliness ({evalTimeliness}%)
               </label>
-              <input
+              <input id="suppliers-delivery-timeliness"
                 type="range"
                 min="50"
                 max="100"
                 value={evalTimeliness}
                 onChange={(e) => setEvalTimeliness(Number(e.target.value))}
-                className="w-full accent-[#1F6A37]"
+                className="w-full accent-[var(--brand-accent)]"
               />
-              <span className="text-[10px] text-[var(--text-secondary)]">Adherence to receiving dock SLA</span>
+              <span className="ui-meta text-[var(--text-secondary)]">Adherence to receiving dock SLA</span>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+              <label htmlFor="suppliers-pricing-compliance" className="ui-label block mb-1">
                 Pricing Compliance ({evalPricing}%)
               </label>
-              <input
+              <input id="suppliers-pricing-compliance"
                 type="range"
                 min="50"
                 max="100"
                 value={evalPricing}
                 onChange={(e) => setEvalPricing(Number(e.target.value))}
-                className="w-full accent-[#1F6A37]"
+                className="w-full accent-[var(--brand-accent)]"
               />
-              <span className="text-[10px] text-[var(--text-secondary)]">Zero unauthorized surcharges</span>
+              <span className="ui-meta text-[var(--text-secondary)]">Zero unauthorized surcharges</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+              <label htmlFor="suppliers-crate-packaging-grade" className="ui-label block mb-1">
                 Crate & Packaging Grade *
               </label>
-              <select
+              <select id="suppliers-crate-packaging-grade"
                 value={evalGrade}
                 onChange={(e) => setEvalGrade(e.target.value as 'Grade A' | 'Grade B' | 'Grade C')}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                className="ui-field w-full"
               >
                 <option value="Grade A">Grade A (Uniform sorting & clean plastic crates)</option>
                 <option value="Grade B">Grade B (Acceptable sorting with minor variations)</option>
@@ -1520,13 +1517,13 @@ function SupplierWorkspace() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+              <label htmlFor="suppliers-governance-recommendation" className="ui-label block mb-1">
                 Governance Recommendation *
               </label>
-              <select
+              <select id="suppliers-governance-recommendation"
                 value={evalRec}
                 onChange={(e) => setEvalRec(e.target.value as SupplierEvaluationRecord['recommendation'])}
-                className="w-full h-9 px-3 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                className="ui-field w-full"
               >
                 <option value="Preferred Cooperative">Preferred Cooperative (Priority offtake)</option>
                 <option value="Standard Approved">Standard Approved (Regular procurement)</option>
@@ -1537,22 +1534,22 @@ function SupplierWorkspace() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+            <label htmlFor="suppliers-audit-notes-evaluator-findings" className="ui-label block mb-1">
               Audit Notes & Evaluator Findings *
             </label>
-            <textarea
+            <textarea id="suppliers-audit-notes-evaluator-findings"
               required
               rows={3}
               value={evalNotes}
               onChange={(e) => setEvalNotes(e.target.value)}
               placeholder="Detail inspection observations, transit temperature logger readings, and sorting compliance..."
-              className="w-full p-2.5 rounded-xl text-xs bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[#1F6A37]"
+              className="ui-field w-full"
             />
           </div>
 
           <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between text-xs">
             <span className="text-[var(--text-secondary)]">Calculated Composite Score:</span>
-            <span className="font-heading font-bold text-base text-[#1F6A37] dark:text-[#4EB462]">
+            <span className="font-heading font-bold text-base text-[var(--brand-accent)]">
               {((evalQuality * 0.4) + (evalTimeliness * 0.3) + (evalPricing * 0.3)).toFixed(1)}%
             </span>
           </div>
@@ -1561,13 +1558,13 @@ function SupplierWorkspace() {
             <button
               type="button"
               onClick={() => setEvaluationOpen(false)}
-              className="h-9 px-4 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-9 px-5 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+              className="ui-button ui-button-primary"
             >
               <Award className="w-4 h-4" />
               <span>Record Performance Audit</span>
@@ -1592,19 +1589,19 @@ function SupplierWorkspace() {
             <div className="grid grid-cols-2 gap-3 p-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs">
               <div>
                 <span className="text-[var(--text-secondary)]">Total Invoiced:</span>
-                <p className="font-mono font-semibold text-neutral-900 dark:text-white">
+                <p className="font-mono font-semibold text-[var(--text-primary)]">
                   KES {(paymentPayable.totalAmountKes ?? paymentPayable.amountKes ?? 0).toLocaleString()}
                 </p>
               </div>
               <div>
                 <span className="text-[var(--text-secondary)]">Outstanding Balance:</span>
-                <p className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                <p className="font-mono font-bold text-[var(--status-warning-fg)]">
                   KES {paymentPayable.balanceKes.toLocaleString()}
                 </p>
               </div>
             </div>
 
-            <label className="block text-sm font-medium">
+            <label className="ui-label block">
               Amount (KES)
               <input
                 type="number"
@@ -1620,7 +1617,7 @@ function SupplierWorkspace() {
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm font-medium">
-              <label>
+              <label className="ui-label">
                 Payment method
                 <select
                   value={payMethod}
@@ -1634,7 +1631,7 @@ function SupplierWorkspace() {
                 </select>
               </label>
 
-              <label>
+              <label className="ui-label">
                 Transaction reference
                 <input
                   type="text"
@@ -1647,7 +1644,7 @@ function SupplierWorkspace() {
               </label>
             </div>
 
-            <label className="block text-sm font-medium">
+            <label className="ui-label block">
               Settlement notes <span className="text-[var(--text-secondary)]">(optional)</span>
               <input
                 type="text"
@@ -1658,7 +1655,7 @@ function SupplierWorkspace() {
               />
             </label>
 
-            {paymentError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{paymentError}</p>}
+            {paymentError && <p role="alert" className="text-sm text-[var(--status-danger-fg)]">{paymentError}</p>}
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
               <button
@@ -1672,7 +1669,7 @@ function SupplierWorkspace() {
               <button
                 type="submit"
                 disabled={isSubmittingPayment}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--brand-accent)] px-4 text-sm font-semibold text-white disabled:opacity-60 not-disabled:cursor-pointer dark:text-[var(--bg-canvas)]"
+                className="ui-button ui-button-primary"
               >
                 <DollarSign aria-hidden="true" className="h-4 w-4" />
                 <span>{isSubmittingPayment ? 'Recording…' : 'Record payment'}</span>

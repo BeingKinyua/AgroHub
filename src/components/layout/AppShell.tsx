@@ -6,6 +6,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   Activity,
+  AlertCircle,
+  AlertTriangle,
   BarChart3,
   Bell,
   Boxes,
@@ -17,6 +19,7 @@ import {
   FileText,
   FolderKanban,
   Handshake,
+  Info,
   Landmark,
   LayoutDashboard,
   Leaf,
@@ -41,6 +44,7 @@ import {
   Users,
   Warehouse,
   X,
+  type LucideIcon,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
 import { canAccessDeliveryRun } from '@/lib/services/delivery-workflow';
@@ -62,7 +66,7 @@ interface NavItem {
   label: string;
   href: string;
   permission: PermissionKey;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   badgeCount?: number;
 }
 
@@ -72,6 +76,14 @@ interface NavGroup {
 }
 
 const STORAGE_KEY_SIDEBAR = 'agro_bos_sidebar_collapsed_v1';
+const navIconButton = 'ui-button ui-button-ghost ui-button-icon text-[var(--nav-text-muted)] hover:bg-[var(--nav-surface)] hover:text-[var(--nav-text)]';
+const accountLink = 'ui-button ui-button-ghost flex w-full justify-start px-3 text-left text-[var(--text-primary)]';
+const toastVariants = {
+  success: { icon: CheckCircle2, style: 'border-[var(--status-success-border)] bg-[var(--status-success-bg)] text-[var(--status-success-fg)]' },
+  warning: { icon: AlertTriangle, style: 'border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] text-[var(--status-warning-fg)]' },
+  error: { icon: AlertCircle, style: 'border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]' },
+  info: { icon: Info, style: 'border-[var(--status-info-border)] bg-[var(--status-info-bg)] text-[var(--status-info-fg)]' },
+};
 
 const isNavActive = (pathname: string, href: string) =>
   pathname === href || pathname.startsWith(href + '/') ||
@@ -636,8 +648,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!isInitialized) {
     return (
       <div className="min-h-screen bg-[var(--bg-canvas)] flex items-center justify-center p-6">
-        <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
-          <div className="w-6 h-6 rounded-md bg-[#1F6A37] animate-pulse" />
+        <div role="status" className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
+          <div aria-hidden="true" className="size-6 rounded-md bg-[var(--brand-accent)] motion-safe:animate-pulse" />
           <span>Initializing Agro-Deliveries Business Operating System...</span>
         </div>
       </div>
@@ -652,15 +664,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (currentUser.status === 'Suspended' || currentUser.status === 'Disabled') {
     return (
       <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex items-center justify-center p-6">
-        <div className="max-w-lg w-full rounded-[22px] bg-[var(--bg-card)] border border-red-500/30 p-8 text-center shadow-[var(--shadow-lg)]">
-          <div className="w-12 h-12 rounded-2xl bg-red-500/15 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto mb-4">
-            <ShieldAlert className="w-6 h-6" />
+        <div className="ui-surface w-full max-w-lg p-6 text-center shadow-[var(--shadow-lg)] sm:p-8">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]">
+            <ShieldAlert aria-hidden="true" className="size-6" />
           </div>
           <StatusBadge status={currentUser.status} />
           <h1 className="font-heading text-2xl font-semibold mt-3">
             Workspace Access Restricted
           </h1>
-          <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-2 leading-relaxed">
+          <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
             Operator account <strong>{currentUser.fullName}</strong> (
             {currentUser.email}) is currently marked as{' '}
             <strong>{currentUser.status}</strong>. Suspended or disabled
@@ -674,7 +686,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 logout();
                 router.push('/login');
               }}
-              className="px-5 py-2.5 rounded-[10px] bg-[#1F6A37] text-white text-xs font-medium hover:bg-[#12512C] transition-colors cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               Return to Login
             </button>
@@ -692,33 +704,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* DESKTOP & TABLET INDEPENDENT SCROLLING SIDEBAR */}
       <aside
         aria-label="Workspace Sidebar"
-        style={{
-          width: sidebarCollapsed ? '84px' : '272px',
-          minWidth: sidebarCollapsed ? '84px' : '272px',
-        }}
-        className={`hidden md:flex flex-col shrink-0 h-dvh sticky top-0 z-40 bg-[#08190C] text-[#F4F6F3] border-r border-white/10 transition-[width] duration-200 ease-out select-none ${
-          sidebarCollapsed ? 'w-[84px] min-w-[84px]' : 'w-[272px] min-w-[272px]'
+        className={`ui-nav hidden md:flex flex-col shrink-0 h-dvh sticky top-0 z-40 bg-[var(--nav-bg)] text-[var(--nav-text)] border-r border-[var(--nav-border)] transition-[width] duration-200 ease-out select-none ${
+          sidebarCollapsed ? 'w-[var(--sidebar-mini-width)]' : 'w-[var(--sidebar-width)]'
         }`}
       >
         {/* Fixed Top Brand Header */}
         <div
-          className={`h-16 shrink-0 flex items-center border-b border-white/10 ${
+          className={`h-16 shrink-0 flex items-center border-b border-[var(--nav-border)] ${
             sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4'
           }`}
         >
           {!sidebarCollapsed ? (
             <Link
               href="/dashboard"
-              className="flex items-center gap-2.5 overflow-hidden min-w-0"
+              className="flex min-h-11 min-w-0 items-center gap-2.5 overflow-hidden rounded-[var(--radius-control)]"
             >
-              <div className="w-8 h-8 rounded-lg bg-[#1F6A37] text-[#4EB462] flex items-center justify-center shrink-0 border border-[#4EB462]/25">
-                <Leaf className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-lg bg-[var(--nav-surface)] text-[var(--nav-active)] flex items-center justify-center shrink-0 border border-[var(--nav-border)]">
+                <Leaf aria-hidden="true" className="size-4" />
               </div>
               <div className="truncate">
-                <div className="font-heading text-xs font-semibold tracking-wider text-white">
+                <div className="font-heading text-sm font-semibold tracking-wider text-[var(--nav-text)]">
                   AGRO-DELIVERIES KE.
                 </div>
-                <div className="text-[10px] text-[#A9BEAE] truncate">
+                <div className="text-xs text-[var(--nav-text-muted)] truncate">
                   BUSINESS OPERATING SYSTEM
                 </div>
               </div>
@@ -729,7 +737,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={toggleSidebarCollapsed}
                 aria-label="Expand sidebar"
-                className="w-10 h-10 rounded-full bg-[#142B1B] text-[#4EB462] border border-[#4EB462]/25 flex items-center justify-center hover:bg-[#1F6A37]/40 transition-colors cursor-pointer"
+                className={`${navIconButton} border-[var(--nav-border)] bg-[var(--nav-surface)] text-[var(--nav-active)]`}
               >
                 <PanelLeftOpen className="w-4 h-4" />
               </button>
@@ -740,7 +748,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={toggleSidebarCollapsed}
-              className="p-2 rounded-full text-[#A9BEAE] hover:text-white hover:bg-white/8 transition-colors cursor-pointer"
+              className={navIconButton}
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
             >
@@ -760,12 +768,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {permittedNavGroups.map((group) => (
             <div key={group.group}>
               {!sidebarCollapsed ? (
-                <div className="px-2.5 mb-1.5 text-[10px] font-semibold tracking-wider text-[#A9BEAE]/65 uppercase">
+                <div className="px-2.5 mb-1.5 text-xs font-semibold tracking-wider text-[var(--nav-text-muted)] uppercase">
                   {group.group}
                 </div>
               ) : (
                 <div
-                  className="h-px bg-white/8 mx-2 my-2"
+                  className="h-px bg-[var(--nav-border)] mx-2 my-2"
                   aria-hidden="true"
                 />
               )}
@@ -782,14 +790,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       data-nav-active={active ? 'true' : undefined}
                       aria-current={active ? 'page' : undefined}
                       aria-label={sidebarCollapsed ? item.label : undefined}
-                      className={`relative flex items-center rounded-xl text-xs font-medium transition-all duration-150 ${
+                      className={`relative flex min-h-11 items-center rounded-[var(--radius-control)] text-sm font-medium transition-colors ${
                         sidebarCollapsed
                           ? 'w-full h-11 justify-center px-0'
                           : 'justify-between gap-2.5 px-3 py-2.5'
                       } ${
                         active
-                          ? 'bg-[#142B1B] text-[#4EB462] border border-[#4EB462]/30 shadow-xs'
-                          : 'text-[#A9BEAE] hover:text-white hover:bg-white/6 border border-transparent'
+                          ? 'bg-[var(--nav-surface)] text-[var(--nav-active)] border border-[var(--nav-border)] shadow-xs'
+                          : 'text-[var(--nav-text-muted)] hover:text-[var(--nav-text)] hover:bg-[var(--nav-surface)] border border-transparent'
                       }`}
                     >
                       <div
@@ -798,8 +806,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         }`}
                       >
                         <Icon
+                          aria-hidden="true"
                           className={`w-4 h-4 shrink-0 transition-colors ${
-                            active ? 'text-[#4EB462]' : 'text-[#A9BEAE]'
+                            active ? 'text-[var(--nav-active)]' : 'text-[var(--nav-text-muted)]'
                           }`}
                         />
                         {!sidebarCollapsed && (
@@ -810,7 +819,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {!sidebarCollapsed &&
                         item.badgeCount !== undefined &&
                         item.badgeCount > 0 && (
-                          <span className="font-mono-tabular text-[11px] px-1.5 py-0.5 rounded-md bg-[#1F6A37]/45 text-[#E5EFE6] border border-[#4EB462]/20">
+                          <span className="font-mono-tabular text-xs px-1.5 py-0.5 rounded-md bg-[var(--nav-surface)] text-[var(--nav-text)] border border-[var(--nav-border)]">
                             {item.badgeCount}
                           </span>
                         )}
@@ -820,7 +829,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         item.badgeCount > 0 && (
                           <span
                             aria-hidden="true"
-                            className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#4EB462]"
+                            className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--nav-active)]"
                           />
                         )}
                     </Link>
@@ -851,12 +860,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Sticky Bottom Operator Profile & Sign-Out Surface */}
-        <div className="p-3 shrink-0 border-t border-white/10 bg-[#08190C]">
+        <div className="p-3 shrink-0 border-t border-[var(--nav-border)] bg-[var(--nav-bg)]">
           {!sidebarCollapsed ? (
-            <div className="p-2.5 rounded-xl bg-[#0C1B11] border border-white/10 flex items-center justify-between gap-2.5">
+            <div className="p-2.5 rounded-xl bg-[var(--nav-surface)] border border-[var(--nav-border)] flex items-center justify-between gap-2.5">
               <Link
                 href="/profile"
-                className="flex items-center gap-2.5 min-w-0 flex-1 group"
+                className="group flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-[var(--radius-control)]"
               >
                 <Avatar
                   fullName={currentUser.fullName}
@@ -864,10 +873,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   size="sm"
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold text-white truncate group-hover:text-[#4EB462] transition-colors">
+                  <div className="text-sm font-semibold text-[var(--nav-text)] truncate group-hover:text-[var(--nav-active)] transition-colors">
                     {currentUser.fullName}
                   </div>
-                  <div className="text-[11px] text-[#4EB462] truncate">
+                  <div className="text-xs text-[var(--nav-active)] truncate">
                     {currentUser.roleName}
                   </div>
                 </div>
@@ -880,7 +889,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
                 title="Sign out of workspace"
                 aria-label="Sign out of workspace"
-                className="p-2 rounded-full text-[#A9BEAE] hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                className={navIconButton}
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -891,7 +900,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 label={`${currentUser.fullName} (${currentUser.roleName})`}
                 side="right"
               >
-                <Link href="/profile" className="block">
+                <Link href="/profile" aria-label="My profile" className={navIconButton}>
                   <Avatar
                     fullName={currentUser.fullName}
                     avatarUrl={currentUser.avatarUrl}
@@ -907,7 +916,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     router.push('/login');
                   }}
                   aria-label="Sign out"
-                  className="w-9 h-9 flex items-center justify-center rounded-full text-[#A9BEAE] hover:text-red-400 hover:bg-white/5 cursor-pointer"
+                  className={navIconButton}
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -922,7 +931,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <dialog
             id="mobile-navigation"
             ref={mobileDrawerRef}
-            className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-[#08190C]/75 backdrop:backdrop-blur-xs"
+            className="ui-nav fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-[var(--nav-bg)]/75 backdrop:backdrop-blur-xs"
             aria-label="Workspace navigation"
             onCancel={(event) => { event.preventDefault(); setMobileDrawerOpen(false); }}
             onClick={(event) => { if (event.target === event.currentTarget) setMobileDrawerOpen(false); }}
@@ -932,18 +941,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-[288px] max-w-[86vw] bg-[#08190C] text-[#F4F6F3] h-dvh flex flex-col z-10 border-r border-white/10"
+              className="relative w-[288px] max-w-[86vw] bg-[var(--nav-bg)] text-[var(--nav-text)] h-dvh flex flex-col z-10 border-r border-[var(--nav-border)]"
             >
-              <div className="h-16 px-4 shrink-0 flex items-center justify-between border-b border-white/10">
+              <div className="h-16 px-4 shrink-0 flex items-center justify-between border-b border-[var(--nav-border)]">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#1F6A37] text-[#4EB462] flex items-center justify-center">
-                    <Leaf className="w-4 h-4" />
+                  <div className="w-8 h-8 rounded-lg bg-[var(--nav-surface)] text-[var(--nav-active)] flex items-center justify-center">
+                    <Leaf aria-hidden="true" className="size-4" />
                   </div>
                   <div>
-                    <div className="font-heading text-xs font-semibold text-white">
+                    <div className="font-heading text-sm font-semibold text-[var(--nav-text)]">
                       AGRO-DELIVERIES KE.
                     </div>
-                    <div className="text-[10px] text-[#A9BEAE]">
+                    <div className="text-xs text-[var(--nav-text-muted)]">
                       {currentUser.roleName}
                     </div>
                   </div>
@@ -952,7 +961,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   type="button"
                   onClick={() => setMobileDrawerOpen(false)}
                   aria-label="Close navigation menu"
-                  className="grid size-11 place-items-center rounded-full text-[#A9BEAE] hover:text-white cursor-pointer"
+                  className={navIconButton}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -961,7 +970,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto sidebar-scroll p-3.5 space-y-5">
                 {permittedNavGroups.map((group) => (
                   <div key={group.group}>
-                    <div className="px-2.5 mb-1.5 text-[10px] font-semibold tracking-wider text-[#A9BEAE]/65">
+                    <div className="px-2.5 mb-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--nav-text-muted)]">
                       {group.group}
                     </div>
                     <div className="space-y-1">
@@ -976,17 +985,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             onClick={() => setMobileDrawerOpen(false)}
                             className={`flex min-h-11 items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium ${
                               active
-                                ? 'bg-[#142B1B] text-[#4EB462] border border-[#4EB462]/25'
-                                : 'text-[#A9BEAE] hover:text-white'
+                                ? 'bg-[var(--nav-surface)] text-[var(--nav-active)] border border-[var(--nav-border)]'
+                                : 'text-[var(--nav-text-muted)] hover:text-[var(--nav-text)]'
                             }`}
                           >
                             <div className="flex items-center gap-2.5">
-                              <Icon className="w-4 h-4" />
+                              <Icon aria-hidden="true" className="size-4 shrink-0" />
                               <span>{item.label}</span>
                             </div>
                             {item.badgeCount !== undefined &&
                               item.badgeCount > 0 && (
-                                <span className="font-mono-tabular text-[11px] px-1.5 py-0.5 rounded bg-[#1F6A37]/40 text-white">
+                                <span className="font-mono-tabular text-xs px-1.5 py-0.5 rounded bg-[var(--nav-surface)] text-[var(--nav-text)]">
                                   {item.badgeCount}
                                 </span>
                               )}
@@ -998,11 +1007,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 ))}
               </nav>
 
-              <div className="p-4 shrink-0 border-t border-white/10 space-y-2.5">
+              <div className="p-4 shrink-0 border-t border-[var(--nav-border)] space-y-2.5">
                 <Link
                   href="/profile"
                   onClick={() => setMobileDrawerOpen(false)}
-                  className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[#0C1B11] border border-white/10"
+                  className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--nav-surface)] border border-[var(--nav-border)]"
                 >
                   <Avatar
                     fullName={currentUser.fullName}
@@ -1010,10 +1019,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     size="sm"
                   />
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold text-white truncate">
+                    <div className="text-sm font-semibold text-[var(--nav-text)] truncate">
                       {currentUser.fullName}
                     </div>
-                    <div className="text-[11px] text-[#4EB462] truncate">
+                    <div className="text-xs text-[var(--nav-active)] truncate">
                       @{currentUser.nickname} · View Profile
                     </div>
                   </div>
@@ -1024,7 +1033,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     logout();
                     router.push('/login');
                   }}
-                  className="w-full py-2.5 px-3 rounded-full bg-red-500/15 text-red-300 text-xs font-medium flex items-center justify-center gap-2 cursor-pointer"
+                  className="ui-button ui-button-danger w-full"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Sign Out</span>
@@ -1035,35 +1044,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
 
       {/* MAIN INDEPENDENT SCROLL WORKSPACE COLUMN */}
-      <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
+      <div className="flex min-w-0 flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
         {/* STICKY TOP UTILITY HEADER */}
-        <header className="sticky top-0 z-[var(--z-header)] h-16 bg-[var(--bg-card)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
+        <header className="sticky top-0 z-[var(--z-header)] flex h-[var(--header-height)] items-center justify-between gap-2 border-b border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 sm:gap-3 sm:px-6 lg:px-8">
           {/* Mobile Menu Trigger (hidden on desktop) */}
           <button
             type="button"
             onClick={() => setMobileDrawerOpen(true)}
-            className="grid size-11 place-items-center rounded-[10px] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] cursor-pointer shrink-0 md:hidden"
+            className="ui-button ui-button-secondary ui-button-icon md:hidden"
             aria-label="Open navigation menu"
             aria-expanded={mobileDrawerOpen}
             aria-controls={mobileDrawerOpen ? 'mobile-navigation' : undefined}
           >
-            <Menu className="w-4 h-4" />
+            <Menu aria-hidden="true" className="size-4" />
           </button>
 
           {/* 1. Global Search Trigger */}
-          <div className="flex-1 max-w-xl mx-1 sm:mx-3">
+          <div className="min-w-0 max-w-xl flex-1 sm:mx-3">
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="w-full h-10 px-3.5 rounded-[10px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] flex items-center justify-between gap-2 hover:border-[#4EB462]/60 transition-colors cursor-pointer"
+              className="ui-button ui-button-secondary w-full justify-between bg-[var(--bg-canvas)] px-2.5 font-normal text-[var(--text-secondary)] sm:px-3.5"
             >
-              <span className="flex items-center gap-2 truncate">
-                <Search className="w-3.5 h-3.5 shrink-0 text-[#1F6A37] dark:text-[#4EB462]" />
-                <span className="truncate">
-                  Search across AgroHub (orders, inventory, partners)...
-                </span>
+              <span className="flex min-w-0 items-center gap-2">
+                <Search aria-hidden="true" className="size-4 shrink-0 text-[var(--brand-accent)]" />
+                <span className="truncate">Search AgroHub</span>
               </span>
-              <kbd className="hidden sm:inline-block font-mono-tabular text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+              <kbd className="ui-meta hidden shrink-0 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-0.5 font-mono-tabular sm:inline-block">
                 ⌘K
               </kbd>
             </button>
@@ -1072,7 +1079,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Right: Notifications + Profile Menu */}
           <div
             ref={headerActionsRef}
-            className="flex items-center gap-2.5 shrink-0"
+            className="flex shrink-0 items-center gap-2"
           >
             {/* 2. Notification Center */}
             <div className="relative">
@@ -1082,13 +1089,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   setNotificationsOpen((v) => !v);
                   setProfileMenuOpen(false);
                 }}
-                aria-label="Notifications"
+                aria-label={unreadCount ? `Notifications (${unreadCount} unread)` : 'Notifications'}
                 aria-expanded={notificationsOpen}
-                className="relative h-10 w-10 rounded-[10px] hover:bg-[var(--bg-canvas)] border border-transparent hover:border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] transition-colors cursor-pointer"
+                aria-controls={notificationsOpen ? 'workspace-notifications' : undefined}
+                className="ui-button ui-button-ghost ui-button-icon relative"
               >
-                <Bell className="w-4 h-4 text-[var(--text-primary)]" />
+                <Bell aria-hidden="true" className="size-4 text-[var(--text-primary)]" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#CC310E] text-white font-mono-tabular text-[10px] font-bold flex items-center justify-center">
+                  <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 flex min-h-5 min-w-5 items-center justify-center rounded-full border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-1 font-mono-tabular text-xs font-semibold text-[var(--status-danger-fg)]">
                     {unreadCount}
                   </span>
                 )}
@@ -1098,47 +1106,42 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {notificationsOpen && (
                   <motion.div
                     {...DROPDOWN_MOTION}
-                    className="absolute right-0 mt-2 w-80 sm:w-96 rounded-[18px] bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-lg)] p-3.5 z-[var(--z-dropdown)]"
+                    id="workspace-notifications"
+                    className="ui-surface fixed inset-x-3 top-[calc(var(--header-height)+0.5rem)] z-[var(--z-dropdown)] max-h-[calc(100dvh-var(--header-height)-1rem)] overflow-y-auto p-3.5 shadow-[var(--shadow-lg)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96"
                   >
-                    <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-[var(--border-subtle)]">
+                    <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2.5">
                       <div>
-                        <div className="text-xs font-semibold text-[var(--text-primary)]">
-                          Operational Notifications
+                        <div className="ui-section-title font-semibold text-[var(--text-primary)]">
+                          Notifications
                         </div>
-                        <div className="text-[11px] text-[var(--text-secondary)]">
+                        <div className="ui-meta">
                           Filtered by your RBAC permissions
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={markAllNotificationsRead}
-                        className="px-2.5 py-1 rounded-md bg-[var(--bg-canvas)] text-[11px] font-medium text-[#1F6A37] dark:text-[#4EB462] inline-flex items-center gap-1 hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors cursor-pointer"
+                        className="ui-button ui-button-ghost ui-button-compact text-[var(--brand-accent)]"
                       >
-                        <CheckCheck className="w-3.5 h-3.5" />
+                        <CheckCheck aria-hidden="true" className="size-4" />
                         <span>Mark all read</span>
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-1.5 mb-3">
+                    <div className="mb-3 flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => setNotificationTab('all')}
-                        className={`px-3 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
-                          notificationTab === 'all'
-                            ? 'bg-[#1F6A37] text-white'
-                            : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)]'
-                        }`}
+                        className="ui-tab ui-button-compact"
+                        aria-pressed={notificationTab === 'all'}
                       >
                         All ({permittedNotifications.length})
                       </button>
                       <button
                         type="button"
                         onClick={() => setNotificationTab('unread')}
-                        className={`px-3 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
-                          notificationTab === 'unread'
-                            ? 'bg-[#1F6A37] text-white'
-                            : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)]'
-                        }`}
+                        className="ui-tab ui-button-compact"
+                        aria-pressed={notificationTab === 'unread'}
                       >
                         Unread ({unreadCount})
                       </button>
@@ -1146,7 +1149,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                     <div className="max-h-80 overflow-y-auto space-y-2">
                       {displayedNotifications.length === 0 ? (
-                        <div className="py-6 text-center text-xs text-[var(--text-secondary)]">
+                        <div className="py-6 text-center text-sm text-[var(--text-secondary)]">
                           No {notificationTab === 'unread' ? 'unread ' : ''}
                           notifications for your role.
                         </div>
@@ -1159,22 +1162,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                               markNotificationRead(n.id);
                               setNotificationsOpen(false);
                             }}
-                            className={`block p-3 rounded-[12px] border transition-colors ${
+                            className={`block rounded-[var(--radius-control)] border p-3 transition-colors hover:bg-[var(--bg-subtle)] ${
                               n.read
-                                ? 'bg-[var(--bg-canvas)]/50 border-transparent opacity-75'
-                                : 'bg-[var(--bg-canvas)] border-[var(--border-subtle)] hover:border-[#4EB462]/45'
+                                ? 'border-transparent'
+                                : 'border-[var(--border-subtle)] bg-[var(--bg-canvas)]'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2 mb-1">
                               <StatusBadge status={n.severity} />
-                              <span className="text-[11px] text-[var(--text-secondary)] font-mono-tabular">
+                              <span className="ui-meta font-mono-tabular">
                                 {n.timestamp}
                               </span>
                             </div>
-                            <div className="text-xs font-semibold text-[var(--text-primary)] mt-1">
+                            <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
                               {n.title}
                             </div>
-                            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 leading-relaxed">
+                            <p className="mt-0.5 text-sm leading-relaxed text-[var(--text-secondary)]">
                               {n.description}
                             </p>
                           </Link>
@@ -1196,7 +1199,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
                 aria-expanded={profileMenuOpen}
                 aria-label="Account and Profile Menu"
-                className="h-10 w-10 rounded-full flex items-center justify-center hover:ring-2 hover:ring-[#4EB462]/40 transition-all cursor-pointer"
+                aria-controls={profileMenuOpen ? 'workspace-account' : undefined}
+                className="ui-button ui-button-ghost ui-button-icon rounded-full"
               >
                 <Avatar
                   fullName={currentUser.fullName}
@@ -1209,7 +1213,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {profileMenuOpen && (
                   <motion.div
                     {...DROPDOWN_MOTION}
-                    className="absolute right-0 mt-2 w-80 rounded-[18px] bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-lg)] p-4 z-[var(--z-dropdown)]"
+                    id="workspace-account"
+                    className="ui-surface fixed inset-x-3 top-[calc(var(--header-height)+0.5rem)] z-[var(--z-dropdown)] max-h-[calc(100dvh-var(--header-height)-1rem)] overflow-y-auto p-4 shadow-[var(--shadow-lg)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80"
                   >
                     {/* Identity Header */}
                     <div className="flex items-start gap-3 pb-3.5 mb-3 border-b border-[var(--border-subtle)]">
@@ -1222,7 +1227,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
                           {currentUser.fullName}
                         </div>
-                        <div className="text-xs text-[var(--text-secondary)] truncate">
+                        <div className="ui-meta truncate">
                           @{currentUser.nickname} · {currentUser.email}
                         </div>
                         <div className="mt-1.5 flex items-center gap-1.5">
@@ -1236,12 +1241,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <Link
                         href="/profile"
                         onClick={() => setProfileMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-xs font-medium text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
+                        className={accountLink}
                       >
-                        <User className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
+                        <User aria-hidden="true" className="size-4 shrink-0 text-[var(--brand-accent)]" />
                         <div>
                           <div>My Profile & Account</div>
-                          <div className="text-[11px] text-[var(--text-secondary)] font-normal">
+                          <div className="ui-meta font-normal">
                             Identity, nickname, role & permissions
                           </div>
                         </div>
@@ -1249,12 +1254,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <Link
                         href="/settings"
                         onClick={() => setProfileMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-xs font-medium text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
+                        className={accountLink}
                       >
-                        <Settings className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
+                        <Settings aria-hidden="true" className="size-4 shrink-0 text-[var(--brand-accent)]" />
                         <div>
                           <div>Workspace Settings</div>
-                          <div className="text-[11px] text-[var(--text-secondary)] font-normal">
+                          <div className="ui-meta font-normal">
                             Theme, hubs & operational preferences
                           </div>
                         </div>
@@ -1263,12 +1268,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <Link
                           href="/administration/audit-logs"
                           onClick={() => setProfileMenuOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-xs font-medium text-[var(--text-primary)] hover:bg-[#E5EFE6] dark:hover:bg-[#122719] transition-colors"
+                          className={accountLink}
                         >
-                          <FileSpreadsheet className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
+                          <FileSpreadsheet aria-hidden="true" className="size-4 shrink-0 text-[var(--brand-accent)]" />
                           <div>
                             <div>Security & Audit Trail</div>
-                            <div className="text-[11px] text-[var(--text-secondary)] font-normal">
+                            <div className="ui-meta font-normal">
                               Immutable system governance log
                             </div>
                           </div>
@@ -1278,48 +1283,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                     {/* Appearance Section in Profile Menu */}
                     <div className="pb-3 mb-3 border-b border-[var(--border-subtle)]">
-                      <div className="text-[11px] font-semibold text-[var(--text-secondary)] mb-2 px-1">
+                      <div className="ui-meta mb-2 px-1 font-semibold">
                         Appearance
                       </div>
                       <div
                         role="group"
                         aria-label="Theme Mode"
-                        className="grid grid-cols-3 gap-1 p-1 rounded-[10px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)]"
+                        className="grid grid-cols-3 gap-2 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-1"
                       >
                         <button
                           type="button"
                           onClick={() => setTheme('light')}
-                          className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                            theme === 'light'
-                              ? 'bg-[var(--bg-card)] text-[#1F6A37] shadow-xs'
-                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                          }`}
+                          className="ui-tab px-1.5"
+                          aria-pressed={theme === 'light'}
                         >
-                          <Sun className="w-3.5 h-3.5" />
+                          <Sun aria-hidden="true" className="hidden size-4 shrink-0 min-[360px]:block" />
                           <span>Light</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setTheme('dark')}
-                          className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                            theme === 'dark'
-                              ? 'bg-[var(--bg-card)] text-[#4EB462] shadow-xs'
-                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                          }`}
+                          className="ui-tab px-1.5"
+                          aria-pressed={theme === 'dark'}
                         >
-                          <Moon className="w-3.5 h-3.5" />
+                          <Moon aria-hidden="true" className="hidden size-4 shrink-0 min-[360px]:block" />
                           <span>Dark</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setTheme('system')}
-                          className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                            theme === 'system'
-                              ? 'bg-[var(--bg-card)] text-[#1F6A37] dark:text-[#4EB462] shadow-xs'
-                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                          }`}
+                          className="ui-tab px-1.5"
+                          aria-pressed={theme === 'system'}
                         >
-                          <Monitor className="w-3.5 h-3.5" />
+                          <Monitor aria-hidden="true" className="hidden size-4 shrink-0 min-[360px]:block" />
                           <span>System</span>
                         </button>
                       </div>
@@ -1332,10 +1328,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         logout();
                         router.push('/login');
                       }}
-                      className="w-full px-3 py-2 rounded-[10px] text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 flex items-center justify-between transition-colors cursor-pointer"
+                      className="ui-button ui-button-danger w-full justify-between"
                     >
                       <span>Sign out of AgroHub BOS</span>
-                      <LogOut className="w-3.5 h-3.5" />
+                      <LogOut aria-hidden="true" className="size-4" />
                     </button>
                   </motion.div>
                 )}
@@ -1364,74 +1360,82 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* CONTEXTUAL MOBILE BOTTOM NAVIGATION (<= 15% viewport height) */}
       <nav
         aria-label="Mobile Quick Navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-[var(--z-header)] h-14 bg-[#08190C] text-[#A9BEAE] border-t border-white/10 grid grid-cols-5 items-center px-2"
+        className="ui-nav fixed inset-x-0 bottom-0 z-[var(--z-header)] grid h-[calc(3.5rem+env(safe-area-inset-bottom))] grid-cols-5 items-center border-t border-[var(--nav-border)] bg-[var(--nav-bg)] px-2 pb-[env(safe-area-inset-bottom)] text-[var(--nav-text-muted)] md:hidden"
       >
         <Link
           href="/dashboard"
-          className={`flex flex-col items-center justify-center py-1 text-[10px] ${
-            pathname === '/dashboard' ? 'text-[#4EB462] font-medium' : ''
+          aria-current={pathname === '/dashboard' ? 'page' : undefined}
+          className={`flex min-h-11 flex-col items-center justify-center rounded-[var(--radius-control)] px-1 py-1 text-xs ${
+            pathname === '/dashboard' ? 'text-[var(--nav-active)] font-medium' : ''
           }`}
         >
-          <LayoutDashboard className="w-4 h-4 mb-0.5" />
+          <LayoutDashboard aria-hidden="true" className="mb-0.5 size-4" />
           <span>Home</span>
         </Link>
         {can('orders.view') ? (
           <Link
             href="/orders"
-            className={`flex flex-col items-center justify-center py-1 text-[10px] ${
-              pathname === '/orders' ? 'text-[#4EB462] font-medium' : ''
+            aria-current={pathname === '/orders' ? 'page' : undefined}
+            className={`flex min-h-11 flex-col items-center justify-center rounded-[var(--radius-control)] px-1 py-1 text-xs ${
+              pathname === '/orders' ? 'text-[var(--nav-active)] font-medium' : ''
             }`}
           >
-            <ShoppingBag className="w-4 h-4 mb-0.5" />
+            <ShoppingBag aria-hidden="true" className="mb-0.5 size-4" />
             <span>Orders</span>
           </Link>
         ) : (
           <Link
             href="/deliveries"
-            className={`flex flex-col items-center justify-center py-1 text-[10px] ${
-              pathname === '/deliveries' ? 'text-[#4EB462] font-medium' : ''
+            aria-current={pathname === '/deliveries' ? 'page' : undefined}
+            className={`flex min-h-11 flex-col items-center justify-center rounded-[var(--radius-control)] px-1 py-1 text-xs ${
+              pathname === '/deliveries' ? 'text-[var(--nav-active)] font-medium' : ''
             }`}
           >
-            <Truck className="w-4 h-4 mb-0.5" />
+            <Truck aria-hidden="true" className="mb-0.5 size-4" />
             <span>Runs</span>
           </Link>
         )}
         {can('inventory.view') ? (
           <Link
             href="/inventory"
-            className={`flex flex-col items-center justify-center py-1 text-[10px] ${
-              pathname === '/inventory' ? 'text-[#4EB462] font-medium' : ''
+            aria-current={pathname === '/inventory' ? 'page' : undefined}
+            className={`flex min-h-11 flex-col items-center justify-center rounded-[var(--radius-control)] px-1 py-1 text-xs ${
+              pathname === '/inventory' ? 'text-[var(--nav-active)] font-medium' : ''
             }`}
           >
-            <Warehouse className="w-4 h-4 mb-0.5" />
+            <Warehouse aria-hidden="true" className="mb-0.5 size-4" />
             <span>Inventory</span>
           </Link>
         ) : (
           <Link
             href="/documents"
-            className={`flex flex-col items-center justify-center py-1 text-[10px] ${
-              pathname === '/documents' ? 'text-[#4EB462] font-medium' : ''
+            aria-current={pathname === '/documents' ? 'page' : undefined}
+            className={`flex min-h-11 flex-col items-center justify-center rounded-[var(--radius-control)] px-1 py-1 text-xs ${
+              pathname === '/documents' ? 'text-[var(--nav-active)] font-medium' : ''
             }`}
           >
-            <FileText className="w-4 h-4 mb-0.5" />
+            <FileText aria-hidden="true" className="mb-0.5 size-4" />
             <span>Docs</span>
           </Link>
         )}
         <Link
           href="/profile"
-          className={`flex flex-col items-center justify-center py-1 text-[10px] ${
-            pathname === '/profile' ? 'text-[#4EB462] font-medium' : ''
+          aria-current={pathname === '/profile' ? 'page' : undefined}
+          className={`flex min-h-11 flex-col items-center justify-center rounded-[var(--radius-control)] px-1 py-1 text-xs ${
+            pathname === '/profile' ? 'text-[var(--nav-active)] font-medium' : ''
           }`}
         >
-          <User className="w-4 h-4 mb-0.5" />
+          <User aria-hidden="true" className="mb-0.5 size-4" />
           <span>Profile</span>
         </Link>
         <button
           type="button"
           onClick={() => setMobileDrawerOpen(true)}
-          className="flex flex-col items-center justify-center py-1 text-[10px] rounded-full hover:text-white"
+          aria-expanded={mobileDrawerOpen}
+          aria-controls={mobileDrawerOpen ? 'mobile-navigation' : undefined}
+          className="flex min-h-11 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-control)] px-1 py-1 text-xs hover:bg-[var(--nav-surface)] hover:text-[var(--nav-text)]"
         >
-          <Menu className="w-4 h-4 mb-0.5" />
+          <Menu aria-hidden="true" className="mb-0.5 size-4" />
           <span>Modules</span>
         </button>
       </nav>
@@ -1446,7 +1450,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder={currentUser.roleId === 'delivery_driver' ? 'Search your delivery runs' : 'Search by name or reference'}
-            className="min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] pl-9 pr-3 text-sm"
+            className="ui-field w-full pl-9"
           />
         </label>
         {searchQuery.trim() && (
@@ -1455,12 +1459,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {searchResults.map((item) => (
                 <li key={item.category + item.title + item.href}>
                   <Link href={item.href} onClick={() => setSearchOpen(false)}
-                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg p-3 hover:bg-[var(--bg-subtle)]">
+                    className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-[var(--radius-control)] p-3 hover:bg-[var(--bg-subtle)]">
                     <div>
                       <p className="text-sm font-semibold">{item.title}</p>
-                      <p className="text-xs text-[var(--text-secondary)]">{item.subtitle}</p>
+                      <p className="ui-meta">{item.subtitle}</p>
                     </div>
-                    <span className="text-xs text-[var(--brand-accent)]">{item.category}</span>
+                    <span className="ui-meta text-[var(--brand-accent)]">{item.category}</span>
                   </Link>
                 </li>
               ))}
@@ -1472,41 +1476,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* GLOBAL TOAST FEEDBACK STACK */}
       <div
         aria-live="polite"
-        className="fixed bottom-16 md:bottom-6 right-4 sm:right-6 z-[var(--z-toast)] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"
+        className="pointer-events-none fixed inset-x-3 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[var(--z-toast)] flex max-w-sm flex-col gap-2.5 sm:left-auto sm:right-6 sm:w-full md:bottom-6"
       >
         <AnimatePresence>
-          {toasts.map((t) => (
-            <motion.div
-              key={t.id}
-              initial={{ opacity: 0, y: 12, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.97 }}
-              transition={{ duration: 0.18 }}
-              className="pointer-events-auto rounded-2xl bg-[#08190C] text-[#F4F6F3] border border-[#4EB462]/35 p-3.5 shadow-[var(--shadow-lg)] flex items-start justify-between gap-3"
-            >
-              <div className="flex items-start gap-2.5 min-w-0">
-                <CheckCircle2 className="w-4 h-4 text-[#4EB462] shrink-0 mt-0.5" />
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold text-white">
-                    {t.title}
-                  </div>
-                  {t.description && (
-                    <div className="text-[11px] text-[#A9BEAE] mt-0.5 leading-relaxed">
-                      {t.description}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => dismissToast(t.id)}
-                aria-label="Dismiss notification"
-                className="p-1 rounded-full text-[#A9BEAE] hover:text-white cursor-pointer"
+          {toasts.map((toast) => {
+            const { icon: Icon, style } = toastVariants[toast.tone];
+            return (
+              <motion.div
+                key={toast.id}
+                initial={reduceMotion ? false : { opacity: 0, y: 12, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: 8, scale: 0.97 }}
+                transition={{ duration: reduceMotion ? 0 : 0.18 }}
+                className={`pointer-events-auto flex items-start justify-between gap-2 rounded-[var(--radius-card)] border p-3 shadow-[var(--shadow-lg)] ${style}`}
               >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </motion.div>
-          ))}
+                <div className="flex min-w-0 items-start gap-2.5 py-1">
+                  <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                  <div className="min-w-0 wrap-break-word text-sm">
+                    <div className="font-semibold">{toast.title}</div>
+                    {toast.description && <p className="mt-0.5 leading-relaxed">{toast.description}</p>}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => dismissToast(toast.id)}
+                  aria-label="Dismiss notification"
+                  className="ui-button ui-button-ghost ui-button-icon ui-button-compact [color:inherit]"
+                >
+                  <X aria-hidden="true" className="size-4" />
+                </button>
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </div>
     </div>

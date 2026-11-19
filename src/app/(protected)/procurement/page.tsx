@@ -81,15 +81,15 @@ function ProcurementContent() {
       </div>
 
       <div className="flex flex-wrap gap-2" aria-label="Procurement views">
-        <button type="button" aria-pressed={!showSuppliers} className={!showSuppliers ? purchaseButton : purchaseSecondaryButton}
+        <button type="button" aria-pressed={!showSuppliers} className="ui-tab"
           onClick={() => setShowSuppliers(false)}>Sourcing & purchases</button>
-        <button type="button" aria-pressed={showSuppliers} className={showSuppliers ? purchaseButton : purchaseSecondaryButton}
+        <button type="button" aria-pressed={showSuppliers} className="ui-tab"
           onClick={() => setShowSuppliers(true)}>Supplier comparison</button>
       </div>
 
       {showSuppliers ? (
         <section aria-labelledby="procurement-suppliers" className="space-y-3">
-          <h2 id="procurement-suppliers" className="font-heading text-lg font-semibold">Supplier comparison</h2>
+          <h2 id="procurement-suppliers" className="ui-section-title">Supplier comparison</h2>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {suppliers.filter((supplier) => !supplier.isArchived).map((supplier) => (
               <Card key={supplier.id} className="space-y-3">
@@ -112,7 +112,7 @@ function ProcurementContent() {
       ) : (
         <>
           <section aria-labelledby="sourcing-demand" className="space-y-3">
-            <h2 id="sourcing-demand" className="font-heading text-lg font-semibold">Customer sourcing demand</h2>
+            <h2 id="sourcing-demand" className="ui-section-title">Customer sourcing demand</h2>
             {attentionOrders.length === 0 && <Card><p className="text-sm text-[var(--text-secondary)]">No customer orders have outstanding direct sourcing.</p></Card>}
             {attentionOrders.map(({ order, lines }) => (
               <Card key={order.id} className={`space-y-3 ${order.id === orderParam ? 'ring-1 ring-[var(--brand-accent)]' : ''}`}>
@@ -138,10 +138,10 @@ function ProcurementContent() {
 
           <section aria-labelledby="purchase-orders" className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 id="purchase-orders" className="font-heading text-lg font-semibold">Purchase orders</h2>
-              <label className="flex flex-wrap items-center gap-2 text-sm">Show
+              <h2 id="purchase-orders" className="ui-section-title">Purchase orders</h2>
+              <label className="ui-label flex flex-wrap items-center gap-2">Show
                 <select value={filter} onChange={(event) => setFilter(event.target.value as PurchaseFilter)}
-                  className="h-11 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-sm">
+                  className="ui-field">
                   {filters.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </label>

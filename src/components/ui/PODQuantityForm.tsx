@@ -4,9 +4,9 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { calculateInvoiceEligibility } from '@/lib/services/business-rules';
 import { checkPODLine, comparePODLine, POD_DISCREPANCY_REASONS, preparePODReceipt, type PODExpectedLine, type PODQuantityInput } from '@/lib/services/delivery-workflow';
 
-export const podInputClass = 'min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-accent)]';
-export const podSecondaryClass = 'inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] disabled:opacity-50';
-export const podPrimaryClass = 'inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1F6A37] px-4 py-2 text-sm font-semibold text-white hover:bg-[#12512C] disabled:opacity-50';
+export const podInputClass = 'ui-field w-full';
+export const podSecondaryClass = 'ui-button ui-button-secondary';
+export const podPrimaryClass = 'ui-button ui-button-primary';
 
 interface QuantityFields {
   received: string;
@@ -88,7 +88,7 @@ export function PODQuantityForm({ expected, mode, billingAvailable = false, chil
     <form onSubmit={submit} className="space-y-5">
       {children}
       <div className="space-y-3">
-        <h3 className="text-base font-semibold">Delivery quantities</h3>
+        <h3 className="ui-section-title">Delivery quantities</h3>
         {lines.map((line, index) => {
           const key = line.orderLineId;
           const quantity = quantities[index];
@@ -111,20 +111,20 @@ export function PODQuantityForm({ expected, mode, billingAvailable = false, chil
                 </p>
               )}
               <div className="grid grid-cols-2 gap-3">
-                <label className="min-w-0 space-y-1 text-sm font-medium">
+                <label className="ui-label min-w-0 space-y-1">
                   <span>Received</span>
                   <input type="number" inputMode="decimal" min="0" step="any" required value={values.received}
                     aria-invalid={issue && quantity.receivedQty < 0 ? true : undefined}
                     onChange={(event) => edit(key, { received: event.target.value })} className={podInputClass} />
                 </label>
-                <label className="min-w-0 space-y-1 text-sm font-medium">
+                <label className="ui-label min-w-0 space-y-1">
                   <span>Accepted</span>
                   <input type="number" inputMode="decimal" min="0" max={Number.isFinite(quantity.receivedQty) ? Math.min(quantity.receivedQty, line.dispatchedQty) : undefined} step="any" required value={values.accepted}
                     aria-invalid={issue ? true : undefined}
                     onChange={(event) => edit(key, { accepted: event.target.value })} className={podInputClass} />
                 </label>
               </div>
-              {issue && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{issue}</p>}
+              {issue && <p role="alert" className="text-sm text-[var(--status-danger-fg)]">{issue}</p>}
               {comparison && (
                 <dl className="grid grid-cols-3 gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 text-sm tabular-nums">
                   <div><dt className="text-xs text-[var(--text-secondary)]">Short</dt><dd>{comparison.currentDeliveryShortage} {line.unit}</dd></div>
@@ -134,7 +134,7 @@ export function PODQuantityForm({ expected, mode, billingAvailable = false, chil
               )}
               {comparison?.hasDiscrepancy && (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="min-w-0 space-y-1 text-sm font-medium">
+                  <label className="ui-label min-w-0 space-y-1">
                     <span>Discrepancy reason</span>
                     <select required value={values.reason} onChange={(event) => edit(key, { reason: event.target.value })} className={podInputClass}>
                       <option value="">Select a reason</option>
@@ -142,7 +142,7 @@ export function PODQuantityForm({ expected, mode, billingAvailable = false, chil
                       {POD_DISCREPANCY_REASONS.map((reason) => <option key={reason}>{reason}</option>)}
                     </select>
                   </label>
-                  <label className="min-w-0 space-y-1 text-sm font-medium">
+                  <label className="ui-label min-w-0 space-y-1">
                     <span>Notes {values.reason === 'Other' ? '(required)' : '(optional)'}</span>
                     <input required={values.reason === 'Other'} value={values.explanation} onChange={(event) => edit(key, { explanation: event.target.value })} className={podInputClass} />
                   </label>
@@ -160,11 +160,11 @@ export function PODQuantityForm({ expected, mode, billingAvailable = false, chil
         </div>
         <output className="font-heading text-lg font-semibold tabular-nums" aria-live="polite">{amount ?? 'Awaiting quantities'}</output>
       </div>
-      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">
+      <label className="ui-label flex min-h-11 cursor-pointer items-center gap-3">
         <input type="checkbox" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="size-5 shrink-0 accent-[var(--brand-accent)]" />
         I checked the received and accepted quantities against the goods and delivery evidence.
       </label>
-      {error && <p role="alert" className="rounded-lg border border-red-500/35 p-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p role="alert" className="rounded-lg border border-[var(--status-danger-border)] p-3 text-sm text-[var(--status-danger-fg)]">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
         <button type="button" onClick={onCancel} disabled={submitting} className={podSecondaryClass}>Cancel</button>
         <button type="submit" disabled={submitting || !confirmed || !lines.length} className={mode === 'capture' ? podPrimaryClass : podSecondaryClass}>

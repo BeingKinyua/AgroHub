@@ -45,11 +45,6 @@ export default function RolesAdministrationPage() {
   return (
     <div>
       <PageHeader
-        breadcrumbs={[
-          { label: 'Workspace', href: '/dashboard' },
-          { label: 'Administration' },
-          { label: 'RBAC Role Matrix' },
-        ]}
         title="Roles and permissions"
         description="Choose a role to review what its members can see or do in AgroHub."
       />
@@ -92,39 +87,25 @@ export default function RolesAdministrationPage() {
                 type="button"
                 aria-pressed={active}
                 onClick={() => setSelectedRoleId(r.id)}
-                className={`w-full text-left p-4 rounded-[14px] border transition-all cursor-pointer ${
-                  active
-                    ? 'bg-[#142B1B] text-[#F4F6F3] border-[#4EB462]/45 shadow-[var(--shadow-md)]'
-                    : 'bg-[var(--bg-card)] text-[var(--text-primary)] border-[var(--border-subtle)] hover:border-[#4EB462]/40'
-                }`}
+                className={`ui-button ui-button-secondary block w-full p-4 text-left font-normal ${active ? 'border-[var(--status-success-border)] bg-[var(--action-selected-bg)]' : ''}`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-heading text-sm font-semibold">
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">
                     {r.name}
                   </span>
                   <span
-                    className={`font-mono-tabular text-[11px] px-2 py-0.5 rounded-md ${
-                      active
-                        ? 'bg-[#1F6A37]/50 text-[#4EB462]'
-                        : 'bg-[var(--bg-canvas)] text-[#1F6A37] dark:text-[#4EB462]'
-                    }`}
+                    className="ui-badge ui-tone-neutral shrink-0 tabular-nums"
                   >
-                    {r.permissions.length} perms
+                    {r.permissions.length} permissions
                   </span>
                 </div>
                 <p
-                  className={`text-xs mt-1 leading-relaxed ${
-                    active ? 'text-[#A9BEAE]' : 'text-[var(--text-secondary)]'
-                  }`}
+                  className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]"
                 >
                   {r.description}
                 </p>
                 <div
-                  className={`mt-2.5 pt-2 border-t flex items-center justify-between text-[11px] ${
-                    active
-                      ? 'border-white/10 text-[#A9BEAE]'
-                      : 'border-[var(--border-subtle)] text-[var(--text-secondary)]'
-                  }`}
+                  className="ui-meta mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2"
                 >
                   <span>{assignedCount} {assignedCount === 1 ? 'member' : 'members'}</span>
                   {r.lastModified && <span>Updated {r.lastModified}</span>}
@@ -141,12 +122,12 @@ export default function RolesAdministrationPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[var(--border-subtle)]">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
-                    <h2 className="font-heading text-lg font-semibold text-[var(--text-primary)]">
+                    <Shield className="w-4 h-4 text-[var(--brand-accent)]" />
+                    <h2 className="ui-section-title">
                       {selectedRole.name}
                     </h2>
                   </div>
-                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  <p className="text-sm text-[var(--text-secondary)] mt-0.5">
                     {selectedRole.defaultFocus}
                   </p>
                 </div>
@@ -167,10 +148,10 @@ export default function RolesAdministrationPage() {
                       className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-heading text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]">
+                        <span className="ui-section-title">
                           {moduleName} Module
                         </span>
-                        <span className="font-mono-tabular text-[11px] text-[var(--text-secondary)]">
+                        <span className="font-mono-tabular ui-meta">
                           {
                             perms.filter((p) =>
                               selectedRole.permissions.includes(p.key)
@@ -194,32 +175,24 @@ export default function RolesAdministrationPage() {
                               aria-label={p.description}
                               disabled={!editable}
                               onClick={() => handleToggle(p.key)}
-                              className={`px-4 py-3 rounded-[12px] border text-left flex items-start justify-between gap-3 transition-colors ${
-                                granted
-                                  ? 'bg-[var(--bg-card)] border-[#4EB462]/45'
-                                  : 'bg-[var(--bg-card)]/50 border-[var(--border-subtle)] opacity-70'
-                              } ${
-                                editable
-                                  ? 'cursor-pointer hover:border-[#4EB462]'
-                                  : 'cursor-default'
-                              }`}
+                              className={`ui-button ui-button-secondary w-full items-start justify-between gap-3 p-3 text-left font-normal disabled:opacity-100 ${granted ? 'border-[var(--status-success-border)]' : ''}`}
                             >
                               <div className="min-w-0">
-                                <div className="font-mono-tabular text-xs font-semibold text-[var(--text-primary)] truncate">
+                                <div className="text-sm font-semibold leading-snug text-[var(--text-primary)]">
                                   {p.description}
                                 </div>
-                                <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                                <div className="ui-meta mt-0.5 break-all">
                                   {p.key}
                                 </div>
                               </div>
                               <div className="shrink-0 mt-0.5">
                                 {granted ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#E5EFE6] dark:bg-[#142B1B] text-[#1F6A37] dark:text-[#4EB462] text-[10px] font-semibold">
+                                  <span className="ui-badge ui-tone-success">
                                     <CheckCircle2 className="w-3 h-3" />
                                     <span>Granted</span>
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-0.5 rounded bg-[var(--bg-canvas)] text-[var(--text-secondary)] text-[10px]">
+                                  <span className="ui-badge ui-tone-neutral">
                                     Revoked
                                   </span>
                                 )}

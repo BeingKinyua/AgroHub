@@ -81,7 +81,7 @@ function CustomersDirectory() {
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="h-10 px-4 rounded-[10px] bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               <Plus className="w-4 h-4" />
               <span>Onboard Customer</span>
@@ -143,9 +143,7 @@ function CustomersDirectory() {
             const active = accountType === filter.type;
             return (
               <Link key={filter.href} href={filter.href} aria-current={active ? 'page' : undefined}
-                className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium ${active
-                  ? 'bg-[var(--bg-subtle)] text-[var(--brand-accent)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]'}`}
+                className="ui-tab whitespace-nowrap"
               >
                 {filter.label}
               </Link>
@@ -157,7 +155,7 @@ function CustomersDirectory() {
           <Search className="pointer-events-none absolute left-3 size-4 text-[var(--text-secondary)]" aria-hidden="true" />
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)}
             placeholder="Search by name, code, or contract"
-            className="min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] pl-9 pr-3 text-sm" />
+            className="ui-field w-full pl-9 pr-3" />
         </label>
       </div>
 
@@ -166,9 +164,9 @@ function CustomersDirectory() {
       ) : (
       <Card padding="p-0" className="overflow-hidden">
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="ui-table w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
+              <tr className="border-b border-[var(--border-subtle)]">
                 <th className="py-3 px-4">Code & Account Name</th>
                 <th className="py-3 px-4">Segment & Zone</th>
                 <th className="py-3 px-4">Procurement Contact</th>
@@ -181,7 +179,7 @@ function CustomersDirectory() {
               {visibleCustomers.map((c) => (
                 <tr key={c.id} className="hover:bg-[var(--bg-canvas)]/60">
                   <td className="py-3.5 px-4">
-                    <div className="font-mono-tabular text-[11px] text-[#1F6A37] dark:text-[#4EB462] font-semibold">
+                    <div className="font-mono-tabular text-xs text-[var(--brand-accent)] font-semibold">
                       {c.code}
                     </div>
                     <div className="font-semibold text-[var(--text-primary)]">
@@ -190,13 +188,13 @@ function CustomersDirectory() {
                   </td>
                   <td className="py-3.5 px-4">
                     <div>{c.segment}</div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">
+                    <div className="ui-meta">
                       {c.deliveryZone}
                     </div>
                   </td>
                   <td className="py-3.5 px-4">
                     <div>{c.procurementContact}</div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">
+                    <div className="ui-meta">
                       {c.phone}
                     </div>
                   </td>
@@ -204,7 +202,7 @@ function CustomersDirectory() {
                     <div>
                       {c.paymentTerms} · {c.orderCadence}
                     </div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">
+                    <div className="ui-meta">
                       {c.priceTier}
                     </div>
                     {c.isInstitutional && c.contractRef && <div className="mt-0.5 text-xs">{c.contractRef}</div>}
@@ -213,7 +211,7 @@ function CustomersDirectory() {
                     <div className="font-semibold">
                       {c.outstandingBalanceKes.toLocaleString()}
                     </div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">
+                    <div className="ui-meta">
                       Limit: {c.creditLimitKes.toLocaleString()}
                     </div>
                   </td>
@@ -230,7 +228,7 @@ function CustomersDirectory() {
           {visibleCustomers.map((c) => (
             <div key={c.id} className="p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-mono-tabular text-xs font-semibold text-[#1F6A37] dark:text-[#4EB462]">
+                <span className="font-mono-tabular text-xs font-semibold text-[var(--brand-accent)]">
                   {c.code}
                 </span>
                 <StatusBadge status={c.status} />
@@ -259,28 +257,28 @@ function CustomersDirectory() {
         <form onSubmit={handleCreate} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="customers-name" className="ui-label block mb-1">
                 Account / Institution Name
               </label>
-              <input
+              <input id="customers-name"
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Brookhouse School Karen Kitchen"
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">Segment</label>
-              <select
+              <label htmlFor="customers-segment" className="ui-label block mb-1">Segment</label>
+              <select id="customers-segment"
                 value={segment}
                 onChange={(e) =>
                   setSegment(
                     e.target.value as CustomerInstitutionRecord['segment']
                   )
                 }
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 <option value="School">School</option>
                 <option value="Hospital">Hospital</option>
@@ -294,73 +292,73 @@ function CustomersDirectory() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="customers-contact" className="ui-label block mb-1">
                 Procurement Contact Name
               </label>
-              <input
+              <input id="customers-contact"
                 type="text"
                 required
                 value={contact}
                 onChange={(e) => setContact(e.target.value)}
                 placeholder="e.g., Mr. James Mutiso"
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="customers-phone" className="ui-label block mb-1">
                 Phone Number
               </label>
-              <input
+              <input id="customers-phone"
                 type="text"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="customers-email" className="ui-label block mb-1">
                 Work Email
               </label>
-              <input
+              <input id="customers-email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="procurement@institution.ac.ke"
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="customers-zone" className="ui-label block mb-1">
                 Delivery Zone
               </label>
-              <input
+              <input id="customers-zone"
                 type="text"
                 required
                 value={deliveryZone}
                 onChange={(e) => setDeliveryZone(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="customers-terms" className="ui-label block mb-1">
                 Payment Terms
               </label>
-              <select
+              <select id="customers-terms"
                 value={paymentTerms}
                 onChange={(e) =>
                   setPaymentTerms(
                     e.target.value as CustomerInstitutionRecord['paymentTerms']
                   )
                 }
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 <option value="Net 15">Net 15</option>
                 <option value="Net 30">Net 30</option>
@@ -369,14 +367,14 @@ function CustomersDirectory() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="customers-credit" className="ui-label block mb-1">
                 Approved Credit Limit (KES)
               </label>
-              <input
+              <input id="customers-credit"
                 type="number"
                 value={creditLimitKes}
                 onChange={(e) => setCreditLimitKes(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                className="ui-field w-full font-mono-tabular"
               />
             </div>
           </div>
@@ -385,13 +383,13 @@ function CustomersDirectory() {
             <button
               type="button"
               onClick={() => setCreateOpen(false)}
-              className="px-4 py-2 rounded-full border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium cursor-pointer"
+              className="ui-button ui-button-primary"
             >
               Create Customer Account
             </button>

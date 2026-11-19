@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useBos } from '@/lib/services/bos-context';
 import { Card, FeedbackBanner, KPI, Modal, PageHeader, StatusBadge } from '@/components/ui/primitives';
-import { podPrimaryClass, podSecondaryClass } from '@/components/ui/PODQuantityForm';
 import { calculateInvoiceEligibility } from '@/lib/services/business-rules';
 import { getExistingPODInvoice } from '@/lib/services/delivery-workflow';
 
@@ -44,7 +43,7 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Customer invoices" description="Issue invoices for verified receipts and track customer balances."
-        actions={can('finance.record_payment') && can('finance.allocate_payment') ? <Link href="/payments" className={podPrimaryClass}>Record payment</Link> : undefined} />
+        actions={can('finance.record_payment') && can('finance.allocate_payment') ? <Link href="/payments" className="ui-button ui-button-primary">Record payment</Link> : undefined} />
       <FeedbackBanner message={feedback?.msg ?? null} type={feedback?.type} onDismiss={() => setFeedback(null)} />
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -55,18 +54,18 @@ export default function InvoicesPage() {
 
       {readyToInvoice.length > 0 && (
         <section className="space-y-3" id="ready-to-invoice">
-          <h2 className="text-lg font-semibold">Verified receipts ready to invoice</h2>
+          <h2 className="ui-section-title">Verified receipts ready to invoice</h2>
           <ul className="space-y-2">
             {readyToInvoice.map(({ pod, order, amount }) => (
               <li key={pod.id}>
                 <Card padding="p-4" className="flex flex-wrap items-center justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-semibold">{order.customerName}</p>
-                    <p className="text-sm text-[var(--text-secondary)]">{order.orderNumber} · {pod.id}</p>
+                    <p className="ui-meta">{order.orderNumber} · {pod.id}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     <strong className="text-sm tabular-nums">{money(amount)}</strong>
-                    {can('finance.record_payment') && <button type="button" className={podPrimaryClass} disabled={pendingIssueId !== null}
+                    {can('finance.record_payment') && <button type="button" className="ui-button ui-button-primary ui-button-compact" disabled={pendingIssueId !== null}
                       onClick={() => issue(order.id, pod.id)}>{pendingIssueId === pod.id ? 'Issuing…' : 'Issue invoice'}</button>}
                   </div>
                 </Card>
@@ -77,22 +76,22 @@ export default function InvoicesPage() {
       )}
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Issued invoices</h2>
+        <h2 className="ui-section-title">Issued invoices</h2>
         <ul className="space-y-2">
           {invoices.map((invoice) => (
             <li key={invoice.id} id={`invoice-${invoice.invoiceNumber}`} className="scroll-mt-24">
               <Card padding="p-4" className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
                 <div className="space-y-1">
                   <p className="text-sm font-semibold">{invoice.customerName}</p>
-                  <p className="text-sm text-[var(--text-secondary)]">{invoice.invoiceNumber} · {invoice.orderNumber}</p>
+                  <p className="ui-meta">{invoice.invoiceNumber} · {invoice.orderNumber}</p>
                 </div>
                 <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <div><dt className="text-xs text-[var(--text-secondary)]">Due</dt><dd>{invoice.dueDate}</dd></div>
-                  <div><dt className="text-xs text-[var(--text-secondary)]">Balance</dt><dd className="font-semibold tabular-nums">{money(invoice.balanceKes)}</dd></div>
+                  <div><dt className="ui-meta">Due</dt><dd>{invoice.dueDate}</dd></div>
+                  <div><dt className="ui-meta">Balance</dt><dd className="font-semibold tabular-nums">{money(invoice.balanceKes)}</dd></div>
                 </dl>
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={invoice.status} />
-                  <button type="button" className={podSecondaryClass} onClick={() => setSelectedId(invoice.id)}>View invoice</button>
+                  <button type="button" className="ui-button ui-button-secondary ui-button-compact" onClick={() => setSelectedId(invoice.id)}>View invoice</button>
                 </div>
               </Card>
             </li>
@@ -106,13 +105,13 @@ export default function InvoicesPage() {
         {selected && (
           <div className="space-y-4 text-sm">
             <div className="flex flex-wrap items-center gap-2"><StatusBadge status={selected.status} /><span>{selected.orderNumber}</span></div>
-            <dl className="grid grid-cols-2 gap-3 rounded-lg bg-[var(--bg-canvas)] p-4 sm:grid-cols-4">
-              <div><dt className="text-xs text-[var(--text-secondary)]">Issued</dt><dd>{selected.issueDate}</dd></div>
-              <div><dt className="text-xs text-[var(--text-secondary)]">Due</dt><dd>{selected.dueDate}</dd></div>
-              <div><dt className="text-xs text-[var(--text-secondary)]">Terms</dt><dd>{selected.paymentTerms || 'Unrecorded'}</dd></div>
-              {selectedCustomer?.kraPin && <div><dt className="text-xs text-[var(--text-secondary)]">Customer KRA PIN</dt><dd>{selectedCustomer.kraPin}</dd></div>}
+            <dl className="ui-surface grid grid-cols-2 gap-3 bg-[var(--bg-subtle)] p-4 sm:grid-cols-4">
+              <div><dt className="ui-meta">Issued</dt><dd>{selected.issueDate}</dd></div>
+              <div><dt className="ui-meta">Due</dt><dd>{selected.dueDate}</dd></div>
+              <div><dt className="ui-meta">Terms</dt><dd>{selected.paymentTerms || 'Unrecorded'}</dd></div>
+              {selectedCustomer?.kraPin && <div><dt className="ui-meta">Customer KRA PIN</dt><dd>{selectedCustomer.kraPin}</dd></div>}
             </dl>
-            {selected.podRef && <p>Proof of delivery <Link href={`/fulfillment?receipt=${selected.podRef}`} className="font-semibold underline">{selected.podRef}</Link></p>}
+            {selected.podRef && <p>Proof of delivery <Link href={`/fulfillment?receipt=${selected.podRef}`} className="ui-link underline">{selected.podRef}</Link></p>}
             {selected.lineItems?.length ? (
               <ul className="space-y-2">
                 {selected.lineItems.map((line, index) => (
@@ -126,13 +125,13 @@ export default function InvoicesPage() {
                 ))}
               </ul>
             ) : <p className="text-[var(--text-secondary)]">Billed quantities are unavailable for this invoice.</p>}
-            <dl className="space-y-2 rounded-lg bg-[var(--bg-canvas)] p-4">
+            <dl className="ui-surface space-y-2 bg-[var(--bg-subtle)] p-4">
               <div className="flex justify-between"><dt>Invoiced total</dt><dd className="tabular-nums">{money(selected.amountKes)}</dd></div>
               <div className="flex justify-between"><dt>Paid</dt><dd className="tabular-nums">{money(selected.paidAmountKes)}</dd></div>
               <div className="flex justify-between border-t border-[var(--border-subtle)] pt-2 font-semibold"><dt>Balance due</dt><dd className="tabular-nums">{money(selected.balanceKes)}</dd></div>
             </dl>
             {can('finance.record_payment') && can('finance.allocate_payment') && selected.balanceKes > 0 &&
-              <Link href={`/payments?invoice=${selected.invoiceNumber}`} className={podPrimaryClass}>Allocate payment</Link>}
+              <Link href={`/payments?invoice=${selected.invoiceNumber}`} className="ui-button ui-button-primary">Allocate payment</Link>}
           </div>
         )}
       </Modal>

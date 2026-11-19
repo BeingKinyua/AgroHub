@@ -48,9 +48,9 @@ const CATEGORIES = [
   'Herbs & Greens',
 ] as const;
 
-const cardButton = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-sm font-semibold hover:bg-[var(--bg-canvas)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-accent)] disabled:opacity-50';
-const primaryButton = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#1F6A37] px-4 py-2 text-sm font-semibold text-white hover:bg-[#12512C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-accent)] disabled:opacity-50';
-const formControl = 'min-h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-accent)]';
+const cardButton = 'ui-button ui-button-secondary';
+const primaryButton = 'ui-button ui-button-primary';
+const formControl = 'ui-field w-full';
 const formatKes = (amount: number) => `KES ${amount.toLocaleString('en-KE')}`;
 const formatStock = (amount: number, unit: UnitOfMeasure) => `${amount.toLocaleString('en-KE')} ${unit}`;
 
@@ -432,7 +432,7 @@ export default function ProductsPage() {
 
       <Card padding="p-4" className="space-y-4">
         <div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
-          <label className="block space-y-1 text-sm font-medium">
+          <label className="ui-label block space-y-1">
             <span>Search products</span>
             <div className="relative">
               <Search size={17} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
@@ -440,14 +440,14 @@ export default function ProductsPage() {
                 className={`${formControl} pl-10`} />
             </div>
           </label>
-          <label className="block space-y-1 text-sm font-medium">
+          <label className="ui-label block space-y-1">
             <span>Category</span>
             <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={formControl}>
               <option value="All">All categories</option>
               {filterCategories.map((category) => <option key={category}>{category}</option>)}
             </select>
           </label>
-          <label className="block space-y-1 text-sm font-medium">
+          <label className="ui-label block space-y-1">
             <span>Status</span>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={formControl}>
               <option value="All">Current catalogue</option>
@@ -464,11 +464,11 @@ export default function ProductsPage() {
           </p>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Catalogue view">
             <button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')}
-              className={`${cardButton} aria-pressed:bg-[var(--bg-subtle)] aria-pressed:text-[var(--brand-accent)]`}>
+              className="ui-tab">
               <Table2 size={16} aria-hidden="true" /> Table
             </button>
             <button type="button" aria-pressed={view === 'grid'} onClick={() => setView('grid')}
-              className={`${cardButton} aria-pressed:bg-[var(--bg-subtle)] aria-pressed:text-[var(--brand-accent)]`}>
+              className="ui-tab">
               <LayoutGrid size={16} aria-hidden="true" /> Grid
             </button>
           </div>
@@ -483,7 +483,7 @@ export default function ProductsPage() {
         </Card>
       ) : view === 'table' ? (
         <Card padding="p-0" className="overflow-hidden">
-          <table className="w-full table-fixed text-left text-sm" aria-label="Product catalogue">
+          <table className="ui-table w-full table-fixed text-left" aria-label="Product catalogue">
             <thead className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-secondary)]">
               <tr>
                 <th scope="col" className="px-3 py-3 sm:w-1/3 sm:px-4">Product</th>
@@ -498,7 +498,7 @@ export default function ProductsPage() {
                 <tr key={product.id} className="hover:bg-[var(--bg-canvas)]">
                   <th scope="row" className="px-3 py-2 font-normal sm:px-4">
                     <button type="button" onClick={() => openProduct(product.id)}
-                      className="block min-h-11 break-words rounded-md text-left text-sm font-semibold underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-accent)]">
+                      className="ui-button ui-button-ghost w-full justify-start break-words whitespace-normal text-left hover:underline">
                       {product.name}
                     </button>
                     <span className="block break-words text-xs text-[var(--text-secondary)]">{product.sku}</span>
@@ -507,7 +507,7 @@ export default function ProductsPage() {
                   <td className="px-2 py-3 tabular-nums sm:px-3">
                     <span className="block break-words">{formatStock(product.availableQty, product.unit)}</span>
                     {product.status === 'Active' && product.availableQty <= product.reorderPoint &&
-                      <span className="block text-xs text-amber-700 dark:text-amber-300">Reorder</span>}
+                      <span className="block text-xs text-[var(--status-warning-fg)]">Reorder</span>}
                   </td>
                   <td className="hidden px-3 py-3 tabular-nums md:table-cell">{formatKes(product.pricing.institutionalKes)}</td>
                   <td className="px-2 py-3 sm:px-4"><StatusBadge status={product.status} /></td>
@@ -527,7 +527,7 @@ export default function ProductsPage() {
                 <div className="flex flex-1 flex-col gap-3 p-4">
                   <div className="min-w-0">
                     <p className="text-xs text-[var(--text-secondary)]">{product.sku} · {product.category}</p>
-                    <h2 className="mt-1 text-base font-semibold">{product.name}</h2>
+                    <h2 className="ui-section-title mt-1">{product.name}</h2>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span className="tabular-nums">{formatStock(product.availableQty, product.unit)} available</span>
@@ -568,7 +568,7 @@ export default function ProductsPage() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <section className="space-y-3 rounded-xl border border-[var(--border-subtle)] p-4">
-                <h3 className="text-base font-semibold">Stock</h3>
+                <h3 className="ui-section-title">Stock</h3>
                 <dl className="grid grid-cols-2 gap-3 text-sm tabular-nums">
                   <div><dt className="text-[var(--text-secondary)]">Available</dt><dd className="font-semibold">{formatStock(detailProduct.availableQty, detailProduct.unit)}</dd></div>
                   <div><dt className="text-[var(--text-secondary)]">Reserved</dt><dd>{formatStock(detailProduct.reservedQty, detailProduct.unit)}</dd></div>
@@ -577,7 +577,7 @@ export default function ProductsPage() {
                 </dl>
               </section>
               <section className="space-y-3 rounded-xl border border-[var(--border-subtle)] p-4">
-                <h3 className="text-base font-semibold">Pricing per unit</h3>
+                <h3 className="ui-section-title">Pricing per unit</h3>
                 <dl className="grid grid-cols-2 gap-3 text-sm tabular-nums">
                   <div><dt className="text-[var(--text-secondary)]">Institutional</dt><dd className="font-semibold">{formatKes(detailProduct.pricing.institutionalKes)}</dd></div>
                   <div><dt className="text-[var(--text-secondary)]">Wholesale</dt><dd>{formatKes(detailProduct.pricing.wholesaleKes)}</dd></div>
@@ -587,7 +587,7 @@ export default function ProductsPage() {
                 </dl>
               </section>
             </div>
-            {lifecycleError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{lifecycleError}</p>}
+            {lifecycleError && <p role="alert" className="text-sm text-[var(--status-danger-fg)]">{lifecycleError}</p>}
             <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
               <button type="button" className={cardButton} onClick={() => setHistoryProduct(detailProduct)}>
                 <LineChart size={16} aria-hidden="true" /> Price history
@@ -609,7 +609,7 @@ export default function ProductsPage() {
                       <Archive size={16} aria-hidden="true" /> {lifecycleAction === 'archive' ? 'Archiving…' : 'Archive'}
                     </button>
                   )}
-                  <button type="button" className={`${cardButton} text-red-700 dark:text-red-300`} disabled={Boolean(lifecycleAction)}
+                  <button type="button" className="ui-button ui-button-danger" disabled={Boolean(lifecycleAction)}
                     onClick={() => { setLifecycleError(''); setConfirmingDelete(true); }}>
                     <Trash2 size={16} aria-hidden="true" /> Delete
                   </button>
@@ -629,11 +629,11 @@ export default function ProductsPage() {
       >
         <div className="space-y-4">
           <p className="text-sm">Deleting permanently removes this product from the catalogue.</p>
-          {lifecycleError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{lifecycleError}</p>}
+          {lifecycleError && <p role="alert" className="text-sm text-[var(--status-danger-fg)]">{lifecycleError}</p>}
           <div className="flex flex-wrap justify-end gap-2">
             <button type="button" className={cardButton} disabled={Boolean(lifecycleAction)}
               onClick={() => { setConfirmingDelete(false); setLifecycleError(''); }}>Cancel</button>
-            <button type="button" className={`${cardButton} text-red-700 dark:text-red-300`} disabled={Boolean(lifecycleAction)}
+            <button type="button" className="ui-button ui-button-danger" disabled={Boolean(lifecycleAction)}
               onClick={() => void updateProductLifecycle('delete')}>{lifecycleAction === 'delete' ? 'Deleting…' : 'Delete product'}</button>
           </div>
         </div>
@@ -651,45 +651,45 @@ export default function ProductsPage() {
             {/* Summary KPIs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
-                <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                <div className="ui-meta font-medium text-[var(--text-secondary)]">
                   Current Purchase Price
                 </div>
-                <div className="text-base font-bold font-mono text-[#1F6A37] dark:text-[#4EB462] mt-0.5">
+                <div className="text-base font-bold font-mono text-[var(--brand-accent)] mt-0.5">
                   KES {supplierTrend.latestPrice.toLocaleString()}
                 </div>
-                <div className="text-[10px] text-[var(--text-secondary)]">
+                <div className="ui-meta text-[var(--text-secondary)]">
                   per {supplierTrend.unit}
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
-                <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                <div className="ui-meta font-medium text-[var(--text-secondary)]">
                   Baseline Recorded Price
                 </div>
                 <div className="text-base font-semibold font-mono text-[var(--text-primary)] mt-0.5">
                   KES {supplierTrend.initialPrice.toLocaleString()}
                 </div>
-                <div className="text-[10px] text-[var(--text-secondary)]">
+                <div className="ui-meta text-[var(--text-secondary)]">
                   First tracked milestone
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
-                <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                <div className="ui-meta font-medium text-[var(--text-secondary)]">
                   Overall Net Variance
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   {supplierTrend.diffKes > 0 ? (
-                    <TrendingUp className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <TrendingUp className="w-3.5 h-3.5 text-[var(--status-warning-fg)]" />
                   ) : supplierTrend.diffKes < 0 ? (
-                    <TrendingDown className="w-3.5 h-3.5 text-[#1F6A37] dark:text-[#4EB462]" />
+                    <TrendingDown className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
                   ) : (
                     <Minus className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
                   )}
                   <span
                     className={`text-sm font-bold font-mono ${
                       supplierTrend.diffKes > 0
-                        ? 'text-amber-700 dark:text-amber-400'
+                        ? 'text-[var(--status-warning-fg)]'
                         : supplierTrend.diffKes < 0
-                        ? 'text-[#1F6A37] dark:text-[#4EB462]'
+                        ? 'text-[var(--status-success-fg)]'
                         : 'text-[var(--text-secondary)]'
                     }`}
                   >
@@ -698,12 +698,12 @@ export default function ProductsPage() {
                     {supplierTrend.diffPct.toFixed(1)}%)
                   </span>
                 </div>
-                <div className="text-[10px] text-[var(--text-secondary)]">
+                <div className="ui-meta text-[var(--text-secondary)]">
                   Cost shift over time
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
-                <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                <div className="ui-meta font-medium text-[var(--text-secondary)]">
                   Procurement Band
                 </div>
                 <div className="text-xs font-mono font-semibold text-[var(--text-primary)] mt-1">
@@ -719,12 +719,12 @@ export default function ProductsPage() {
             <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <LineChart className="w-4 h-4 text-[#1F6A37] dark:text-[#4EB462]" />
+                  <LineChart className="w-4 h-4 text-[var(--brand-accent)]" />
                   <span className="text-xs font-semibold text-[var(--text-primary)]">
                     Supplier Purchase Price Timeline (KES / {supplierTrend.unit})
                   </span>
                 </div>
-                <span className="text-[11px] text-[var(--text-secondary)] font-mono">
+                <span className="ui-meta text-[var(--text-secondary)] font-mono">
                   {supplierTrend.chartData.length} timeline milestones
                 </span>
               </div>
@@ -737,8 +737,8 @@ export default function ProductsPage() {
                   >
                     <defs>
                       <linearGradient id="supplierCostGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#1F6A37" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#1F6A37" stopOpacity={0.0} />
+                        <stop offset="5%" stopColor="var(--brand-accent)" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="var(--brand-accent)" stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid
@@ -749,7 +749,7 @@ export default function ProductsPage() {
                     <XAxis
                       dataKey="formattedDate"
                       stroke="var(--text-secondary)"
-                      tick={{ fontSize: 11, fill: '#3D694A' }}
+                      tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
                       tickLine={false}
                       axisLine={{ stroke: 'rgba(61, 105, 74, 0.2)' }}
                     />
@@ -759,7 +759,7 @@ export default function ProductsPage() {
                         (dataMax: number) => Math.ceil(dataMax * 1.1),
                       ]}
                       stroke="var(--text-secondary)"
-                      tick={{ fontSize: 11, fill: '#3D694A' }}
+                      tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={(val: number) =>
@@ -776,27 +776,27 @@ export default function ProductsPage() {
                             stepDiff: number;
                           };
                           return (
-                            <div className="rounded-xl bg-[#08190C] border border-[#1F6A37]/40 p-3 shadow-xl text-xs text-[#F4F6F3]">
-                              <div className="flex items-center justify-between gap-3 text-[11px] text-[#A3B899] mb-1">
+                            <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--status-success-border)] p-3 shadow-xl text-xs text-[var(--text-primary)]">
+                              <div className="flex items-center justify-between gap-3 text-xs text-[var(--text-secondary)] mb-1">
                                 <span>{data.fullDate}</span>
-                                <span className="font-mono text-[10px] bg-[#1F6A37]/30 px-1.5 py-0.5 rounded text-[#4EB462]">
+                                <span className="font-mono text-xs bg-[var(--status-success-bg)] px-1.5 py-0.5 rounded text-[var(--brand-accent)]">
                                   Supplier Purchase Price
                                 </span>
                               </div>
-                              <div className="text-sm font-semibold font-mono text-[#4EB462]">
+                              <div className="text-sm font-semibold font-mono text-[var(--brand-accent)]">
                                 KES {data.priceKes.toLocaleString()}{' '}
-                                <span className="text-xs font-normal text-[#A3B899]">
+                                <span className="text-xs font-normal text-[var(--text-secondary)]">
                                   / {supplierTrend.unit}
                                 </span>
                               </div>
                               {data.stepDiff !== 0 && (
-                                <div className="text-[11px] mt-1 flex items-center gap-1 font-mono">
-                                  <span className="text-[#A3B899]">Vs Prior:</span>
+                                <div className="text-xs mt-1 flex items-center gap-1 font-mono">
+                                  <span className="text-[var(--text-secondary)]">Vs Prior:</span>
                                   <span
                                     className={
                                       data.stepDiff > 0
-                                        ? 'text-amber-400'
-                                        : 'text-emerald-400'
+                                        ? 'text-[var(--status-warning-fg)]'
+                                        : 'text-[var(--status-success-fg)]'
                                     }
                                   >
                                     {data.stepDiff > 0
@@ -805,9 +805,9 @@ export default function ProductsPage() {
                                   </span>
                                 </div>
                               )}
-                              <div className="text-[11px] text-[#A3B899] mt-1.5 border-t border-[#1F6A37]/30 pt-1">
+                              <div className="text-xs text-[var(--text-secondary)] mt-1.5 border-t border-[var(--status-success-border)] pt-1">
                                 Logged By:{' '}
-                                <span className="text-[#F4F6F3]">{data.changedBy}</span>
+                                <span className="text-[var(--text-primary)]">{data.changedBy}</span>
                               </div>
                             </div>
                           );
@@ -818,12 +818,12 @@ export default function ProductsPage() {
                     <Area
                       type="monotone"
                       dataKey="priceKes"
-                      stroke="#1F6A37"
+                      stroke="var(--brand-accent)"
                       strokeWidth={2.5}
                       fillOpacity={1}
                       fill="url(#supplierCostGradient)"
-                      dot={{ r: 4, fill: '#1F6A37', stroke: '#fff', strokeWidth: 1.5 }}
-                      activeDot={{ r: 6, fill: '#1F6A37', stroke: '#fff', strokeWidth: 2 }}
+                      dot={{ r: 4, fill: 'var(--brand-accent)', stroke: 'var(--bg-card)', strokeWidth: 1.5 }}
+                      activeDot={{ r: 6, fill: 'var(--brand-accent)', stroke: 'var(--bg-card)', strokeWidth: 2 }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -834,7 +834,7 @@ export default function ProductsPage() {
             <div className="space-y-2">
               <div className="text-xs font-semibold text-[var(--text-primary)] flex items-center justify-between">
                 <span>Supplier Purchase Price Adjustment Log</span>
-                <span className="text-[11px] font-normal text-[var(--text-secondary)]">
+                <span className="ui-meta font-normal text-[var(--text-secondary)]">
                   Exclusively supplier acquisition cost tier
                 </span>
               </div>
@@ -842,18 +842,18 @@ export default function ProductsPage() {
                 {[...supplierTrend.chartData].reverse().map((entry, idx) => (
                   <div
                     key={`${entry.date}-${idx}`}
-                    className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between text-xs hover:border-[#1F6A37]/30 transition-colors"
+                    className="p-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center justify-between text-xs hover:border-[var(--status-success-border)] transition-colors"
                   >
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-[var(--text-primary)] font-mono">
                           {entry.fullDate}
                         </span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#1F6A37]/10 text-[#1F6A37] dark:text-[#4EB462]">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--status-success-bg)] text-[var(--brand-accent)]">
                           Supplier Purchase Price
                         </span>
                       </div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">
+                      <div className="ui-meta text-[var(--text-secondary)]">
                         Procurement Officer:{' '}
                         <strong className="font-medium text-[var(--text-primary)]">
                           {entry.changedBy}
@@ -861,19 +861,19 @@ export default function ProductsPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-mono-tabular font-bold text-sm text-[#1F6A37] dark:text-[#4EB462]">
+                      <div className="font-mono-tabular font-bold text-sm text-[var(--brand-accent)]">
                         KES {entry.priceKes.toLocaleString()}
-                        <span className="text-[10px] font-normal text-[var(--text-secondary)]">
+                        <span className="ui-meta font-normal text-[var(--text-secondary)]">
                           {' '}
                           / {supplierTrend.unit}
                         </span>
                       </div>
                       {entry.stepDiff !== 0 ? (
                         <div
-                          className={`text-[10px] font-mono font-medium ${
+                          className={`text-xs font-mono font-medium ${
                             entry.stepDiff > 0
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-emerald-600 dark:text-emerald-400'
+                              ? 'text-[var(--status-warning-fg)]'
+                              : 'text-[var(--status-success-fg)]'
                           }`}
                         >
                           {entry.stepDiff > 0
@@ -882,7 +882,7 @@ export default function ProductsPage() {
                           vs prior
                         </div>
                       ) : (
-                        <div className="text-[10px] text-[var(--text-secondary)]">
+                        <div className="ui-meta text-[var(--text-secondary)]">
                           Baseline rate
                         </div>
                       )}
@@ -917,10 +917,10 @@ export default function ProductsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-product-name" className="ui-label block mb-1">
                   Product Name *
                 </label>
-                <input
+                <input aria-invalid={Boolean(formErrors.name)} id="products-product-name"
                   type="text"
                   required
                   value={name}
@@ -929,27 +929,27 @@ export default function ProductsPage() {
                     if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: '' }));
                   }}
                   placeholder="e.g., Naivasha Grade A French Beans"
-                  className={`w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border text-xs font-medium ${
-                    formErrors.name ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  className={`ui-field w-full ${
+                    formErrors.name ? 'border-[var(--status-danger-border)]' : 'border-[var(--border-subtle)]'
                   }`}
                 />
                 {formErrors.name && (
-                  <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-1">
+                  <div className="text-xs text-[var(--status-danger-fg)] mt-1">
                     {formErrors.name}
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-product-category" className="ui-label block mb-1">
                   Product Category *
                 </label>
-                <select
+                <select id="products-product-category"
                   value={category}
                   onChange={(e) =>
                     handleCategoryChange(e.target.value as ProductRecord['category'])
                   }
-                  className="w-full h-10 px-3 rounded-md bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                  className="ui-field w-full"
                 >
                   {CATEGORIES.filter((c) => c !== 'All').map((c) => (
                     <option key={c} value={c}>
@@ -961,14 +961,14 @@ export default function ProductsPage() {
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-medium text-[var(--text-secondary)]">
+                  <label htmlFor="products-unique-sku" className="ui-label block">
                     Unique SKU Code *
                   </label>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
+                  <span className="text-xs text-[var(--status-success-fg)] font-mono">
                     AD-{'{CAT}'}-{'{SEQ}'}
                   </span>
                 </div>
-                <input
+                <input id="products-unique-sku" aria-invalid={Boolean(formErrors.sku)} aria-describedby="products-unique-sku-help"
                   type="text"
                   required
                   value={sku}
@@ -977,28 +977,28 @@ export default function ProductsPage() {
                     if (formErrors.sku) setFormErrors((prev) => ({ ...prev, sku: '' }));
                   }}
                   placeholder="AD-VEG-001"
-                  className={`w-full h-10 px-3 rounded-md bg-[var(--bg-card)] border text-xs font-mono-tabular uppercase ${
-                    formErrors.sku ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  className={`ui-field w-full font-mono-tabular uppercase ${
+                    formErrors.sku ? 'border-[var(--status-danger-border)]' : 'border-[var(--border-subtle)]'
                   }`}
                 />
-                <div className="text-[10px] text-neutral-500 mt-1">
+                <div id="products-unique-sku-help" className="ui-meta mt-1">
                   Generated sequence is monotonic and non-reusable.
                 </div>
                 {formErrors.sku && (
-                  <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-1">
+                  <div className="text-xs text-[var(--status-danger-fg)] mt-1">
                     {formErrors.sku}
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-unit-of-measure" className="ui-label block mb-1">
                   Unit of Measure *
                 </label>
-                <select
+                <select id="products-unit-of-measure"
                   value={unit}
                   onChange={(e) => setUnit(e.target.value as UnitOfMeasure)}
-                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs cursor-pointer"
+                  className="ui-field w-full"
                 >
                   <option value="kilograms">kilograms (kg)</option>
                   <option value="pieces">pieces (pcs)</option>
@@ -1010,15 +1010,15 @@ export default function ProductsPage() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-description-grading-specifications" className="ui-label block mb-1">
                   Description & Grading Specifications
                 </label>
-                <textarea
+                <textarea id="products-description-grading-specifications"
                   rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="e.g. Export rejection grade, sorted and washed, chilled to 4°C within 2 hours of harvest."
-                  className="w-full p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs"
+                  className="ui-field w-full"
                 />
               </div>
             </div>
@@ -1030,7 +1030,7 @@ export default function ProductsPage() {
               <div className="text-xs font-semibold text-[var(--text-primary)]">
                 2. Product Image Asset
               </div>
-              <span className="text-[10px] text-[var(--text-secondary)]">
+              <span className="ui-meta text-[var(--text-secondary)]">
                 {uploadedImage ? 'Custom file attached' : 'Default category asset active'}
               </span>
             </div>
@@ -1052,16 +1052,16 @@ export default function ProductsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-reorder-buffer-target" className="ui-label block mb-1">
                   Reorder Buffer Target ({unit}) *
                 </label>
-                <input
+                <input id="products-reorder-buffer-target"
                   type="number"
                   min="0"
                   required
                   value={reorderPoint}
                   onChange={(e) => setReorderPoint(Number(e.target.value))}
-                  className="w-full h-9 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                  className="ui-field w-full font-mono-tabular"
                 />
               </div>
 
@@ -1071,11 +1071,11 @@ export default function ProductsPage() {
                   id="newBatchTracked"
                   checked={batchTracked}
                   onChange={(e) => setBatchTracked(e.target.checked)}
-                  className="rounded text-[#1F6A37] focus:ring-[#1F6A37]"
+                  className="rounded focus:ring-[var(--brand-accent)] accent-[var(--brand-accent)]"
                 />
                 <label
                   htmlFor="newBatchTracked"
-                  className="text-xs text-[var(--text-secondary)] cursor-pointer"
+                  className="ui-label cursor-pointer"
                 >
                   FEFO Batch Tracked
                 </label>
@@ -1087,11 +1087,11 @@ export default function ProductsPage() {
                   id="newExpiryTracked"
                   checked={expiryTracked}
                   onChange={(e) => setExpiryTracked(e.target.checked)}
-                  className="rounded text-[#1F6A37] focus:ring-[#1F6A37]"
+                  className="rounded focus:ring-[var(--brand-accent)] accent-[var(--brand-accent)]"
                 />
                 <label
                   htmlFor="newExpiryTracked"
-                  className="text-xs text-[var(--text-secondary)] cursor-pointer"
+                  className="ui-label cursor-pointer"
                 >
                   Expiry Date Tracked
                 </label>
@@ -1107,81 +1107,81 @@ export default function ProductsPage() {
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               <div>
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-supplier-cost" className="ui-label block mb-1">
                   Supplier Cost *
                 </label>
-                <input
+                <input aria-invalid={Boolean(formErrors.cost)} id="products-supplier-cost"
                   type="number"
                   min="1"
                   required
                   value={newCostKes}
                   onChange={(e) => setNewCostKes(Number(e.target.value))}
-                  className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular ${
-                    formErrors.cost ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  className={`ui-field w-full font-mono-tabular ${
+                    formErrors.cost ? 'border-[var(--status-danger-border)]' : 'border-[var(--border-subtle)]'
                   }`}
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-institutional" className="ui-label block mb-1">
                   Institutional *
                 </label>
-                <input
+                <input aria-invalid={Boolean(formErrors.inst)} id="products-institutional"
                   type="number"
                   min="1"
                   required
                   value={newInstKes}
                   onChange={(e) => setNewInstKes(Number(e.target.value))}
-                  className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462] ${
-                    formErrors.inst ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  className={`ui-field w-full font-mono-tabular font-semibold ${
+                    formErrors.inst ? 'border-[var(--status-danger-border)]' : 'border-[var(--border-subtle)]'
                   }`}
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-wholesale" className="ui-label block mb-1">
                   Wholesale *
                 </label>
-                <input
+                <input aria-invalid={Boolean(formErrors.whl)} id="products-wholesale"
                   type="number"
                   min="1"
                   required
                   value={newWhlKes}
                   onChange={(e) => setNewWhlKes(Number(e.target.value))}
-                  className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular font-semibold ${
-                    formErrors.whl ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  className={`ui-field w-full font-mono-tabular font-semibold ${
+                    formErrors.whl ? 'border-[var(--status-danger-border)]' : 'border-[var(--border-subtle)]'
                   }`}
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-retail-pos" className="ui-label block mb-1">
                   Retail (POS) *
                 </label>
-                <input
+                <input aria-invalid={Boolean(formErrors.ret)} id="products-retail-pos"
                   type="number"
                   min="1"
                   required
                   value={newRetKes}
                   onChange={(e) => setNewRetKes(Number(e.target.value))}
-                  className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular ${
-                    formErrors.ret ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  className={`ui-field w-full font-mono-tabular ${
+                    formErrors.ret ? 'border-[var(--status-danger-border)]' : 'border-[var(--border-subtle)]'
                   }`}
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-online" className="ui-label block mb-1">
                   Online *
                 </label>
-                <input
+                <input aria-invalid={Boolean(formErrors.online)} id="products-online"
                   type="number"
                   min="1"
                   required
                   value={newOnlineKes}
                   onChange={(e) => setNewOnlineKes(Number(e.target.value))}
-                  className={`w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border text-xs font-mono-tabular ${
-                    formErrors.online ? 'border-rose-500' : 'border-[var(--border-subtle)]'
+                  className={`ui-field w-full font-mono-tabular ${
+                    formErrors.online ? 'border-[var(--status-danger-border)]' : 'border-[var(--border-subtle)]'
                   }`}
                 />
               </div>
@@ -1193,14 +1193,14 @@ export default function ProductsPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(false)}
-              className="h-10 px-4 rounded-lg border border-[var(--border-subtle)] text-xs font-medium hover:bg-[var(--bg-canvas)] cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="h-10 px-5 rounded-lg bg-[#1F6A37] hover:bg-[#12512C] disabled:opacity-50 text-white text-xs font-semibold cursor-pointer shadow-sm inline-flex items-center gap-1.5"
+              className="ui-button ui-button-primary"
             >
               <Plus className="w-4 h-4" />
               <span>{isSubmitting ? 'Registering SKU...' : 'Create Product SKU'}</span>
@@ -1219,39 +1219,39 @@ export default function ProductsPage() {
         <form onSubmit={handleSaveEditProduct} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="products-product-name-2" className="ui-label block mb-1">
                 Product Name *
               </label>
-              <input
+              <input id="products-product-name-2"
                 type="text"
                 required
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 placeholder="e.g., Kinangop Roma Tomatoes"
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">SKU Code *</label>
-              <input
+              <label htmlFor="products-sku-code" className="ui-label block mb-1">SKU Code *</label>
+              <input id="products-sku-code"
                 type="text"
                 required
                 value={editSku}
                 onChange={(e) => setEditSku(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                className="ui-field w-full font-mono-tabular"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium mb-1">Category *</label>
-              <select
+              <label htmlFor="products-category" className="ui-label block mb-1">Category *</label>
+              <select id="products-category"
                 value={editCategory}
                 onChange={(e) =>
                   setEditCategory(e.target.value as ProductRecord['category'])
                 }
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 {!CATEGORIES.some((option) => option === editCategory) && <option value={editCategory}>{editCategory}</option>}
                 {CATEGORIES.filter((c) => c !== 'All').map((c) => (
@@ -1262,13 +1262,13 @@ export default function ProductsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="products-unit-of-measure-2" className="ui-label block mb-1">
                 Unit of Measure *
               </label>
-              <select
+              <select id="products-unit-of-measure-2"
                 value={editUnit}
                 onChange={(e) => setEditUnit(e.target.value as UnitOfMeasure)}
-                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+                className="ui-field w-full"
               >
                 <option value="kilograms">kilograms</option>
                 <option value="pieces">pieces</option>
@@ -1279,15 +1279,15 @@ export default function ProductsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">
+              <label htmlFor="products-lifecycle-status" className="ui-label block mb-1">
                 Lifecycle Status *
               </label>
-              <select
+              <select id="products-lifecycle-status"
                 value={editStatus}
                 onChange={(e) =>
                   setEditStatus(e.target.value as ProductRecord['status'])
                 }
-                className="w-full h-10 px-3 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium"
+                className="ui-field w-full"
               >
                 <option value="Active">Active</option>
                 <option value="Seasonal Hold">Seasonal Hold</option>
@@ -1298,15 +1298,15 @@ export default function ProductsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium mb-1">
+            <label htmlFor="products-description-specifications" className="ui-label block mb-1">
               Description / Specifications
             </label>
-            <textarea
+            <textarea id="products-description-specifications"
               rows={2}
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
               placeholder="Grading specifications, packaging standard, origin county..."
-              className="w-full p-2.5 rounded-md bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="ui-field w-full"
             />
           </div>
 
@@ -1318,7 +1318,7 @@ export default function ProductsPage() {
                 <button
                   type="button"
                   onClick={() => setEditImageUrl('')}
-                  className="text-[11px] text-rose-600 dark:text-rose-400 hover:underline"
+                  className="ui-button ui-button-danger"
                 >
                   Remove Custom Image
                 </button>
@@ -1340,16 +1340,16 @@ export default function ProductsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-buffer-target-reorder-point" className="ui-label block mb-1">
                   Buffer Target / Reorder Point ({editUnit})
                 </label>
-                <input
+                <input id="products-buffer-target-reorder-point"
                   type="number"
                   min="0"
                   required
                   value={editReorderPoint}
                   onChange={(e) => setEditReorderPoint(Number(e.target.value))}
-                  className="w-full h-9 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                  className="ui-field w-full font-mono-tabular"
                 />
               </div>
               <div className="flex items-center gap-2 pt-5">
@@ -1358,9 +1358,9 @@ export default function ProductsPage() {
                   id="editBatchTracked"
                   checked={editBatchTracked}
                   onChange={(e) => setEditBatchTracked(e.target.checked)}
-                  className="rounded text-[#1F6A37] focus:ring-[#1F6A37]"
+                  className="rounded focus:ring-[var(--brand-accent)] accent-[var(--brand-accent)]"
                 />
-                <label htmlFor="editBatchTracked" className="text-xs text-[var(--text-secondary)] cursor-pointer">
+                <label htmlFor="editBatchTracked" className="ui-label cursor-pointer">
                   FEFO Batch Tracked
                 </label>
               </div>
@@ -1370,9 +1370,9 @@ export default function ProductsPage() {
                   id="editExpiryTracked"
                   checked={editExpiryTracked}
                   onChange={(e) => setEditExpiryTracked(e.target.checked)}
-                  className="rounded text-[#1F6A37] focus:ring-[#1F6A37]"
+                  className="rounded focus:ring-[var(--brand-accent)] accent-[var(--brand-accent)]"
                 />
-                <label htmlFor="editExpiryTracked" className="text-xs text-[var(--text-secondary)] cursor-pointer">
+                <label htmlFor="editExpiryTracked" className="ui-label cursor-pointer">
                   Expiry Date Tracked
                 </label>
               </div>
@@ -1386,82 +1386,82 @@ export default function ProductsPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               <div>
-                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-supplier-cost-2" className="ui-label block mb-1">
                   Supplier Cost
                 </label>
-                <input
+                <input id="products-supplier-cost-2"
                   type="number"
                   required
                   value={editCostKes}
                   onChange={(e) => setEditCostKes(Number(e.target.value))}
-                  className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                  className="ui-field w-full font-mono-tabular"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-institutional-2" className="ui-label block mb-1">
                   Institutional
                 </label>
-                <input
+                <input id="products-institutional-2"
                   type="number"
                   required
                   value={editInstKes}
                   onChange={(e) => setEditInstKes(Number(e.target.value))}
-                  className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462]"
+                  className="ui-field w-full font-mono-tabular font-semibold"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-wholesale-2" className="ui-label block mb-1">
                   Wholesale
                 </label>
-                <input
+                <input id="products-wholesale-2"
                   type="number"
                   required
                   value={editWhlKes}
                   onChange={(e) => setEditWhlKes(Number(e.target.value))}
-                  className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular font-semibold"
+                  className="ui-field w-full font-mono-tabular font-semibold"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-retail-pos-2" className="ui-label block mb-1">
                   Retail (POS)
                 </label>
-                <input
+                <input id="products-retail-pos-2"
                   type="number"
                   required
                   value={editRetKes}
                   onChange={(e) => setEditRetKes(Number(e.target.value))}
-                  className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                  className="ui-field w-full font-mono-tabular"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-[var(--text-secondary)] mb-1">
+                <label htmlFor="products-online-2" className="ui-label block mb-1">
                   Online
                 </label>
-                <input
+                <input id="products-online-2"
                   type="number"
                   required
                   value={editOnlineKes}
                   onChange={(e) => setEditOnlineKes(Number(e.target.value))}
-                  className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-mono-tabular"
+                  className="ui-field w-full font-mono-tabular"
                 />
               </div>
             </div>
           </div>
 
-          {editError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{editError}</p>}
+          {editError && <p role="alert" className="text-sm text-[var(--status-danger-fg)]">{editError}</p>}
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"
               disabled={savingEdit}
               onClick={() => setEditDetailsProduct(null)}
-              className="px-4 py-2 rounded-md border border-[var(--border-subtle)] text-xs font-medium cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={savingEdit}
-              className="px-5 py-2 rounded-md bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-semibold cursor-pointer shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50"
+              className="ui-button ui-button-primary"
             >
               <Edit2 className="w-3.5 h-3.5" />
               <span>{savingEdit ? 'Saving…' : 'Save changes'}</span>
@@ -1480,12 +1480,12 @@ export default function ProductsPage() {
         {sourcingModalProduct && (
           <div className="space-y-4">
             {getSuppliersForProduct(sourcingModalProduct.id).length === 0 ? (
-              <div className="rounded-lg border border-dashed border-neutral-300 p-8 text-center dark:border-neutral-700">
-                <Truck className="mx-auto h-8 w-8 text-neutral-400" />
-                <h4 className="mt-2 text-sm font-semibold text-neutral-900 dark:text-white">
+              <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-8 text-center">
+                <Truck className="mx-auto h-8 w-8 text-[var(--text-secondary)]" />
+                <h4 className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
                   No direct suppliers configured
                 </h4>
-                <p className="mt-1 text-xs text-neutral-500">
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
                   This product does not currently have registered suppliers in its sourcing price list.
                   Add this SKU in the Suppliers module to track farmgate costs and lead times.
                 </p>
@@ -1500,46 +1500,46 @@ export default function ProductsPage() {
                   return (
                     <div
                       key={sup.id}
-                      className="rounded-lg border border-neutral-200 bg-white p-4 shadow-xs dark:border-neutral-800 dark:bg-neutral-900"
+                      className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 shadow-xs"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">
+                            <h4 className="text-sm font-semibold text-[var(--text-primary)]">
                               {sup.name}
                             </h4>
-                            <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                            <span className="rounded bg-[var(--status-success-bg)] px-1.5 py-0.5 text-xs font-semibold text-[var(--status-success-fg)]">
                               {sup.code}
                             </span>
                           </div>
-                          <p className="mt-0.5 text-xs text-neutral-500">
+                          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                             {sup.region} · Contact: {sup.contactPerson} ({sup.phone})
                           </p>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm font-bold text-emerald-700 dark:text-emerald-400 font-mono">
+                          <div className="text-sm font-bold text-[var(--status-success-fg)] font-mono">
                             {supplyItem && supplyItem.currentCostKes > 0 ? `${formatKes(supplyItem.currentCostKes)} / ${supplyItem.unit}` : 'Quote pending'}
                           </div>
-                          <p className="text-[10px] text-neutral-500">Quoted Farmgate Cost</p>
+                          <p className="ui-meta text-[var(--text-secondary)]">Quoted Farmgate Cost</p>
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-neutral-100 pt-2 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
+                      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[var(--border-subtle)] pt-2 text-xs text-[var(--text-secondary)]">
                         <div>
-                          <span className="text-neutral-400">Lead Time: </span>
-                          <strong className="text-neutral-800 dark:text-neutral-200">
+                          <span className="text-[var(--text-secondary)]">Lead Time: </span>
+                          <strong className="text-[var(--text-primary)]">
                             {supplyItem?.leadTimeDays ?? sup.leadTimeDays} days
                           </strong>
                         </div>
                         <div>
-                          <span className="text-neutral-400">Min Order Qty: </span>
-                          <strong className="text-neutral-800 dark:text-neutral-200">
+                          <span className="text-[var(--text-secondary)]">Min Order Qty: </span>
+                          <strong className="text-[var(--text-primary)]">
                             {minimum !== undefined ? formatStock(minimum, sourcingModalProduct.unit) : 'Unrecorded'}
                           </strong>
                         </div>
                         <div>
-                          <span className="text-neutral-400">Quality Score: </span>
-                          <strong className="text-neutral-800 dark:text-neutral-200">
+                          <span className="text-[var(--text-secondary)]">Quality Score: </span>
+                          <strong className="text-[var(--text-primary)]">
                             {sup.qualityScorePct}%
                           </strong>
                         </div>
@@ -1554,7 +1554,7 @@ export default function ProductsPage() {
               <button
                 type="button"
                 onClick={() => setSourcingModalProduct(null)}
-                className="rounded-md border border-neutral-300 px-3.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                className="ui-button ui-button-secondary"
               >
                 Close
               </button>

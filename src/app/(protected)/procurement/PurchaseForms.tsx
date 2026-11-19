@@ -9,9 +9,9 @@ import { getOrderSourcingLines, getPurchaseReceiptBalance, getSupplierDueDate } 
 import { canSourceCatalogProduct } from '@/lib/services/supplier-offerings';
 import type { ProcurementOrderRecord } from '@/types/domain/bos';
 
-const control = 'mt-1.5 h-11 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 text-sm text-[var(--text-primary)]';
-export const purchaseButton = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-green-800 px-4 text-sm font-semibold text-white transition-colors hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-60';
-export const purchaseSecondaryButton = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border-subtle)] px-4 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] disabled:opacity-60';
+const control = 'ui-field mt-1.5 w-full';
+export const purchaseButton = 'ui-button ui-button-primary';
+export const purchaseSecondaryButton = 'ui-button ui-button-secondary';
 export const formatKes = (total: number) => `KES ${total.toLocaleString('en-KE', { maximumFractionDigits: 2 })}`;
 
 function todayInKenya() {
@@ -26,7 +26,7 @@ function FormFooter({ pending, error, onClose, action }: {
 }) {
   return (
     <>
-      {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">{error}</p>}
+      {error && <p role="alert" className="rounded-lg bg-[var(--status-danger-bg)] p-3 text-sm text-[var(--status-danger-fg)]">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
         <button type="button" onClick={onClose} disabled={pending} className={purchaseSecondaryButton}>Cancel</button>
         <button type="submit" disabled={pending} className={purchaseButton}>{pending ? 'Saving…' : action}</button>
@@ -100,7 +100,7 @@ export function NewPurchaseForm({ orderId, onClose, onSaved }: FormProps & { ord
       allowBackdropClose={false} allowEscapeClose={!pending}>
       <form onSubmit={submit} onChange={() => setDirty(true)} className="space-y-5 text-sm">
         <div className="grid gap-4 sm:grid-cols-2">
-          <label>Purchase destination
+          <label className="ui-label">Purchase destination
             <select value={purpose} onChange={(event) => {
               setPurpose(event.target.value as typeof purpose);
               setSupplierId('');
@@ -111,7 +111,7 @@ export function NewPurchaseForm({ orderId, onClose, onSaved }: FormProps & { ord
             </select>
           </label>
           {direct ? (
-            <label>Customer order
+            <label className="ui-label">Customer order
               <select value={selectedOrder} onChange={(event) => {
                 setSelectedOrder(event.target.value);
                 setSupplierId('');
@@ -122,14 +122,14 @@ export function NewPurchaseForm({ orderId, onClose, onSaved }: FormProps & { ord
               </select>
             </label>
           ) : (
-            <label>Receiving warehouse
+            <label className="ui-label">Receiving warehouse
               <select value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} required className={control}>
                 <option value="">Select warehouse</option>
                 {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
               </select>
             </label>
           )}
-          <label>Supplier
+          <label className="ui-label">Supplier
             <select value={supplierId} onChange={(event) => {
               setSupplierId(event.target.value);
               setDraft([newPurchaseLine(1)]);
@@ -138,7 +138,7 @@ export function NewPurchaseForm({ orderId, onClose, onSaved }: FormProps & { ord
               {eligibleSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
             </select>
           </label>
-          <label>Expected {direct ? 'collection' : 'receipt'} date
+          <label className="ui-label">Expected {direct ? 'collection' : 'receipt'} date
             <input type="date" required value={date} onChange={(event) => setDate(event.target.value)} className={control} />
           </label>
         </div>
@@ -153,7 +153,7 @@ export function NewPurchaseForm({ orderId, onClose, onSaved }: FormProps & { ord
               const minimum = selected?.offering.moq ?? selected?.offering.minOrderQty;
               return (
                 <div key={item.id} className="grid items-start gap-3 rounded-xl border border-[var(--border-subtle)] p-3 sm:grid-cols-[minmax(0,2fr)_1fr_1fr_auto]">
-                  <label>Product
+                  <label className="ui-label">Product
                     <select value={item.selection} required onChange={(event) => {
                       const choice = choices.find((candidate) => candidate.id === event.target.value);
                       updateLine(item.id, { selection: event.target.value, quantity: '', quote: choice ? String(choice.offering.currentCostKes || '') : '' });
@@ -167,16 +167,16 @@ export function NewPurchaseForm({ orderId, onClose, onSaved }: FormProps & { ord
                     </select>
                     {Boolean(minimum) && <span className="mt-1 block text-xs text-[var(--text-secondary)]">Supplier minimum {minimum} {selected?.offering.unit}</span>}
                   </label>
-                  <label>Quantity {selected && `(${selected.offering.unit})`}
+                  <label className="ui-label">Quantity {selected && `(${selected.offering.unit})`}
                     <input type="number" inputMode="decimal" required min="0.001" step="any" max={selected?.limit} value={item.quantity}
                       onChange={(event) => updateLine(item.id, { quantity: event.target.value })} className={control} />
                   </label>
-                  <label>Quote per unit (KES)
+                  <label className="ui-label">Quote per unit (KES)
                     <input type="number" inputMode="decimal" required min="0.01" step="0.01" value={item.quote}
                       onChange={(event) => updateLine(item.id, { quote: event.target.value })} className={control} />
                   </label>
                   <button type="button" aria-label={`Remove purchase line ${index + 1}`} disabled={draft.length === 1}
-                    className={`${purchaseSecondaryButton} sm:mt-6 !w-11 !px-0`} onClick={() => {
+                    className="ui-button ui-button-secondary ui-button-icon sm:mt-6" onClick={() => {
                       setDirty(true);
                       setDraft((items) => items.filter((line) => line.id !== item.id));
                     }}><X size={17} aria-hidden="true" /></button>
@@ -263,15 +263,15 @@ export function PurchaseReceiptForm({ po, onClose, onSaved }: FormProps & { po: 
                   <p className="font-semibold">{line.productName} · {line.sku}</p>
                   <p className="mt-1 text-[var(--text-secondary)]">{outstanding.toLocaleString()} {line.unit} remaining · Quoted {formatKes(line.unitCostKes)} per unit</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <label>Accepted quantity ({line.unit})
+                    <label className="ui-label">Accepted quantity ({line.unit})
                       <input type="number" inputMode="decimal" step="any" min="0" max={outstanding} value={draft[id]?.quantity ?? ''}
                         onChange={(event) => updateLine(id, { quantity: event.target.value })} className={control} />
                     </label>
-                    <label>Actual cost per unit (KES)
+                    <label className="ui-label">Actual cost per unit (KES)
                       <input type="number" inputMode="decimal" step="0.01" min="0.01" required={hasQuantity} value={draft[id]?.cost ?? ''}
                         onChange={(event) => updateLine(id, { cost: event.target.value })} className={control} />
                     </label>
-                    {needsExpiry && <label>Batch expiry date
+                    {needsExpiry && <label className="ui-label">Batch expiry date
                       <input type="date" min={todayInKenya()} required={hasQuantity} value={draft[id]?.expiry ?? ''}
                         onChange={(event) => updateLine(id, { expiry: event.target.value })} className={control} />
                     </label>}
@@ -284,35 +284,35 @@ export function PurchaseReceiptForm({ po, onClose, onSaved }: FormProps & { po: 
           <div className="space-y-2">
             <p className="text-[var(--text-secondary)]">This legacy PO has a text summary. Its collection records the confirmed amount and supplier payable.</p>
             <p className="font-semibold">{po.itemsSummary}</p>
-            <label className="block">Actual purchase amount (KES)
+            <label className="ui-label block">Actual purchase amount (KES)
               <input type="number" required min="0.01" step="0.01" inputMode="decimal" value={legacyAmount}
                 onChange={(event) => setLegacyAmount(event.target.value)} className={control} />
             </label>
           </div>
         )}
         <div className="grid gap-3 sm:grid-cols-2">
-          <label>Receipt or delivery note (optional)
+          <label className="ui-label">Receipt or delivery note (optional)
             <input value={receiptRef} onChange={(event) => setReceiptRef(event.target.value)} className={control} />
           </label>
-          <label>Supplier invoice number (optional)
+          <label className="ui-label">Supplier invoice number (optional)
             <input value={invoiceRef} onChange={(event) => setInvoiceRef(event.target.value)} className={control} />
           </label>
           {calculatedDueDate ? <p className="self-center text-[var(--text-secondary)]">{terms} · Due {calculatedDueDate}</p> : (
-            <label>Agreed payment due date
+            <label className="ui-label">Agreed payment due date
               <input required type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className={control} />
             </label>
           )}
-          {can('finance.record_payment') && <label>Payment already made
+          {can('finance.record_payment') && <label className="ui-label">Payment already made
             <select value={method} onChange={(event) => setMethod(event.target.value as typeof method)} className={control}>
               <option value="">None</option><option value="Cash">Cash</option><option value="M-Pesa Business">M-Pesa</option>
             </select>
           </label>}
           {method && <>
-            <label>Amount paid (KES)
+            <label className="ui-label">Amount paid (KES)
               <input type="number" min="0.01" max={amount} step="0.01" inputMode="decimal" required value={paid}
                 onChange={(event) => setPaid(event.target.value)} className={control} />
             </label>
-            <label>Payment reference
+            <label className="ui-label">Payment reference
               <input required value={paymentRef} onChange={(event) => setPaymentRef(event.target.value)} className={control} />
             </label>
           </>}
@@ -351,9 +351,9 @@ export function ClosePurchaseForm({ po, onClose, onSaved }: FormProps & { po: Pr
       allowBackdropClose={false} allowEscapeClose={!pending}>
       <form onSubmit={submit} className="space-y-4 text-sm">
         <p className="text-[var(--text-secondary)]">This ends receiving for this purchase order and releases its unreceived quantities for a new purchase.</p>
-        <label className="block">Reason for closing
+        <label className="ui-label block">Reason for closing
           <textarea rows={3} required value={reason} onChange={(event) => setReason(event.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-3 py-2 text-sm" />
+            className="ui-field mt-1.5 w-full" />
         </label>
         <FormFooter pending={pending} error={error} onClose={onClose} action="Close remaining quantities" />
       </form>

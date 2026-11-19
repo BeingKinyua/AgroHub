@@ -46,7 +46,7 @@ export default function RootLayout({
     >
       <body
         suppressHydrationWarning
-        className="min-h-screen antialiased selection:bg-[#4EB462]/20 selection:text-[#1F6A37]"
+        className="min-h-screen antialiased"
       >
         <BosProvider>{children}</BosProvider>
       </body>

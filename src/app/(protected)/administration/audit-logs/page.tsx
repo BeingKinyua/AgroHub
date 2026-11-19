@@ -59,19 +59,13 @@ export default function AuditLogsAdministrationPage() {
   return (
     <div>
       <PageHeader
-        breadcrumbs={[
-          { label: 'Workspace', href: '/dashboard' },
-          { label: 'Administration' },
-          { label: 'Audit Logs' },
-        ]}
-        kicker="IMMUTABLE GOVERNANCE & COMPLIANCE LEDGER"
-        title="System Security & Operational Audit Trail"
-        description="Every price change, FEFO stock adjustment, approval decision, payment reconciliation, and RBAC permission change is recorded with before/after values."
+        title="Audit logs"
+        description="Review recorded activity, including the actor and before-and-after values."
         actions={
           <button
             type="button"
             onClick={handleExportCsv}
-            className="h-10 px-4 rounded-full bg-[#1F6A37] hover:bg-[#12512C] text-white text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer"
+            className="ui-button ui-button-primary"
           >
             <Download className="w-4 h-4" />
             <span>Export Audit CSV</span>
@@ -120,13 +114,13 @@ export default function AuditLogsAdministrationPage() {
         activeFilterCount={moduleFilter !== 'All' ? 1 : 0}
         mobileDrawerContent={
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+            <label htmlFor="administration/audit-logs-module" className="ui-label block mb-1">
               Filter by Module
             </label>
-            <select
+            <select id="administration/audit-logs-module"
               value={moduleFilter}
               onChange={(e) => setModuleFilter(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs"
+              className="ui-field w-full"
             >
               {modules.map((m) => (
                 <option key={m} value={m}>
@@ -139,13 +133,14 @@ export default function AuditLogsAdministrationPage() {
       >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="pointer-events-none w-4 h-4 text-[var(--text-secondary)] absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
             <input
-              type="text"
+              type="search"
+              aria-label="Search audit log entries"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search actor, entity ID, action, before/after state..."
-              className="w-full h-10 pl-9 pr-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#4EB462]"
+              className="ui-field w-full pl-9 pr-3.5"
             />
           </div>
 
@@ -155,11 +150,8 @@ export default function AuditLogsAdministrationPage() {
                 key={mod}
                 type="button"
                 onClick={() => setModuleFilter(mod)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                  moduleFilter === mod
-                    ? 'bg-[#1F6A37] text-white'
-                    : 'bg-[var(--bg-canvas)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
+                aria-pressed={moduleFilter === mod}
+                className="ui-tab whitespace-nowrap"
               >
                 {mod}
               </button>
@@ -176,9 +168,9 @@ export default function AuditLogsAdministrationPage() {
       ) : (
         <Card padding="p-0" className="overflow-hidden">
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="ui-table w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 text-[11px] font-semibold text-[var(--text-secondary)]">
+                <tr className="border-b border-[var(--border-subtle)]">
                   <th className="py-3.5 px-4">Timestamp (EAT)</th>
                   <th className="py-3.5 px-4">Operator & Role</th>
                   <th className="py-3.5 px-4">Module & Entity</th>
@@ -186,7 +178,7 @@ export default function AuditLogsAdministrationPage() {
                   <th className="py-3.5 px-4">State Transition (Before → After)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {filteredLogs.map((log) => (
                   <tr
                     key={log.id}
@@ -202,17 +194,17 @@ export default function AuditLogsAdministrationPage() {
                           <div className="font-semibold text-[var(--text-primary)]">
                             {log.actorName}
                           </div>
-                          <div className="text-[11px] text-[var(--text-secondary)]">
+                          <div className="ui-meta">
                             {log.actorRole}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[11px] font-medium">
+                      <span className="px-2 py-0.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium">
                         {log.module}
                       </span>
-                      <div className="font-mono-tabular font-semibold text-[#1F6A37] dark:text-[#4EB462] mt-1">
+                      <div className="font-mono-tabular font-semibold text-[var(--brand-accent)] mt-1">
                         {log.entity}
                       </div>
                     </td>
@@ -220,12 +212,12 @@ export default function AuditLogsAdministrationPage() {
                       {log.action}
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="inline-flex flex-wrap items-center gap-1.5 font-mono-tabular text-[11px]">
+                      <div className="inline-flex flex-wrap items-center gap-1.5 font-mono-tabular text-xs">
                         <span className="px-2 py-0.5 rounded bg-[var(--bg-canvas)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
                           {log.beforeValue}
                         </span>
                         <ArrowRight className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                        <span className="px-2 py-0.5 rounded bg-[#E5EFE6] dark:bg-[#142B1B] text-[#12512C] dark:text-[#4EB462] font-semibold">
+                        <span className="px-2 py-0.5 rounded ui-tone-success font-semibold">
                           {log.afterValue}
                         </span>
                       </div>
@@ -239,7 +231,7 @@ export default function AuditLogsAdministrationPage() {
           <div className="md:hidden divide-y divide-[var(--border-subtle)]">
             {filteredLogs.map((log) => (
               <div key={log.id} className="p-4 space-y-2">
-                <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+                <div className="flex items-center justify-between ui-meta">
                   <span className="font-mono-tabular">{log.timestamp}</span>
                   <span className="px-2 py-0.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
                     {log.module}
@@ -247,16 +239,16 @@ export default function AuditLogsAdministrationPage() {
                 </div>
                 <div className="text-xs font-semibold">
                   {log.action} ·{' '}
-                  <span className="font-mono-tabular text-[#1F6A37] dark:text-[#4EB462]">
+                  <span className="font-mono-tabular text-[var(--brand-accent)]">
                     {log.entity}
                   </span>
                 </div>
-                <div className="text-[11px] text-[var(--text-secondary)]">
+                <div className="ui-meta">
                   Actor: <strong>{log.actorName}</strong> ({log.actorRole})
                 </div>
-                <div className="text-[11px] font-mono-tabular pt-1">
+                <div className="text-xs font-mono-tabular pt-1">
                   {log.beforeValue} →{' '}
-                  <strong className="text-[#1F6A37] dark:text-[#4EB462]">
+                  <strong className="text-[var(--brand-accent)]">
                     {log.afterValue}
                   </strong>
                 </div>

@@ -90,7 +90,7 @@ function DiscrepancyForm({ pod, canSchedule, onClose, onDone }: {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <label className="block space-y-1 text-sm font-medium">
+      <label className="ui-label block space-y-1">
         <span>Resolution</span>
         <select className={podInputClass} value={action} onChange={(event) => setAction(event.target.value as typeof action)}>
           <option value="Accept Final Quantities">Accept verified quantities as final</option>
@@ -98,16 +98,16 @@ function DiscrepancyForm({ pod, canSchedule, onClose, onDone }: {
         </select>
       </label>
       {action === 'Schedule Re-delivery' ?
-        <label className="block space-y-1 text-sm font-medium">
+        <label className="ui-label block space-y-1">
           <span>Replacement delivery date</span>
           <input type="date" className={podInputClass} value={date} onChange={(event) => setDate(event.target.value)} required />
         </label> :
         <p className="text-sm text-[var(--text-secondary)]">Any outstanding quantity will be recorded as a shortage accepted by the supervisor.</p>}
-      <label className="block space-y-1 text-sm font-medium">
+      <label className="ui-label block space-y-1">
         <span>Resolution notes</span>
         <textarea className={podInputClass} value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} required />
       </label>
-      {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p role="alert" className="text-sm text-[var(--status-danger-fg)]">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2">
         <button type="button" className={podSecondaryClass} onClick={onClose} disabled={working}>Cancel</button>
         <button type="submit" className={podPrimaryClass} disabled={working}>{working ? 'Saving…' : 'Record resolution'}</button>
@@ -135,11 +135,11 @@ function RejectForm({ pod, onClose, onDone }: { pod: PODEvidenceRecord; onClose:
   }
   return (
     <form onSubmit={reject} className="space-y-4">
-      <label className="block space-y-1 text-sm font-medium">
+      <label className="ui-label block space-y-1">
         <span>Rejection reason</span>
         <textarea className={podInputClass} value={reason} onChange={(event) => setReason(event.target.value)} rows={3} required />
       </label>
-      {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p role="alert" className="text-sm text-[var(--status-danger-fg)]">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2">
         <button type="button" className={podSecondaryClass} onClick={onClose} disabled={working}>Back</button>
         <button type="submit" className={podPrimaryClass} disabled={working}>{working ? 'Saving…' : 'Reject and reopen stop'}</button>
@@ -241,7 +241,7 @@ function FulfillmentContent() {
       </div>
 
       <section id="pod-queue" className="space-y-3 scroll-mt-24">
-        <h2 className="text-lg font-semibold">Proof of delivery queue</h2>
+        <h2 className="ui-section-title">Proof of delivery queue</h2>
         {queue.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">No receipts need review or reconciliation.</p> :
           <ul className="space-y-2">{queue.map((pod) => (
             <li key={pod.id} id={`pod-${pod.id}`} className="scroll-mt-24">
@@ -258,12 +258,12 @@ function FulfillmentContent() {
       </section>
 
       <section id="orders" className="space-y-3 scroll-mt-24">
-        <h2 className="text-lg font-semibold">Orders</h2>
+        <h2 className="ui-section-title">Orders</h2>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,0.45fr)]">
-          <label className="block space-y-1 text-sm font-medium"><span>Search orders</span>
+          <label className="ui-label block space-y-1"><span>Search orders</span>
             <input type="search" className={podInputClass} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Order number, customer or hub" />
           </label>
-          <label className="block space-y-1 text-sm font-medium"><span>Fulfillment status</span>
+          <label className="ui-label block space-y-1"><span>Fulfillment status</span>
             <select className={podInputClass} value={stage} onChange={(event) => setStage(event.target.value as typeof stage)}>
               <option value="">All statuses</option>{stages.map((entry) => <option key={entry}>{entry}</option>)}
             </select>
@@ -294,7 +294,7 @@ function FulfillmentContent() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2"><StatusBadge status={selectedOrder.status} /><p className="text-sm">{selectedOrder.nextStepLabel}</p></div>
             <p className="text-sm text-[var(--text-secondary)]">{selectedOrder.warehouseName} · Target delivery {selectedOrder.deliveryDate}</p>
-            <h3 className="text-base font-semibold">Order quantities</h3>
+            <h3 className="ui-section-title">Order quantities</h3>
             <ul className="space-y-2">
               {getPODExpectedLines(selectedOrder, podRecords).map((line, index) => (
                 <li key={line.orderLineId} className="space-y-1 rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
@@ -306,7 +306,7 @@ function FulfillmentContent() {
             </ul>
             {selectedReceipts.length > 0 && (
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Proof of delivery history</h3>
+                <h3 className="ui-section-title">Proof of delivery history</h3>
                 {selectedReceipts.map((pod) => (
                   <div key={pod.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] p-3">
                     <div className="flex flex-wrap items-center gap-2 text-sm"><span>{pod.id}</span><StatusBadge status={pod.status} /></div>
