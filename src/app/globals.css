@@ -10,33 +10,33 @@
   color-scheme: light;
 
   /* Agro-Deliveries Brand Color System */
-  --agro-deep-forest: #08190C;
-  --agro-forest-green: #1F6A37;
-  --agro-emerald: #4EB462;
-  --agro-deep-green: #12512C;
-  --agro-soft-mint: #E5EFE6;
-  --agro-off-white: #F4F6F3;
-  --agro-white: #FFFFFF;
-  --agro-ink: #111D12;
-  --agro-muted-green: #3D694A;
+  --agro-deep-forest: #173B39;
+  --agro-forest-green: #234E4B;
+  --agro-emerald: #EC6745;
+  --agro-deep-green: #193D3A;
+  --agro-soft-mint: #E7DCD7;
+  --agro-off-white: #F3ECE9;
+  --agro-white: #FFFCFA;
+  --agro-ink: #234E4B;
+  --agro-muted-green: #537471;
 
   /* Light Mode Operational Surfaces */
-  --bg-canvas: #F4F6F3;
-  --bg-elevated: #FFFFFF;
-  --bg-card: #FFFFFF;
-  --bg-subtle: #EDF2ED;
-  --text-primary: #111D12;
-  --text-secondary: #516055;
-  --border-subtle: #DCE5DD;
-  --control-border: #849388;
-  --brand-accent: var(--agro-forest-green);
+  --bg-canvas: #F3ECE9;
+  --bg-elevated: #FFFCFA;
+  --bg-card: #FFFCFA;
+  --bg-subtle: #EAE0DC;
+  --text-primary: #234E4B;
+  --text-secondary: #53716E;
+  --border-subtle: #D9CCC6;
+  --control-border: #78908D;
+  --brand-accent: #234E4B;
   --brand-emerald: var(--agro-emerald);
   --focus-ring: var(--brand-accent);
 
   /* Actions and selection */
-  --action-primary-bg: var(--agro-forest-green);
-  --action-primary-hover: var(--agro-deep-green);
-  --action-primary-fg: var(--agro-white);
+  --action-primary-bg: #EC6745;
+  --action-primary-hover: #D95636;
+  --action-primary-fg: #173B39;
   --action-selected-bg: var(--agro-soft-mint);
   --action-danger-bg: #A63137;
   --action-danger-hover: #8C262C;
@@ -61,12 +61,12 @@
   --status-neutral-border: var(--border-subtle);
 
   /* Navigation has a fixed forest surface across app themes. */
-  --nav-bg: var(--agro-deep-forest);
-  --nav-surface: #142B1B;
+  --nav-bg: #234E4B;
+  --nav-surface: #2D5C58;
   --nav-text: var(--agro-off-white);
-  --nav-text-muted: #AEC3B2;
-  --nav-active: #8AD798;
-  --nav-border: #35513E;
+  --nav-text-muted: #D0DFDC;
+  --nav-active: #D8E8E4;
+  --nav-border: #527572;
 
   /* Typography */
   --type-meta: 0.75rem;
@@ -115,23 +115,23 @@
   color-scheme: dark;
 
   /* Deliberate Dark Mode Operational Surfaces */
-  --bg-canvas: #08190C;
-  --bg-elevated: #0C1B11;
-  --bg-card: #14251A;
-  --bg-subtle: #1C3022;
-  --text-primary: #F4F6F3;
-  --text-secondary: #AED0B6;
-  --border-subtle: #344B39;
-  --control-border: #6B8D73;
-  --brand-accent: #88D895;
-  --action-primary-bg: #7ACA8B;
-  --action-primary-hover: #99DDA6;
-  --action-primary-fg: var(--agro-deep-forest);
-  --action-selected-bg: #24452D;
+  --bg-canvas: #142C2A;
+  --bg-elevated: #1A3734;
+  --bg-card: #1E403D;
+  --bg-subtle: #294D49;
+  --text-primary: #F3ECE9;
+  --text-secondary: #C1D2CF;
+  --border-subtle: #3D625E;
+  --control-border: #789692;
+  --brand-accent: #B5D2CE;
+  --action-primary-bg: #EC6745;
+  --action-primary-hover: #F08061;
+  --action-primary-fg: #173B39;
+  --action-selected-bg: #345A55;
   --action-danger-bg: #F0A5AB;
   --action-danger-hover: #FFC3C7;
   --action-danger-fg: #381316;
-  --dialog-scrim: rgba(3, 12, 6, 0.78);
+  --dialog-scrim: rgba(7, 22, 21, 0.8);
 
   --status-success-fg: #A2E4AE;
   --status-success-bg: #193B26;
@@ -145,6 +145,13 @@
   --status-info-fg: #AFD7F2;
   --status-info-bg: #1C3547;
   --status-info-border: #486C83;
+
+  --nav-bg: #102523;
+  --nav-surface: #1B3835;
+  --nav-text: #F3ECE9;
+  --nav-text-muted: #C1D2CF;
+  --nav-active: #B5D2CE;
+  --nav-border: #365A56;
 
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
   --shadow-md: 0 8px 22px -4px rgba(0, 0, 0, 0.48);
@@ -202,6 +209,9 @@ html {
     font-size: var(--type-page);
     line-height: 1.2;
     letter-spacing: -0.025em;
+    background: linear-gradient(100deg, var(--text-primary) 0%, var(--text-primary) 78%, var(--brand-emerald) 100%);
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   .ui-section-title {
@@ -252,7 +262,7 @@ html {
     gap: 0.5rem;
     padding: 0.5rem 0.875rem;
     border: 1px solid transparent;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-pill);
     font-size: var(--type-body);
     font-weight: 600;
     line-height: 1.25;

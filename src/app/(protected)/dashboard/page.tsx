@@ -7,6 +7,7 @@ import {
   Package, Plus, ShieldCheck, Sparkles, Truck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card, PageHeader } from '@/components/ui/primitives';
 import { useBos } from '@/lib/services/bos-context';
 import { canAccessDeliveryRun, hasDeliveryRunException, isOpenPODDiscrepancy, isPendingPOD } from '@/lib/services/delivery-workflow';
@@ -207,7 +208,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isDriver ? 'Delivery workspace' : 'Operations overview'}
+        title={`Welcome${currentUser?.fullName ? `, ${currentUser.fullName.split(' ')[0]}` : ''}`}
         description={new Intl.DateTimeFormat('en-KE', { dateStyle: 'full', timeZone: 'Africa/Nairobi' }).format(new Date())}
         actions={can('orders.create') && (
           <Link href="/orders?action=new" className="ui-button ui-button-primary">
@@ -216,6 +217,45 @@ export default function DashboardPage() {
           </Link>
         )}
       />
+
+      <section aria-label="Operational overview" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'Open orders', value: can('orders.view') ? activeOrders.length : 0, detail: 'Orders in progress' },
+          { label: 'Dispatches ready', value: can('deliveries.view') ? dispatchRuns.length : 0, detail: 'Planned or loaded' },
+          { label: 'Awaiting approval', value: can('approvals.view') ? pendingApprovals.length : 0, detail: 'Requests to review' },
+          { label: 'Stock alerts', value: can('inventory.view') ? expiringBatches.length : 0, detail: 'Batches near expiry' },
+        ].map((metric, index) => (
+          <Card key={metric.label} padding="p-4 sm:p-5" className={`min-h-32 ${index === 0 ? 'xl:col-span-2' : ''}`}>
+            <p className="ui-meta font-medium">{metric.label}</p>
+            <p className="ui-metric mt-2 text-3xl">{metric.value}</p>
+            <p className="ui-meta mt-1">{metric.detail}</p>
+          </Card>
+        ))}
+        <Card padding="p-4 sm:p-5" className="min-w-0 sm:col-span-2 xl:col-span-4">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="ui-section-title">Workload snapshot</h2>
+              <p className="ui-meta mt-1">Current items across the queues you can access</p>
+            </div>
+          </div>
+          <div className="h-56 w-full" role="img" aria-label="Bar chart showing open orders, dispatches ready, approvals awaiting review, and stock alerts">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[
+                { name: 'Orders', count: can('orders.view') ? activeOrders.length : 0 },
+                { name: 'Dispatch', count: can('deliveries.view') ? dispatchRuns.length : 0 },
+                { name: 'Approvals', count: can('approvals.view') ? pendingApprovals.length : 0 },
+                { name: 'Stock alerts', count: can('inventory.view') ? expiringBatches.length : 0 },
+              ]} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+                <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'var(--bg-subtle)' }} contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', borderRadius: 14, color: 'var(--text-primary)' }} />
+                <Bar dataKey="count" name="Items" fill="var(--brand-accent)" radius={[8, 8, 0, 0]} maxBarSize={56} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </section>
 
       <section aria-labelledby="dashboard-attention" className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">

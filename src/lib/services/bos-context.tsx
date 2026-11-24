@@ -596,7 +596,7 @@ export function BosProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(true);
   const [demoModeEnabled, setDemoModeState] = useState(false);
 
-  const [theme, setThemeState] = useState<ThemeMode>('system');
+  const [theme, setThemeState] = useState<ThemeMode>('light');
   const [resolvedDark, setResolvedDark] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
