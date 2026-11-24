@@ -25,6 +25,16 @@ type Queue = {
   rows: { id: string; title: string; detail: string; href?: string }[];
 };
 
+type DashboardAction = {
+  id: string;
+  title: string;
+  detail: string;
+  href: string;
+  action: string;
+  category: string;
+  urgency: 'critical' | 'important' | 'routine';
+};
+
 const rolePriorities: Record<string, string[]> = {
   delivery_driver: ['dispatch', 'on-route', 'exceptions'],
   procurement_officer: ['sourcing', 'collections', 'stock', 'approvals'],
@@ -41,7 +51,7 @@ const byDate = <T,>(records: T[], date: (record: T) => string) =>
 export default function DashboardPage() {
   const {
     currentUser, can, orders, procurementOrders, deliveries, drivers, podRecords,
-    approvals, supplierPayables, invoices, payments, stockBatches,
+    approvals, supplierPayables, invoices, stockBatches,
   } = useBos();
   const [brief, setBrief] = useState<{ headline: string; priorities: string[]; riskAlert: string }>();
   const [briefStatus, setBriefStatus] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -83,9 +93,6 @@ export default function DashboardPage() {
   const totalPayablesKes = can('finance.view')
     ? supplierPayables.filter((payable) => payable.balanceKes > 0).reduce((sum, payable) => sum + payable.balanceKes, 0)
     : 0;
-  const reconciledCollections = can('finance.view') ? payments.filter((payment) =>
-    payment.direction === 'Inbound (Customer AR)' && payment.reconciled
-  ) : [];
   const recentMonths = Array.from({ length: 6 }, (_, index) => {
     const date = new Date(`${monthKey}-01T00:00:00Z`);
     date.setUTCMonth(date.getUTCMonth() - (5 - index));
@@ -95,8 +102,16 @@ export default function DashboardPage() {
       month: new Intl.DateTimeFormat('en-KE', { month: 'short', timeZone: 'UTC' }).format(date),
       invoiced: can('finance.view') ? invoices.filter((invoice) => invoice.issueDate.startsWith(key)
         ).reduce((sum, invoice) => sum + invoice.amountKes, 0) : 0,
-      collected: can('finance.view') ? reconciledCollections.filter((payment) => payment.date.startsWith(key)
-        ).reduce((sum, payment) => sum + payment.amountKes, 0) : 0,
+      profit: (() => {
+        if (!can('finance.view')) return null;
+        const monthRows = invoices.filter((invoice) => invoice.issueDate.startsWith(key));
+        const hasCompleteCosting = monthRows.length > 0 && monthRows.every((invoice) =>
+          invoice.lineItems?.length && invoice.lineItems.every((line) => Number.isFinite(line.purchaseCostKes))
+        );
+        return hasCompleteCosting ? monthRows.reduce((sum, invoice) => sum + (invoice.lineItems ?? []).reduce(
+          (invoiceSum, line) => invoiceSum + line.lineTotalKes - line.quantity * (line.purchaseCostKes ?? 0), 0,
+        ), 0) : null;
+      })(),
     };
   });
   const orderPipeline = ['Draft', 'Confirmed', 'Picking', 'Packed', 'Dispatched', 'Delivered', 'Partially Fulfilled']
@@ -120,6 +135,40 @@ export default function DashboardPage() {
     const index = daysOverdue === 0 ? 0 : daysOverdue <= 15 ? 1 : daysOverdue <= 30 ? 2 : daysOverdue <= 60 ? 3 : 4;
     receivableAging[index].amount += invoice.balanceKes;
   });
+  const recentMonthKeys = new Set(recentMonths.map((month) => month.key));
+  const orderByNumber = new Map(orders.map((order) => [order.orderNumber, order]));
+  const customerSegmentRevenue = new Map<string, number>();
+  invoices.filter((invoice) => can('finance.view') && recentMonthKeys.has(invoice.issueDate.slice(0, 7)))
+    .forEach((invoice) => {
+      const segment = orderByNumber.get(invoice.orderNumber)?.customerSegment ?? 'Unclassified';
+      customerSegmentRevenue.set(segment, (customerSegmentRevenue.get(segment) ?? 0) + invoice.amountKes);
+    });
+  const segmentRevenue = [...customerSegmentRevenue.entries()]
+    .map(([segment, revenue]) => ({ segment, revenue }))
+    .sort((a, b) => b.revenue - a.revenue);
+  const runStatusGroups = [
+    { status: 'Ready to dispatch', count: 0 },
+    { status: 'In delivery', count: 0 },
+    { status: 'Delivered', count: 0 },
+    { status: 'Partially delivered', count: 0 },
+    { status: 'Rescheduled', count: 0 },
+  ];
+  runs.forEach((run) => {
+    const group = run.status === 'Planned' || run.status === 'Loaded' ? 0
+      : run.status === 'Dispatched' ? 1
+        : run.status === 'Delivered' ? 2
+          : run.status === 'Partially Delivered' ? 3 : 4;
+    runStatusGroups[group].count += 1;
+  });
+  const procurementCommitments = new Map<string, number>();
+  procurementOrders.filter((po) => can('procurement.view') && ['PO Issued', 'Receiving (GRN)', 'Quality Check', 'Partially Received'].includes(po.stage))
+    .forEach((po) => {
+      const source = po.purpose === 'Direct Customer Fulfillment' ? 'Direct procurement'
+        : po.purpose === 'Bulk Stock Procurement' ? 'Stock procurement' : 'Unclassified';
+      procurementCommitments.set(source, (procurementCommitments.get(source) ?? 0) + po.totalKes);
+    });
+  const procurementBySource = [...procurementCommitments.entries()]
+    .map(([source, commitment]) => ({ source, commitment }));
   const deliveryRows = (entries: typeof deliveries) => entries.map((run) => {
     const dates = (run.orderNumbers ?? run.ordersIncluded)
       .map((identifier) => ordersByIdentifier.get(identifier)?.deliveryDate)
@@ -230,6 +279,31 @@ export default function DashboardPage() {
     : queues
   ).filter((queue): queue is Queue => queue?.visible === true);
   const activeQueues = relevantQueues.filter((queue) => queue.rows.length > 0);
+  const actionableQueues = activeQueues.filter((queue) => !['orders', 'packing'].includes(queue.id));
+  const dashboardActions: DashboardAction[] = actionableQueues.flatMap((queue) => queue.rows.map((row) => {
+    const isCritical = queue.id === 'exceptions' ||
+      (queue.id === 'receivables' && Number(row.detail.match(/KES\s([\d,]+)/)?.[1]?.replaceAll(',', '') ?? 0) >= 100000) ||
+      (queue.id === 'payables' && row.detail.includes('Overdue since')) ||
+      (queue.id === 'stock' && row.detail.includes('Expired'));
+    const urgency: DashboardAction['urgency'] = isCritical ? 'critical'
+      : ['sourcing', 'collections', 'dispatch', 'on-route', 'approvals', 'payables', 'receivables', 'stock'].includes(queue.id)
+        ? 'important' : 'routine';
+    return {
+      id: `${queue.id}:${row.id}`,
+      title: row.title,
+      detail: row.detail,
+      href: row.href ?? queue.href,
+      action: queue.action,
+      category: queue.title,
+      urgency,
+    };
+  })).sort((a, b) => ({ critical: 0, important: 1, routine: 2 }[a.urgency] - { critical: 0, important: 1, routine: 2 }[b.urgency]));
+  const openActionCount = dashboardActions.length;
+  const actionUrgencyCounts = {
+    critical: dashboardActions.filter((action) => action.urgency === 'critical').length,
+    important: dashboardActions.filter((action) => action.urgency === 'important').length,
+    routine: dashboardActions.filter((action) => action.urgency === 'routine').length,
+  };
 
   const loadBrief = async () => {
     setBriefStatus('loading');
@@ -258,7 +332,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title={`Welcome${currentUser?.fullName ? `, ${currentUser.fullName.split(' ')[0]}` : ''}`}
-        description={new Intl.DateTimeFormat('en-KE', { dateStyle: 'full', timeZone: 'Africa/Nairobi' }).format(new Date())}
+        description={`Here's how your business is performing today · ${new Intl.DateTimeFormat('en-KE', { dateStyle: 'full', timeZone: 'Africa/Nairobi' }).format(new Date())}`}
         actions={can('orders.create') && (
           <Link href="/orders?action=new" className="ui-button ui-button-primary">
             <Plus className="size-4" aria-hidden="true" />
@@ -313,7 +387,7 @@ export default function DashboardPage() {
           {can('orders.view') && (
             <Card variant="raised" padding="p-4 sm:p-5" className="col-span-1 flex min-h-36 flex-col justify-between xl:col-span-3">
               <div className="flex items-start justify-between gap-2"><p className="ui-meta font-semibold">Orders this month</p><PackageCheck className="size-4 text-[var(--text-secondary)]" aria-hidden="true" /></div>
-              <div><p className="ui-metric mt-2 text-2xl">{monthOrders.length}</p><p className="ui-meta mt-1">{orders.filter((order) => ['Delivered', 'Closed'].includes(order.status)).length} completed overall</p></div>
+              <div><p className="ui-metric mt-2 text-2xl">{monthOrders.length}</p><p className="ui-meta mt-1">{activeOrders.length} currently in progress</p></div>
             </Card>
           )}
           {can('deliveries.view') && (
@@ -325,106 +399,153 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section aria-label="Business performance charts" className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+      <section aria-label="Business performance and action centre" className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-12">
+        <Card variant="raised" padding="p-4 sm:p-5" className={`min-w-0 xl:order-2 ${can('finance.view') ? 'xl:col-span-5' : 'xl:col-span-12'}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><h2 className="ui-section-title">Action Centre</h2><p className="ui-meta mt-1">Issues and decisions requiring attention</p></div>
+            <span className="ui-metric grid size-10 place-items-center rounded-full bg-[var(--bg-subtle)] text-xl">{openActionCount}</span>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2" aria-label="Action priority counts">
+            <span className="ui-badge ui-tone-danger">{actionUrgencyCounts.critical} Critical</span>
+            <span className="ui-badge ui-tone-warning">{actionUrgencyCounts.important} Important</span>
+            <span className="ui-badge ui-tone-neutral">{actionUrgencyCounts.routine} Routine</span>
+          </div>
+          {dashboardActions.length ? (
+            <ul className="mt-3 divide-y divide-[var(--border-subtle)]">
+              {dashboardActions.slice(0, 5).map((action) => (
+                <li key={action.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`ui-badge ${action.urgency === 'critical' ? 'ui-tone-danger' : action.urgency === 'important' ? 'ui-tone-warning' : 'ui-tone-neutral'}`}>{action.urgency}</span>
+                      <span className="ui-meta">{action.category}</span>
+                    </div>
+                    <p className="mt-1.5 text-sm font-semibold">{action.title}</p>
+                    <p className="ui-meta mt-0.5">{action.detail}</p>
+                  </div>
+                  <Link href={action.href} className="ui-button ui-button-secondary ui-button-compact shrink-0">{action.action} <ArrowRight className="size-3.5" aria-hidden="true" /></Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-5 flex items-center gap-3 rounded-[var(--radius-card)] bg-[var(--bg-subtle)] p-4 text-sm text-[var(--text-secondary)]">
+              <CheckCircle2 className="size-5 shrink-0 text-[var(--brand-accent)]" aria-hidden="true" />
+              Your work queues are clear.
+            </div>
+          )}
+          {dashboardActions.length > 5 && <p className="ui-meta mt-2">Showing 5 of {dashboardActions.length} open actions.</p>}
+          {can('reports.view') && <Link href="/reports" className="ui-button ui-button-ghost mt-3 px-0 text-[var(--brand-accent)]">View all reports <ArrowRight className="size-4" aria-hidden="true" /></Link>}
+        </Card>
         {can('finance.view') && (
-          <Card variant="raised" padding="p-4 sm:p-5" className={`min-w-0 ${can('orders.view') ? 'xl:col-span-7' : 'xl:col-span-12'}`}>
+          <Card variant="raised" padding="p-4 sm:p-5" className="min-w-0 xl:order-1 xl:col-span-7">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div><h3 className="ui-section-title">Revenue and cash collected</h3><p className="ui-meta mt-1">Monthly totals · last six months · KES</p></div>
+              <div><h3 className="ui-section-title">Revenue and gross profit</h3><p className="ui-meta mt-1">Invoiced sales · last six months · KES</p></div>
               <span className="grid size-9 place-items-center rounded-full bg-[var(--bg-subtle)] text-[var(--brand-accent)]"><TrendingUp className="size-4" aria-hidden="true" /></span>
             </div>
-            <div className="h-64 w-full" role="group" aria-label="Monthly invoiced revenue compared with reconciled customer payments">
+            <div className="h-64 w-full" role="group" aria-label="Monthly invoiced revenue and gross profit for the last six months">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart accessibilityLayer data={recentMonths} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
                   <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={(value: number) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}m` : `${Math.round(value / 1000)}k`} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(value) => formatKes(Number(value))} contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', borderRadius: 14, color: 'var(--text-primary)' }} />
+                  <Tooltip formatter={(value) => value == null ? 'Not enough cost data' : formatKes(Number(value))} contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', borderRadius: 14, color: 'var(--text-primary)' }} />
                   <Legend />
-                  <Line type="monotone" dataKey="invoiced" name="Invoiced" stroke="var(--brand-accent)" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                  <Line type="monotone" dataKey="collected" name="Collected" stroke="var(--chart-secondary)" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="invoiced" name="Invoiced revenue" stroke="var(--brand-accent)" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  <Line type="monotone" dataKey="profit" name="Gross profit" connectNulls={false} stroke="var(--chart-secondary)" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
+            <p className="ui-meta mt-2">Gross profit appears only for months where every invoice has item-level purchase costs.</p>
           </Card>
         )}
-        {can('orders.view') && (
-          <Card variant="raised" padding="p-4 sm:p-5" className={`min-w-0 ${can('finance.view') ? 'xl:col-span-5' : 'xl:col-span-12'}`}>
-            <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="ui-section-title">Order pipeline</h3><p className="ui-meta mt-1">Current orders by status</p></div><span className="grid size-9 place-items-center rounded-full bg-[var(--bg-subtle)] text-[var(--brand-accent)]"><PackageCheck className="size-4" aria-hidden="true" /></span></div>
-            {orderPipeline.length ? <div className="h-64 w-full" role="group" aria-label="Current order counts by workflow status">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart accessibilityLayer data={orderPipeline} layout="vertical" margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
-                  <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="status" width={98} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip cursor={{ fill: 'var(--bg-subtle)' }} contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', borderRadius: 14, color: 'var(--text-primary)' }} />
-                  <Bar dataKey="orders" name="Orders" fill="var(--brand-accent)" radius={[0, 8, 8, 0]} maxBarSize={24} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div> : <p className="ui-meta py-12 text-center">No order data is available.</p>}
-          </Card>
-        )}
-        {can('finance.view') && (
-          <Card variant="raised" padding="p-4 sm:p-5" className="min-w-0 xl:col-span-12">
-            <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="ui-section-title">Receivables aging</h3><p className="ui-meta mt-1">Outstanding invoice balances by days past due · KES</p></div><span className="grid size-9 place-items-center rounded-full bg-[var(--bg-subtle)] text-[var(--brand-accent)]"><ReceiptText className="size-4" aria-hidden="true" /></span></div>
-            <div className="h-52 w-full" role="group" aria-label="Outstanding accounts receivable grouped by how long invoices are past due">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart accessibilityLayer data={receivableAging} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
-                  <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="bucket" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={(value: number) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}m` : `${Math.round(value / 1000)}k`} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(value) => formatKes(Number(value))} contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', borderRadius: 14, color: 'var(--text-primary)' }} />
-                  <Area type="monotone" dataKey="amount" name="Outstanding balance" stroke="var(--brand-accent)" fill="var(--brand-accent)" fillOpacity={0.16} strokeWidth={3} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        )}
+
       </section>
 
-      <section aria-labelledby="dashboard-attention" className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="dashboard-attention" className="ui-section-title">Needs your attention</h2>
-          {can('reports.view') && (
-            <Link href="/reports" className="ui-button ui-button-secondary">
-              View reports <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
+      <section aria-labelledby="business-insights" className="space-y-3">
+        <div><h2 id="business-insights" className="ui-section-title">Business insights</h2><p className="ui-meta mt-1">Operational flow, customer mix, and sourcing commitments</p></div>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          {can('orders.view') && (
+            <Card variant="raised" padding="p-4 sm:p-5" className="min-w-0 xl:col-span-5">
+              <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="ui-section-title">Order pipeline</h3><p className="ui-meta mt-1">Current orders by workflow stage</p></div><span className="grid size-9 place-items-center rounded-full bg-[var(--bg-subtle)] text-[var(--brand-accent)]"><PackageCheck className="size-4" aria-hidden="true" /></span></div>
+              {orderPipeline.length ? <div className="h-60 w-full" role="group" aria-label="Current order counts by workflow status">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart accessibilityLayer data={orderPipeline} layout="vertical" margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
+                    <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="status" width={98} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: 'var(--bg-subtle)' }} contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', borderRadius: 14, color: 'var(--text-primary)' }} />
+                    <Bar dataKey="orders" name="Orders" fill="var(--brand-accent)" radius={[0, 8, 8, 0]} maxBarSize={24} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div> : <p className="ui-meta py-12 text-center">No order data is available.</p>}
+            </Card>
+          )}
+          {can('deliveries.view') && (
+            <Card variant="raised" padding="p-4 sm:p-5" className={`min-w-0 ${can('orders.view') ? 'xl:col-span-7' : 'xl:col-span-12'}`}>
+              <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="ui-section-title">Delivery performance</h3><p className="ui-meta mt-1">Current delivery runs by outcome</p></div><span className="grid size-9 place-items-center rounded-full bg-[var(--bg-subtle)] text-[var(--brand-accent)]"><Truck className="size-4" aria-hidden="true" /></span></div>
+              <div className="h-60 w-full" role="group" aria-label="Delivery run counts by current status">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart accessibilityLayer data={runStatusGroups} margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
+                    <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="status" interval={0} angle={-12} textAnchor="end" height={52} tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: 'var(--bg-subtle)' }} contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', borderRadius: 14, color: 'var(--text-primary)' }} />
+                    <Bar dataKey="count" name="Runs" fill="var(--chart-secondary)" radius={[8, 8, 0, 0]} maxBarSize={44} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="ui-meta mt-2">On-time rate is unavailable because delivery records do not capture target times.</p>
+            </Card>
+          )}
+          {can('finance.view') && (
+            <Card variant="raised" padding="p-4 sm:p-5" className="min-w-0 xl:col-span-4">
+              <div className="mb-4"><h3 className="ui-section-title">Receivables aging</h3><p className="ui-meta mt-1">Outstanding invoices by days past due · KES</p></div>
+              <div className="h-52 w-full" role="group" aria-label="Outstanding accounts receivable grouped by how long invoices are past due">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart accessibilityLayer data={receivableAging} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+                    <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="bucket" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(value: number) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}m` : `${Math.round(value / 1000)}k`} tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(value) => formatKes(Number(value))} contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', borderRadius: 14, color: 'var(--text-primary)' }} />
+                    <Area type="monotone" dataKey="amount" name="Outstanding balance" stroke="var(--brand-accent)" fill="var(--brand-accent)" fillOpacity={0.16} strokeWidth={3} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          )}
+          {can('finance.view') && (
+            <Card variant="raised" padding="p-4 sm:p-5" className="min-w-0 xl:col-span-4">
+              <div className="mb-4"><h3 className="ui-section-title">Revenue by customer segment</h3><p className="ui-meta mt-1">Invoiced revenue · last six months · KES</p></div>
+              {segmentRevenue.length ? <div className="h-52 w-full" role="group" aria-label="Invoiced revenue by customer segment for the last six months">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart accessibilityLayer data={segmentRevenue} layout="vertical" margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tickFormatter={(value: number) => `${Math.round(value / 1000)}k`} tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="segment" width={82} tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(value) => formatKes(Number(value))} contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', borderRadius: 14, color: 'var(--text-primary)' }} />
+                    <Bar dataKey="revenue" name="Revenue" fill="var(--brand-accent)" radius={[0, 8, 8, 0]} maxBarSize={22} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div> : <p className="ui-meta py-12 text-center">Not enough invoice data to compare segments.</p>}
+            </Card>
+          )}
+          {can('procurement.view') && (
+            <Card variant="raised" padding="p-4 sm:p-5" className="min-w-0 xl:col-span-4">
+              <div className="mb-4"><h3 className="ui-section-title">Procurement commitments</h3><p className="ui-meta mt-1">Open issued purchase orders by sourcing model · KES</p></div>
+              {procurementBySource.length ? <div className="h-52 w-full" role="group" aria-label="Open purchase order commitments grouped by sourcing model">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart accessibilityLayer data={procurementBySource} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+                    <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="source" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(value: number) => `${Math.round(value / 1000)}k`} tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(value) => formatKes(Number(value))} contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-subtle)', borderRadius: 14, color: 'var(--text-primary)' }} />
+                    <Bar dataKey="commitment" name="PO commitment" fill="var(--chart-secondary)" radius={[8, 8, 0, 0]} maxBarSize={44} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div> : <p className="ui-meta py-12 text-center">No open issued purchase orders to compare.</p>}
+            </Card>
           )}
         </div>
-        {!activeQueues.length && (
-          <Card padding="p-4" className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
-            <CheckCircle2 className="size-5 shrink-0 text-[var(--brand-accent)]" aria-hidden="true" />
-            Your work queues are clear.
-          </Card>
-        )}
-        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-          {activeQueues.map(({ id, title, action, href, icon: Icon, rows }) => (
-            <Card key={id} padding="p-4 sm:p-5" className="min-w-0 flex flex-col">
-              <div className="flex items-start gap-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[var(--bg-subtle)] text-[var(--brand-accent)]">
-                  <Icon className="size-4" aria-hidden="true" />
-                </span>
-                <h3 className="ui-section-title min-w-0 flex-1 self-center">{title}</h3>
-                <span className="ui-metric self-center text-xl">{rows.length}</span>
-              </div>
-              {rows.length > 0 && (
-                <ul className="mt-3 flex-1 divide-y divide-[var(--border-subtle)]">
-                  {rows.slice(0, 3).map((row) => (
-                    <li key={row.id} className="py-2.5">
-                      {row.href ? <Link href={row.href} className="ui-link text-sm">{row.title}</Link>
-                        : <p className="text-sm font-medium">{row.title}</p>}
-                      <p className="ui-meta mt-0.5">{row.detail}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <Link href={href} className="ui-button ui-button-ghost mt-auto self-start px-0 text-[var(--brand-accent)]">
-                {action} <ArrowRight className="size-4" aria-hidden="true" />
-              </Link>
-            </Card>
-          ))}
-        </div>
       </section>
-
       {!isDriver && relevantQueues.length > 0 && (
         <Card padding="p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
