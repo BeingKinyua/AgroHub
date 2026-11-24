@@ -7,6 +7,7 @@ import { ArrowRight, MapPin, Truck } from 'lucide-react';
 import { Card, FeedbackBanner, KPI, Modal, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import { PODQuantityForm, podInputClass, podPrimaryClass, podSecondaryClass } from '@/components/ui/PODQuantityForm';
 import { useBos } from '@/lib/services/bos-context';
+import { ModuleChart } from '@/components/ui/ModuleChart';
 import { canAccessDeliveryRun, getDeliveryRunStops, getPODExpectedLines, getUnassignedPackedOrders, hasDeliveryRunException, isOpenPODDiscrepancy, type PODQuantityInput } from '@/lib/services/delivery-workflow';
 import type { DeliveryRunRecord, OrderRecord } from '@/types/domain/bos';
 
@@ -55,6 +56,7 @@ function CapturePOD({ run, order, onClose, onRecorded }: {
           <textarea className={podInputClass} rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
         </label>
       </div>
+
     </PODQuantityForm>
   );
 }
@@ -208,6 +210,9 @@ function DeliveriesContent() {
   const inTransit = runs.filter(isInTransit);
   const recorded = runs.filter((run) => run.status === 'Delivered');
   const exceptions = runs.filter((run) => hasDeliveryRunException(run, orders, podRecords));
+  const stopsByRoute = [...runs.reduce((totals, run) => totals.set(run.routeZone,
+    (totals.get(run.routeZone) ?? 0) + run.ordersIncluded.length), new Map<string, number>())]
+    .map(([route, stops]) => ({ route, stops }));
   const filters: { id: Filter; label: string; list: DeliveryRunRecord[] }[] = [
     { id: 'all', label: 'All runs', list: runs },
     { id: 'dispatch', label: 'Pending dispatch', list: pending },
@@ -237,12 +242,20 @@ function DeliveriesContent() {
         actions={can('deliveries.assign') && <button type="button" className={podPrimaryClass} onClick={() => setPlanning(true)}>Plan delivery run</button>} />
       <FeedbackBanner message={feedback?.msg ?? null} type={feedback?.type} onDismiss={() => setFeedback(null)} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="bento-metrics">
         <KPI label="Pending dispatch" value={String(pending.length)} tone="neutral" />
         <KPI label="In transit" value={String(inTransit.length)} tone="neutral" />
         <KPI label="Arrivals recorded" value={String(recorded.length)} tone="positive" />
         <KPI label="Exceptions" value={String(exceptions.length)} tone={exceptions.length ? 'warning' : 'neutral'} />
       </div>
+
+      <section aria-label="Delivery analysis" className="grid gap-4 lg:grid-cols-2">
+        <ModuleChart title="Delivery run outcomes" subtitle="Runs by current status" data={[
+          { status: 'Dispatch', count: pending.length }, { status: 'In transit', count: inTransit.length },
+          { status: 'Delivered', count: recorded.length }, { status: 'Exceptions', count: exceptions.length },
+        ]} xKey="status" series={[{ key: 'count', label: 'Runs' }]} />
+        <ModuleChart title="Stops per route" subtitle="Scheduled stops across runs you can access" data={stopsByRoute} xKey="route" series={[{ key: 'stops', label: 'Stops' }]} layout="vertical" />
+      </section>
 
       {orderFilter && <div className="flex flex-wrap items-center gap-3 text-sm">Runs for {orderFilter} <Link href="/deliveries" className="underline">Show all runs</Link></div>}
       <div className="flex flex-wrap gap-2" aria-label="Filter delivery runs" role="group">

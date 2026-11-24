@@ -21,6 +21,7 @@ import {
   Card,
   EmptyState,
   FeedbackBanner,
+  KPI,
   Modal,
   PageHeader,
   StatusBadge,
@@ -35,6 +36,7 @@ import {
   SupplierRecord,
 } from '@/types/domain/bos';
 import { SupplierForm } from './SupplierForm';
+import { ModuleChart } from '@/components/ui/ModuleChart';
 
 const statusOptions = ['All', 'Active', 'Under Review', 'Suspended', 'Archived'] as const;
 type DirectoryStatus = (typeof statusOptions)[number];
@@ -249,6 +251,11 @@ function SupplierWorkspace() {
   }, [suppliers, products, normalizedSearch, statusFilter, categoryFilter]);
 
   const totalApKes = supplierPayables.reduce((sum, payable) => sum + payable.balanceKes, 0);
+  const receiptsBySupplier = new Map<string, number>();
+  for (const po of procurementOrders) for (const receipt of po.receipts ?? []) {
+    receiptsBySupplier.set(po.supplierName, (receiptsBySupplier.get(po.supplierName) ?? 0) + receipt.totalKes);
+  }
+  const supplierSpend = [...receiptsBySupplier].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([supplier, spend]) => ({ supplier, spend }));
   const profileBalance = supplierPayables.reduce((sum, payable) => payable.supplierId === profileSupplierId ? sum + payable.balanceKes : sum, 0);
 
   // Authorisation Checks
@@ -408,6 +415,15 @@ function SupplierWorkspace() {
             )}
           />
           <FeedbackBanner message={feedback?.msg || null} type={feedback?.type} onDismiss={() => setFeedback(null)} />
+          <section aria-label="Supplier network overview" className="space-y-4">
+            <div className="bento-metrics">
+              <KPI label="Active suppliers" value={String(suppliers.filter((supplier) => !supplier.isArchived && supplier.status === 'Active').length)} />
+              <KPI label="Supplier network" value={String(suppliers.filter((supplier) => !supplier.isArchived).length)} sublabel="Current directory records" />
+              <KPI label="Open supplier payables" value={currency.format(totalApKes)} sublabel="Recorded payable balances" />
+              <KPI label="Receipts recorded" value={String([...procurementOrders].reduce((count, po) => count + (po.receipts?.length ?? 0), 0))} />
+            </div>
+            <ModuleChart title="Received spend by supplier" subtitle="Top suppliers by recorded receipt value · commitments excluded" data={supplierSpend} xKey="supplier" series={[{ key: 'spend', label: 'Received (KES)' }]} layout="vertical" />
+          </section>
           <nav aria-label="Suppliers workspace" className="flex flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
             {([{ id: 'directory', label: 'Directory' }, { id: 'payables', label: 'Payables' }] as const).map((view) => (
               <Link

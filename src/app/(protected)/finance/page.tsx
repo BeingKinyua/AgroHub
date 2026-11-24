@@ -7,6 +7,7 @@ import { ArrowRight, Plus } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
 import { Card, EmptyState, KPI, LoadingSkeleton, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import { getNairobiDate, getOpenPayables, offsetBusinessDate } from '@/lib/services/workspace-metrics';
+import { ModuleChart } from '@/components/ui/ModuleChart';
 
 const kes = (amount: number) => 'KES ' + amount.toLocaleString('en-KE', { maximumFractionDigits: 2 });
 const tabs = [
@@ -52,6 +53,18 @@ function FinanceContent() {
       inbound: false,
     })),
   ].sort((a, b) => b.date.localeCompare(a.date));
+  const cashActivityByMonth = new Map<string, { inflows: number; outflows: number }>();
+  for (const activity of paymentActivity) {
+    const month = activity.date.slice(0, 7);
+    if (!month) continue;
+    const entry = cashActivityByMonth.get(month) ?? { inflows: 0, outflows: 0 };
+    entry[activity.inbound ? 'inflows' : 'outflows'] += activity.amount;
+    cashActivityByMonth.set(month, entry);
+  }
+  const cashActivityTrend = [...cashActivityByMonth].sort(([a], [b]) => a.localeCompare(b)).slice(-6)
+    .map(([month, totals]) => ({ month, ...totals }));
+  const aging = ['Current (0-15d)', '16-30 Days', '31-60 Days', '60+ Days Overdue']
+    .map((bucket) => ({ bucket, balance: openInvoices.filter((invoice) => invoice.agingBucket === bucket).reduce((sum, invoice) => sum + invoice.balanceKes, 0) }));
 
   return (
     <div className="space-y-5">
@@ -65,12 +78,17 @@ function FinanceContent() {
         )}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="bento-metrics">
         <KPI label="Customer receivables" value={kes(openInvoices.reduce((sum, invoice) => sum + invoice.balanceKes, 0))} />
         <KPI label="Overdue receivables" value={kes(overdueInvoices.reduce((sum, invoice) => sum + invoice.balanceKes, 0))} />
         <KPI label="Supplier payables" value={kes(openPayables.reduce((sum, payable) => sum + payable.balanceKes, 0))} />
         <KPI label="Supplier payments due" value={kes(duePayables.reduce((sum, payable) => sum + payable.balanceKes, 0))} sublabel="Overdue and due in the next 7 days" />
       </div>
+
+      <section aria-label="Finance analysis" className="grid gap-4 lg:grid-cols-2">
+        <ModuleChart title="Recorded payment activity" subtitle="Customer receipts and supplier payments by month" data={cashActivityTrend} xKey="month" series={[{ key: 'inflows', label: 'Customer receipts' }, { key: 'outflows', label: 'Supplier payments', color: 'var(--chart-secondary)' }]} />
+        <ModuleChart title="Receivables aging" subtitle="Open customer balances by invoice aging bucket" data={aging} xKey="bucket" series={[{ key: 'balance', label: 'Open balance (KES)' }]} layout="vertical" />
+      </section>
 
       <nav aria-label="Accounts" className="flex flex-wrap gap-2">
         {tabs.map((tab) => (

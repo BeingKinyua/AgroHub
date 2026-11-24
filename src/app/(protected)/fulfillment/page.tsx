@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Card, FeedbackBanner, KPI, Modal, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import { PODQuantityForm, podInputClass, podPrimaryClass, podSecondaryClass } from '@/components/ui/PODQuantityForm';
 import { useBos } from '@/lib/services/bos-context';
+import { ModuleChart } from '@/components/ui/ModuleChart';
 import { calculateInvoiceEligibility } from '@/lib/services/business-rules';
 import { canAccessDeliveryRun, getExistingPODInvoice, getOrderReceipts, getPODExpectedLines, isOpenPODDiscrepancy, isPendingPOD, type PODQuantityInput } from '@/lib/services/delivery-workflow';
 import type { OrderLifecycleStatus, OrderRecord, PODEvidenceRecord } from '@/types/domain/bos';
@@ -24,6 +25,7 @@ function ReceiptDetails({ pod }: { pod: PODEvidenceRecord }) {
         <StatusBadge status={pod.status} />
         {pod.hasDiscrepancies && <StatusBadge status={pod.reconciliationStatus || 'Disputed'} />}
       </div>
+
       <p className="text-sm text-[var(--text-secondary)]">{pod.recipientName} · {pod.submittedAt}</p>
       <ul className="space-y-3">
         {pod.deliveredItems.map((item, index) => {
@@ -233,12 +235,20 @@ function FulfillmentContent() {
       <PageHeader title="Fulfillment" description="Prepare orders, verify receipt quantities and resolve delivery exceptions." />
       <FeedbackBanner message={feedback?.msg ?? null} type={feedback?.type} onDismiss={() => setFeedback(null)} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="bento-metrics">
         <KPI label="Preparing orders" value={String(activeOrders.filter((order) => ['Confirmed', 'Picking', 'Packed'].includes(order.status)).length)} tone="neutral" />
         <KPI label="In transit" value={String(activeOrders.filter((order) => order.status === 'Dispatched').length)} tone="neutral" />
         <KPI label="Receipts to review" value={String(pending.length)} tone={pending.length ? 'warning' : 'neutral'} />
         <KPI label="Open discrepancies" value={String(discrepancies.length)} tone={discrepancies.length ? 'warning' : 'neutral'} />
       </div>
+
+      <section aria-label="Fulfillment analysis" className="grid gap-4 lg:grid-cols-2">
+        <ModuleChart title="Active order workload" subtitle="Orders by fulfillment stage" data={['Confirmed', 'Picking', 'Packed', 'Dispatched', 'Partially Fulfilled']
+          .map((status) => ({ status, count: activeOrders.filter((order) => order.status === status).length }))} xKey="status" series={[{ key: 'count', label: 'Orders' }]} />
+        <ModuleChart title="Proof of delivery review" subtitle="Pending receipts and open discrepancies" data={[
+          { type: 'Needs review', count: pending.length }, { type: 'Discrepancy', count: discrepancies.length },
+        ]} xKey="type" series={[{ key: 'count', label: 'Receipts' }]} />
+      </section>
 
       <section id="pod-queue" className="space-y-3 scroll-mt-24">
         <h2 className="ui-section-title">Proof of delivery queue</h2>

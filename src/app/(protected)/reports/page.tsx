@@ -5,6 +5,7 @@ import { Download } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
 import { Card, EmptyState, KPI, PageHeader } from '@/components/ui/primitives';
 import { getBillingReport, getNairobiDate, offsetBusinessDate } from '@/lib/services/workspace-metrics';
+import { ModuleChart } from '@/components/ui/ModuleChart';
 
 const kes = (amount: number) => 'KES ' + amount.toLocaleString('en-KE', { maximumFractionDigits: 2 });
 const csvCell = (value: string | number) => {
@@ -23,6 +24,8 @@ export default function ReportsPage() {
   const report = getBillingReport(invalidDates ? [] : invoices, products, from, through);
   const selectedCategory = report.categories.find((row) => row.category === category);
   const rows = selectedCategory?.invoices ?? report.invoices;
+  const invoiceTrend = [...new Map(report.invoices.map((invoice) => [invoice.issueDate.slice(0, 7), 0])).keys()]
+    .sort().map((month) => ({ month, invoiced: report.invoices.filter((invoice) => invoice.issueDate.startsWith(month)).reduce((sum, invoice) => sum + invoice.amountKes, 0) }));
 
   const exportReport = () => {
     const csv = [
@@ -84,10 +87,15 @@ export default function ReportsPage() {
 
       {!invalidDates && (
         <>
-          <section aria-label="Billing totals" className="grid gap-4 sm:grid-cols-3">
+          <section aria-label="Billing totals" className="bento-metrics">
             <KPI label="Invoices issued" value={String(report.invoices.length)} />
             <KPI label="Invoiced amount" value={kes(report.invoicedKes)} />
             <KPI label="Outstanding on these invoices" value={kes(report.outstandingKes)} />
+          </section>
+
+          <section aria-label="Billing analysis" className="grid gap-4 lg:grid-cols-2">
+            <ModuleChart title="Invoiced over time" subtitle={`Invoice issue dates · ${from} to ${through}`} data={invoiceTrend} xKey="month" series={[{ key: 'invoiced', label: 'Invoiced (KES)' }]} />
+            <ModuleChart title="Itemized sales by category" subtitle="Invoice line totals · unitemized invoices are excluded" data={report.categories.map((row) => ({ category: row.category, amount: row.amountKes }))} xKey="category" series={[{ key: 'amount', label: 'Sales (KES)' }]} layout="vertical" />
           </section>
 
           {report.invoices.length ? (

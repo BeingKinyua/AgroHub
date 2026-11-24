@@ -82,7 +82,7 @@ export default function SettingsPage() {
         onDismiss={() => setFeedback(null)}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="bento-metrics mb-6">
         <KPI
           label="Active Distribution Hubs"
           value={`${warehouses.length} Hubs`}

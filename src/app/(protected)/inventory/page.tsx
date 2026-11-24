@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/primitives';
 import { IMAGE_PATHS } from '@/lib/services/initial-data';
 import { StockMovementRecord } from '@/types/domain/bos';
+import { ModuleChart } from '@/components/ui/ModuleChart';
 
 function InventoryContent() {
   const searchParams = useSearchParams();
@@ -94,6 +95,15 @@ function InventoryContent() {
     () => stockBatches.filter((b) => b.daysToExpiry <= 7),
     [stockBatches]
   );
+  const stockByCategory = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const batch of stockBatches) totals.set(products.find((product) => product.id === batch.productId)?.category ?? 'Uncategorized',
+      (totals.get(products.find((product) => product.id === batch.productId)?.category ?? 'Uncategorized') ?? 0) + batch.availableQty * batch.unitCostKes);
+    return [...totals].map(([category, value]) => ({ category, value }));
+  }, [products, stockBatches]);
+  const stockValueKes = stockBatches.reduce((sum, batch) => sum + batch.availableQty * batch.unitCostKes, 0);
+  const movementTypes = useMemo(() => ['Receipt (GRN)', 'Order Pick', 'Transfer', 'Adjustment', 'Wastage']
+    .map((type) => ({ type, count: stockMovements.filter((movement) => movement.type === type).length })), [stockMovements]);
 
   const filteredBatches = useMemo(() => {
     return stockBatches.filter((b) => {
@@ -203,7 +213,7 @@ function InventoryContent() {
       </div>
 
       {/* Top Decision Summary Metrics (Section 23: Available, Reserved, Incoming, Low Stock, Expiring) */}
-      {activeTab !== 'direct-flow' && <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {activeTab !== 'direct-flow' && <div className="bento-metrics">
         <KPI
           label="Available Stock"
           value={`${availableSkus} SKUs`}
@@ -234,7 +244,13 @@ function InventoryContent() {
           sublabel="FEFO priority countdown"
           tone={expiringBatches.length > 0 ? 'danger' : 'positive'}
         />
+        <KPI label="Owned stock value" value={`KES ${stockValueKes.toLocaleString('en-KE', { maximumFractionDigits: 2 })}`} sublabel="Available quantity × batch cost" />
       </div>}
+
+      {activeTab !== 'direct-flow' && <section aria-label="Inventory analysis" className="grid gap-4 lg:grid-cols-2">
+        <ModuleChart title="Owned stock value" subtitle="Available batch value by product category" data={stockByCategory} xKey="category" series={[{ key: 'value', label: 'Stock value (KES)' }]} layout="vertical" />
+        <ModuleChart title="Stock movement mix" subtitle="Recorded movements by type" data={movementTypes} xKey="type" series={[{ key: 'count', label: 'Movements' }]} />
+      </section>}
 
       {/* Primary Section: Inventory at Risk (Section 23) */}
       {activeTab !== 'direct-flow' && <section aria-label="Warehouse stock risks">

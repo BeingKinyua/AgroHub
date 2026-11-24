@@ -89,7 +89,7 @@ function PaymentsContent({ invoiceNumber }: { invoiceNumber: string }) {
         onDismiss={() => setFeedback(null)}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="bento-metrics mb-6">
         <KPI
           label="Inbound Customer Receipts"
           value={`KES ${payments

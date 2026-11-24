@@ -19,6 +19,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useBos } from '@/lib/services/bos-context';
+import { ModuleChart } from '@/components/ui/ModuleChart';
 import {
   Card,
   FeedbackBanner,
@@ -33,7 +34,7 @@ import { CrmTicketRecord } from '@/types/domain/bos';
 
 function CrmContent() {
   const searchParams = useSearchParams();
-  const { crmTickets, customers, can, createCrmTicket, resolveCrmTicket } = useBos();
+  const { crmTickets, customers, orders, can, createCrmTicket, resolveCrmTicket } = useBos();
 
   const [activeTab, setActiveTab] = useState<'actions' | 'customers'>('actions');
   const [filterType, setFilterType] = useState<'all' | 'contracts' | 'follow-up' | 'overdue'>('all');
@@ -64,10 +65,14 @@ function CrmContent() {
 
   // Top Metrics (Section 27: Follow-ups Due, Contracts Expiring, Overdue Customers, Open Complaints, Inactive Accounts)
   const followUpsDue = crmTickets.filter((t) => t.status !== 'Resolved').length;
-  const contractsExpiring = 2; // St. Mary's School & Strathmore <= 14d
+  const contractsExpiring = customers.filter((customer) => customer.status === 'Tender Renewal').length;
   const overdueCustomers = customers.filter((c) => c.overdueBalanceKes > 0).length;
   const openComplaints = crmTickets.filter((t) => t.type === 'Quality Claim' && t.status !== 'Resolved').length;
   const inactiveAccounts = customers.filter((c) => c.status !== 'Active').length;
+  const ticketTypes = ['Contract Renewal', 'Quality Claim', 'Delivery Window Change', 'Tender Pricing Inquiry']
+    .map((type) => ({ type, count: crmTickets.filter((ticket) => ticket.type === type && ticket.status !== 'Resolved').length }));
+  const customerOrderValues = [...orders.reduce((totals, order) => totals.set(order.customerName, (totals.get(order.customerName) ?? 0) + order.totalKes), new Map<string, number>())]
+    .sort((a, b) => b[1] - a[1]).slice(0, 6).map(([customer, value]) => ({ customer, value }));
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,7 +146,7 @@ function CrmContent() {
       />
 
       {/* Top Decision Summary Metrics (Section 27: Follow-ups Due, Contracts Expiring, Overdue Customers, Open Complaints, Inactive Accounts) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="bento-metrics">
         <KPI
           label="Follow-ups Due"
           value={`${followUpsDue} Actions`}
@@ -149,9 +154,9 @@ function CrmContent() {
           tone="warning"
         />
         <KPI
-          label="Contracts Expiring"
-          value={`${contractsExpiring} Tenders`}
-          sublabel="Due for renewal <= 14d"
+          label="Tender renewals"
+          value={`${contractsExpiring} Accounts`}
+          sublabel="Customer accounts marked for renewal"
           tone="warning"
         />
         <KPI
@@ -167,12 +172,17 @@ function CrmContent() {
           tone={openComplaints > 0 ? 'warning' : 'positive'}
         />
         <KPI
-          label="Inactive Accounts"
-          value={`${inactiveAccounts} Dormant`}
-          sublabel="No order > 45 days"
+          label="Accounts requiring attention"
+          value={`${inactiveAccounts} Accounts`}
+          sublabel="Credit watch or renewal status"
           tone="neutral"
         />
       </div>
+
+      <section aria-label="Customer relationship analysis" className="grid gap-4 lg:grid-cols-2">
+        <ModuleChart title="Open customer actions" subtitle="Unresolved actions by type" data={ticketTypes} xKey="type" series={[{ key: 'count', label: 'Actions' }]} />
+        <ModuleChart title="Order value by customer" subtitle="Highest recorded order value · all time" data={customerOrderValues} xKey="customer" series={[{ key: 'value', label: 'Order value (KES)' }]} layout="vertical" />
+      </section>
 
       {/* Primary Work Queue: High-Priority Customer Actions */}
       {crmWorkQueueItems.length > 0 && (

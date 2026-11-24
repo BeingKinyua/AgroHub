@@ -30,6 +30,7 @@ import {
   Card,
   FeedbackBanner,
   ImageUploadZone,
+  KPI,
   Modal,
   PageHeader,
   ResilientImage,
@@ -37,6 +38,7 @@ import {
 } from '@/components/ui/primitives';
 import { ProductRecord, UnitOfMeasure } from '@/types/domain/bos';
 import { IMAGE_PATHS } from '@/lib/services/initial-data';
+import { ModuleChart } from '@/components/ui/ModuleChart';
 
 const CATEGORIES = [
   'All',
@@ -60,6 +62,7 @@ type LifecycleAction = 'archive' | 'restore' | 'delete';
 export default function ProductsPage() {
   const {
     products,
+    orders,
     can,
     createProduct,
     updateProduct,
@@ -92,6 +95,14 @@ export default function ProductsPage() {
     msg: string;
     type: 'success' | 'error';
   } | null>(null);
+  const categoryOrderValue = [...orders.reduce((totals, order) => {
+    for (const line of order.items) {
+      const product = products.find((entry) => entry.id === line.productId);
+      if (product) totals.set(product.category, (totals.get(product.category) ?? 0) + line.lineTotalKes);
+    }
+    return totals;
+  }, new Map<string, number>())].map(([category, value]) => ({ category, value }));
+  const orderedProductIds = new Set(orders.flatMap((order) => order.items.map((item) => item.productId)));
 
   // Full Edit Product Form State
   const [editName, setEditName] = useState('');
@@ -429,6 +440,16 @@ export default function ProductsPage() {
         type={feedback?.type}
         onDismiss={() => setFeedback(null)}
       />
+
+      <section aria-label="Product catalogue overview" className="space-y-4">
+        <div className="bento-metrics">
+          <KPI label="Active products" value={String(products.filter((product) => product.status === 'Active').length)} />
+          <KPI label="Below reorder point" value={String(products.filter((product) => product.status === 'Active' && product.availableQty < product.reorderPoint).length)} tone="warning" />
+          <KPI label="Products on orders" value={String(orderedProductIds.size)} sublabel="Distinct products in recorded orders" />
+          <KPI label="No recorded orders" value={String(products.filter((product) => product.status === 'Active' && !orderedProductIds.has(product.id)).length)} />
+        </div>
+        <ModuleChart title="Order value by product category" subtitle="Recorded order line totals · not recognized revenue" data={categoryOrderValue} xKey="category" series={[{ key: 'value', label: 'Order value (KES)' }]} layout="vertical" />
+      </section>
 
       <Card padding="p-4" className="space-y-4">
         <div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">

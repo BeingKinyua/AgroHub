@@ -55,7 +55,7 @@ export default function RolesAdministrationPage() {
         onDismiss={() => setFeedback(null)}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="bento-metrics mb-6">
         <KPI
           label="Workspace roles"
           value={`${roles.length} Roles`}

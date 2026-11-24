@@ -115,7 +115,7 @@ function ApprovalsContent() {
       />
 
       {/* Top Decision Summary Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="bento-metrics">
         <KPI
           label="Pending Decisions"
           value={`${pendingApprovals.length} Requests`}

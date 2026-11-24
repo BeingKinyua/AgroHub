@@ -118,7 +118,7 @@ export default function DocumentsPage() {
       />
 
       {/* KPI Summary Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="bento-metrics mb-6">
         <KPI
           label="Total Vault Records"
           value={`${documents.length} Files`}

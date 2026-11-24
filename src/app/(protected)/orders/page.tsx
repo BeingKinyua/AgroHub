@@ -37,6 +37,8 @@ import {
   WorkQueueItem,
 } from '@/components/ui/primitives';
 import { OrderLifecycleStatus, OrderRecord } from '@/types/domain/bos';
+import { ModuleChart } from '@/components/ui/ModuleChart';
+import { getNairobiDate } from '@/lib/services/workspace-metrics';
 
 const STATUS_FILTERS: ('All' | 'Needs Action' | OrderLifecycleStatus)[] = [
   'All',
@@ -402,10 +404,18 @@ function OrdersWorkbenchContent() {
     () => orders.filter((o) => o.status === 'On Hold').length,
     [orders]
   );
-  const todayDeliveryCount = useMemo(
-    () => orders.filter((o) => o.deliveryDate === '2026-10-01' || o.deliveryDate === '2026-10-02').length,
-    [orders]
-  );
+  const todayDeliveryCount = useMemo(() => orders.filter((o) => o.deliveryDate === getNairobiDate()).length, [orders]);
+  const orderTrend = useMemo(() => {
+    const end = new Date(`${getNairobiDate()}T12:00:00`);
+    return Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 5 + index, 1));
+      const month = date.toISOString().slice(0, 7);
+      return { month: date.toLocaleDateString('en-KE', { month: 'short' }), orders: orders.filter((order) => order.orderDate.slice(0, 7) === month).length,
+        value: orders.filter((order) => order.orderDate.slice(0, 7) === month).reduce((sum, order) => sum + order.totalKes, 0) };
+    });
+  }, [orders]);
+  const orderStatuses = useMemo(() => ['Pending Payment', 'Confirmed', 'Picking', 'Packed', 'Dispatched', 'Delivered', 'On Hold']
+    .map((status) => ({ status, count: orders.filter((order) => order.status === status).length })), [orders]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
@@ -555,7 +565,7 @@ function OrdersWorkbenchContent() {
       />
 
       {/* Top Summary Decision Metrics (Section 22) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="bento-metrics">
         <KPI
           label="Open Pipeline"
           value={`${openCount} Orders`}
@@ -571,7 +581,7 @@ function OrdersWorkbenchContent() {
         <KPI
           label="Awaiting Payment"
           value={`${awaitingPaymentCount} Invoices`}
-          sublabel="Net terms / EFT pending"
+          sublabel="Unpaid or partly paid customer orders"
           tone="neutral"
         />
         <KPI
@@ -583,10 +593,16 @@ function OrdersWorkbenchContent() {
         <KPI
           label="Today's Delivery"
           value={`${todayDeliveryCount} Scheduled`}
-          sublabel="Target SLA 06:30-10:00 EAT"
+          sublabel="Scheduled for today"
           tone="positive"
         />
       </div>
+
+      <section aria-label="Order performance" className="grid gap-4 lg:grid-cols-2">
+        <ModuleChart title="Order volume" subtitle="Orders created by month · last 6 months" data={orderTrend} xKey="month" series={[{ key: 'orders', label: 'Orders' }]} />
+        <ModuleChart title="Order value" subtitle="Recorded order totals by month · last 6 months" data={orderTrend} xKey="month" series={[{ key: 'value', label: 'Order value (KES)' }]} />
+        <ModuleChart title="Order pipeline" subtitle="Current orders by fulfillment stage" data={orderStatuses} xKey="status" series={[{ key: 'count', label: 'Orders' }]} layout="vertical" />
+      </section>
 
       {/* Primary Work Queue: Orders Requiring Action (Section 22) */}
       {orderWorkQueueItems.length > 0 && (

@@ -23,7 +23,9 @@ import {
   Modal,
   PageHeader,
   StatusBadge,
+  KPI,
 } from '@/components/ui/primitives';
+import { ModuleChart } from '@/components/ui/ModuleChart';
 
 const fleetField = 'ui-field mt-1.5 w-full';
 const fleetCancel = 'ui-button ui-button-secondary';
@@ -78,6 +80,10 @@ export default function FleetPage() {
   const totalDrivers = drivers.length;
   const availableDrivers = drivers.filter((d) => d.status === 'Available').length;
   const onDeliveryDrivers = drivers.filter((d) => d.status === 'On Delivery').length;
+  const vehicleStatuses = ['Available', 'On Route', 'Maintenance', 'Out of Service']
+    .map((status) => ({ status, count: vehicles.filter((vehicle) => vehicle.status === status).length }));
+  const driverStatuses = ['Available', 'On Delivery', 'Off Duty']
+    .map((status) => ({ status, count: drivers.filter((driver) => driver.status === status).length }));
 
   // Filtered vehicles
   const filteredVehicles = useMemo(() => {
@@ -224,43 +230,18 @@ export default function FleetPage() {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Total Fleet</span>
-            <Truck className="h-4 w-4 text-[var(--status-success-fg)]" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{totalVehicles}</p>
-          <p className="mt-1 text-xs text-[var(--text-secondary)]">{availableVehicles} Available for dispatch</p>
+      <section aria-label="Fleet overview" className="space-y-4">
+        <div className="bento-metrics">
+          <KPI label="Total fleet" value={String(totalVehicles)} sublabel={`${availableVehicles} available`} />
+          <KPI label="On delivery runs" value={String(onRouteVehicles)} sublabel={`${onDeliveryDrivers} drivers on delivery`} />
+          <KPI label="Service or workshop" value={String(maintenanceVehicles)} sublabel="Maintenance or out of service" tone={maintenanceVehicles ? 'warning' : 'positive'} />
+          <KPI label="Driver roster" value={String(totalDrivers)} sublabel={`${availableDrivers} available for assignment`} />
         </div>
-
-        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">On Delivery Runs</span>
-            <Clock className="h-4 w-4 text-[var(--status-warning-fg)]" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{onRouteVehicles}</p>
-          <p className="mt-1 text-xs text-[var(--text-secondary)]">{onDeliveryDrivers} drivers active in transit</p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ModuleChart title="Vehicle availability" subtitle="Fleet assets by current status" data={vehicleStatuses} xKey="status" series={[{ key: 'count', label: 'Vehicles' }]} />
+          <ModuleChart title="Driver availability" subtitle="Roster by current status" data={driverStatuses} xKey="status" series={[{ key: 'count', label: 'Drivers' }]} />
         </div>
-
-        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Service & Workshop</span>
-            <Wrench className="h-4 w-4 text-orange-500" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{maintenanceVehicles}</p>
-          <p className="mt-1 text-xs text-[var(--text-secondary)]">Scheduled maintenance / inspection</p>
-        </div>
-
-        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">Driver Roster</span>
-            <UserCheck className="h-4 w-4 text-[var(--status-info-fg)]" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{totalDrivers}</p>
-          <p className="mt-1 text-xs text-[var(--text-secondary)]">{availableDrivers} available for immediate assignment</p>
-        </div>
-      </div>
+      </section>
 
       {/* Tabs and Controls */}
       <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-4 sm:flex-row sm:items-center sm:justify-between">

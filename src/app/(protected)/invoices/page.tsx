@@ -46,7 +46,7 @@ export default function InvoicesPage() {
         actions={can('finance.record_payment') && can('finance.allocate_payment') ? <Link href="/payments" className="ui-button ui-button-primary">Record payment</Link> : undefined} />
       <FeedbackBanner message={feedback?.msg ?? null} type={feedback?.type} onDismiss={() => setFeedback(null)} />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="bento-metrics">
         <KPI label="Total invoiced" value={money(totalBilled)} sublabel={`${invoices.length} invoice records`} tone="positive" />
         <KPI label="Open balance" value={money(totalOutstanding)} sublabel="Outstanding customer receivables" tone="neutral" />
         <KPI label="Overdue balance" value={money(overdueBalance)} sublabel={`${overdue.length} overdue invoices`} tone={overdue.length ? 'warning' : 'neutral'} />

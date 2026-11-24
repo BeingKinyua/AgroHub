@@ -8,6 +8,7 @@ import { useBos } from '@/lib/services/bos-context';
 import { isSupplierEligibleForPurchasing } from '@/lib/services/business-rules';
 import { getOrderSourcingLines, getPurchaseReceiptBalance } from '@/lib/services/procurement-rules';
 import { ClosePurchaseForm, formatKes, NewPurchaseForm, purchaseButton, PurchaseReceiptForm, purchaseSecondaryButton } from './PurchaseForms';
+import { ModuleChart } from '@/components/ui/ModuleChart';
 
 const receivingStages = ['PO Issued', 'Receiving (GRN)', 'Quality Check', 'Partially Received'];
 type PurchaseFilter = 'all' | 'direct' | 'stock' | 'approval' | 'receiving';
@@ -50,6 +51,16 @@ function ProcurementContent() {
     if (filter === 'stock') return po.purpose === 'Bulk Stock Procurement';
     return true;
   });
+  const receiptsByMonth = new Map<string, number>();
+  for (const po of procurementOrders) for (const receipt of po.receipts ?? []) {
+    const month = receipt.receivedAt.slice(0, 7);
+    if (month) receiptsByMonth.set(month, (receiptsByMonth.get(month) ?? 0) + receipt.totalKes);
+  }
+  const procurementSpend = [...receiptsByMonth].sort(([a], [b]) => a.localeCompare(b)).slice(-6)
+    .map(([month, spend]) => ({ month, spend }));
+  const receivedSpendKes = [...receiptsByMonth.values()].reduce((sum, spend) => sum + spend, 0);
+  const procurementStages = ['Pending Approval', 'PO Issued', 'Receiving (GRN)', 'Quality Check', 'Partially Received', 'Completed']
+    .map((stage) => ({ stage, count: procurementOrders.filter((po) => po.stage === stage).length }));
 
   function closeNewPurchase() {
     if (orderParam) setClosedOrder(orderParam);
@@ -74,11 +85,17 @@ function ProcurementContent() {
         </button>} />
       <FeedbackBanner message={feedback?.message ?? null} type={feedback?.type} onDismiss={() => setFeedback(null)} />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="bento-metrics">
         <KPI label="Customer orders sourcing" value={String(attentionOrders.length)} sublabel="With direct quantities outstanding" />
         <KPI label="Purchase orders awaiting approval" value={String(pending.length)} tone="warning" sublabel="Sign-off before issue" />
         <KPI label="Purchase orders awaiting receipt" value={String(awaitingReceipt.length)} sublabel="Issued or partially received" />
+        <KPI label="Received spend" value={formatKes(receivedSpendKes)} sublabel="From recorded goods receipts" />
       </div>
+
+      <section aria-label="Procurement analysis" className="grid gap-4 lg:grid-cols-2">
+        <ModuleChart title="Received procurement spend" subtitle="Recorded goods receipts by month · commitments excluded" data={procurementSpend} xKey="month" series={[{ key: 'spend', label: 'Received (KES)' }]} />
+        <ModuleChart title="Purchase order pipeline" subtitle="Current purchase orders by stage" data={procurementStages} xKey="stage" series={[{ key: 'count', label: 'Purchase orders' }]} layout="vertical" />
+      </section>
 
       <div className="flex flex-wrap gap-2" aria-label="Procurement views">
         <button type="button" aria-pressed={!showSuppliers} className="ui-tab"
