@@ -31,6 +31,7 @@
   --control-border: #78908D;
   --brand-accent: #234E4B;
   --brand-emerald: var(--agro-emerald);
+  --chart-secondary: #71928E;
   --focus-ring: var(--brand-accent);
 
   /* Actions and selection */
@@ -124,6 +125,7 @@
   --border-subtle: #3D625E;
   --control-border: #789692;
   --brand-accent: #B5D2CE;
+  --chart-secondary: #88AAA5;
   --action-primary-bg: #EC6745;
   --action-primary-hover: #F08061;
   --action-primary-fg: #173B39;
