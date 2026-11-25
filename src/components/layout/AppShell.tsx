@@ -922,13 +922,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* Sticky Bottom Operator Profile & Sign-Out Surface */}
+        {/* Sticky Bottom Operator Profile Surface */}
         <div className="p-3 shrink-0 border-t border-[var(--nav-border)] bg-[var(--nav-bg)]">
           {!sidebarCollapsed ? (
-            <div className="p-2.5 rounded-xl bg-[var(--nav-surface)] border border-[var(--nav-border)] flex items-center justify-between gap-2.5">
+            <div
+              className={`p-2.5 rounded-full border flex items-center justify-between  ${
+                isNavActive(pathname, "/profile")
+                  ? "bg-[#ec6745] border-[#ec6745]"
+                  : "bg-[var(--nav-surface)] border-[var(--nav-border)]"
+              }`}
+            >
               <Link
                 href="/profile"
-                className="group flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-[var(--radius-control)]"
+                aria-current={
+                  isNavActive(pathname, "/profile") ? "page" : undefined
+                }
+                className={`group flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full ${
+                  isNavActive(pathname, "/profile") ? "text-[#102523]" : ""
+                }`}
               >
                 <Avatar
                   fullName={currentUser.fullName}
@@ -936,26 +947,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   size="sm"
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-[var(--nav-text)] truncate group-hover:text-[var(--nav-active)] transition-colors">
+                  <div
+                    className={`text-sm font-semibold truncate transition-colors ${
+                      isNavActive(pathname, "/profile")
+                        ? "text-[#102523] group-hover:text-[#102523]"
+                        : "text-[var(--nav-text)] group-hover:text-[var(--nav-active)]"
+                    }`}
+                  >
                     {currentUser.fullName}
                   </div>
-                  <div className="text-xs text-[var(--nav-active)] truncate">
+                  <div
+                    className={`text-xs truncate ${
+                      isNavActive(pathname, "/profile")
+                        ? "text-[#102523]"
+                        : "text-[var(--nav-active)]"
+                    }`}
+                  >
                     {currentUser.roleName}
                   </div>
                 </div>
               </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  logout();
-                  router.push("/login");
-                }}
-                title="Sign out of workspace"
-                aria-label="Sign out of workspace"
-                className={navIconButton}
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
@@ -966,27 +977,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   href="/profile"
                   aria-label="My profile"
-                  className={navIconButton}
+                  aria-current={
+                    isNavActive(pathname, "/profile") ? "page" : undefined
+                  }
+                  className={`${navIconButton} ${
+                    isNavActive(pathname, "/profile")
+                      ? "bg-[#ec6745] text-[#102523] hover:bg-[#ec6745] hover:text-[#102523]"
+                      : ""
+                  }`}
                 >
                   <Avatar
                     fullName={currentUser.fullName}
                     avatarUrl={currentUser.avatarUrl}
-                    size="sm"
+                    size="md"
                   />
                 </Link>
-              </Tooltip>
-              <Tooltip label="Sign out" side="right">
-                <button
-                  type="button"
-                  onClick={() => {
-                    logout();
-                    router.push("/login");
-                  }}
-                  aria-label="Sign out"
-                  className={navIconButton}
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
               </Tooltip>
             </div>
           )}
