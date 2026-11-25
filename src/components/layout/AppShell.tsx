@@ -881,7 +881,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {!sidebarCollapsed &&
                         item.badgeCount !== undefined &&
                         item.badgeCount > 0 && (
-                          <span className="font-mono-tabular text-xs px-1.5 py-0.5 rounded-md bg-[var(--nav-surface)] text-[var(--nav-text)] border border-[var(--nav-border)]">
+                          <span className="font-mono-tabular text-xs px-1.5 py-0.5 rounded-full bg-[var(--nav-surface)] text-[var(--nav-text)] border border-[var(--nav-border)]">
                             {item.badgeCount}
                           </span>
                         )}
