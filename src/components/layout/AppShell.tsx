@@ -1125,7 +1125,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* MAIN INDEPENDENT SCROLL WORKSPACE COLUMN */}
       <div className="flex min-w-0 flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
         {/* STICKY TOP UTILITY HEADER */}
-        <header className="sticky top-0 z-[var(--z-header)] flex h-[var(--header-height)] items-center justify-between gap-2 border-b border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 sm:gap-3 sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-[var(--z-header)] flex h-[var(--header-height)] items-center justify-between gap-2 shadow-xl/20 bg-[var(--bg-card)] px-3 sm:gap-3 sm:px-6 lg:px-8">
           {/* Mobile Menu Trigger (hidden on desktop) */}
           <button
             type="button"
@@ -1143,7 +1143,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="ui-button ui-button-secondary w-full justify-between bg-[var(--bg-canvas)] px-2.5 font-normal text-[var(--text-secondary)] sm:px-3.5"
+              className="ui-button w-full justify-between bg-[var(--bg-canvas)] px-2.5 font-normal text-[var(--text-secondary)] sm:px-3.5"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Search
@@ -1152,7 +1152,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 />
                 <span className="truncate">Search AgroHub</span>
               </span>
-              <kbd className="ui-meta hidden shrink-0 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-0.5 font-mono-tabular sm:inline-block">
+              <kbd className="ui-meta hidden shrink-0 rounded-full bg-[var(--bg-card)] px-1.5 py-1.5 font-mono-tabular sm:inline-block">
                 ⌘K
               </kbd>
             </button>
@@ -1180,7 +1180,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-controls={
                   notificationsOpen ? "workspace-notifications" : undefined
                 }
-                className="ui-button ui-button-ghost ui-button-icon relative"
+                className="ui-button ui-button-secondary ui-button-icon relative bg-[var(--bg-canvas)]"
               >
                 <Bell
                   aria-hidden="true"
@@ -1189,7 +1189,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {unreadCount > 0 && (
                   <span
                     aria-hidden="true"
-                    className="absolute -top-0.5 -right-0.5 flex min-h-5 min-w-5 items-center justify-center rounded-full border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-1 font-mono-tabular text-xs font-semibold text-[var(--status-danger-fg)]"
+                    className="absolute -top-0.5 -right-0.5 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[var(--status-danger-fg)] px-1 font-mono-tabular text-xs font-semibold text-[var(--status-danger-bg)]"
                   >
                     {unreadCount}
                   </span>
@@ -1207,9 +1207,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <div>
                         <div className="ui-section-title font-semibold text-[var(--text-primary)]">
                           Notifications
-                        </div>
-                        <div className="ui-meta">
-                          Filtered by your RBAC permissions
                         </div>
                       </div>
                       <button
@@ -1296,12 +1293,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-controls={
                   profileMenuOpen ? "workspace-account" : undefined
                 }
-                className="ui-button ui-button-ghost ui-button-icon rounded-full"
+                className="ui-button ui-button-icon rounded-full"
               >
                 <Avatar
                   fullName={currentUser.fullName}
                   avatarUrl={currentUser.avatarUrl}
-                  size="md"
+                  size="lg"
                 />
               </button>
 
@@ -1320,14 +1317,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         size="lg"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                        <div className="text-md font-semibold text-[var(--text-primary)] truncate">
                           {currentUser.fullName}
                         </div>
                         <div className="ui-meta truncate">
-                          @{currentUser.nickname} · {currentUser.email}
-                        </div>
-                        <div className="mt-1.5 flex items-center gap-1.5">
-                          <RoleLabel roleName={currentUser.roleName} />
+                          {currentUser.roleName}
                         </div>
                       </div>
                     </div>
@@ -1344,10 +1338,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           className="size-4 shrink-0 text-[var(--brand-accent)]"
                         />
                         <div>
-                          <div>My Profile & Account</div>
-                          <div className="ui-meta font-normal">
-                            Identity, nickname, role & permissions
-                          </div>
+                          <div>My Profile</div>
                         </div>
                       </Link>
                       <Link
@@ -1360,10 +1351,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           className="size-4 shrink-0 text-[var(--brand-accent)]"
                         />
                         <div>
-                          <div>Workspace Settings</div>
-                          <div className="ui-meta font-normal">
-                            Theme, hubs & operational preferences
-                          </div>
+                          <div>Settings</div>
                         </div>
                       </Link>
                       {can("audit.view") && (
@@ -1377,24 +1365,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             className="size-4 shrink-0 text-[var(--brand-accent)]"
                           />
                           <div>
-                            <div>Security & Audit Trail</div>
-                            <div className="ui-meta font-normal">
-                              Immutable system governance log
-                            </div>
+                            <div>Security</div>
                           </div>
                         </Link>
                       )}
                     </div>
 
                     {/* Appearance Section in Profile Menu */}
-                    <div className="pb-3 mb-3 border-b border-[var(--border-subtle)]">
-                      <div className="ui-meta mb-2 px-1 font-semibold">
-                        Appearance
-                      </div>
+                    <div className="pb-3 mb-3">
                       <div
                         role="group"
                         aria-label="Theme Mode"
-                        className="grid grid-cols-3 gap-2 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-1"
+                        className="grid grid-cols-3 gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-1"
                       >
                         <button
                           type="button"
@@ -1442,10 +1424,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         logout();
                         router.push("/login");
                       }}
-                      className="ui-button ui-button-danger w-full justify-between"
+                      className="ui-button ui-button-danger w-full justify-start gap-2"
                     >
-                      <span>Sign out of AgroHub BOS</span>
                       <LogOut aria-hidden="true" className="size-4" />
+                      <span>Sign Out</span>
                     </button>
                   </motion.div>
                 )}
