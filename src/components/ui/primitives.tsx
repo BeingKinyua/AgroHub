@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
@@ -152,7 +153,9 @@ export function KPI({
         )}
       </div>
       <div className="ui-metric ui-kpi-value mt-2 wrap-break-word">{value}</div>
-      {sublabel && <div className="ui-meta ui-kpi-sublabel mt-1.5">{sublabel}</div>}
+      {sublabel && (
+        <div className="ui-meta ui-kpi-sublabel mt-1.5">{sublabel}</div>
+      )}
     </Card>
   );
 }
@@ -517,10 +520,10 @@ export function Avatar({
     .join("");
 
   const sizeMap = {
-    sm: "w-8 h-8 text-xs rounded-lg",
-    md: "w-9 h-9 text-xs rounded-xl",
-    lg: "w-11 h-11 text-sm rounded-xl",
-    xl: "w-14 h-14 text-base rounded-2xl",
+    sm: "w-8 h-8 text-xs rounded-full",
+    md: "w-9 h-9 text-xs rounded-full",
+    lg: "w-11 h-11 text-sm rounded-full",
+    xl: "w-14 h-14 text-base rounded-full",
   };
 
   if (avatarUrl && !imgFailed) {
@@ -538,7 +541,7 @@ export function Avatar({
   return (
     <div
       aria-label={fullName}
-      className={`ui-tone-success flex shrink-0 select-none items-center justify-center border font-heading font-semibold ${sizeMap[size]} ${className}`}
+      className={`ui-tone-success flex shrink-0 select-none items-center justify-center font-heading font-semibold ${sizeMap[size]} ${className}`}
     >
       {initials}
     </div>
@@ -549,24 +552,83 @@ export function Tooltip({
   label,
   side = "right",
   children,
+  portal = false,
 }: {
   label: string;
   side?: "right" | "bottom";
   children: React.ReactNode;
+  portal?: boolean;
 }) {
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [portalVisible, setPortalVisible] = useState(false);
+  const [portalPosition, setPortalPosition] = useState({ left: 0, top: 0 });
+
+  const showPortalTooltip = () => {
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPortalPosition({
+      left: side === "right" ? rect.right + 10 : rect.left + rect.width / 2,
+      top: side === "right" ? rect.top + rect.height / 2 : rect.bottom + 8,
+    });
+    setPortalVisible(true);
+  };
+
+  const portalTooltip =
+    portal && portalVisible && typeof document !== "undefined"
+      ? createPortal(
+          <span
+            role="tooltip"
+            className="pointer-events-none fixed z-[100] whitespace-nowrap rounded-lg border border-[var(--nav-border)] bg-[var(--nav-bg)] px-2.5 py-1 text-xs font-medium text-[var(--nav-text)] shadow-md"
+            style={{
+              left: portalPosition.left,
+              top: portalPosition.top,
+              transform:
+                side === "right" ? "translateY(-50%)" : "translateX(-50%)",
+            }}
+          >
+            {label}
+          </span>,
+          document.body,
+        )
+      : null;
+
   return (
-    <div className="relative group/tooltip inline-flex">
+    <div
+      ref={anchorRef}
+      className="relative group/tooltip inline-flex"
+      onMouseEnter={portal ? showPortalTooltip : undefined}
+      onMouseLeave={portal ? () => setPortalVisible(false) : undefined}
+      onFocusCapture={portal ? showPortalTooltip : undefined}
+      onBlurCapture={
+        portal
+          ? (event) => {
+              if (
+                !event.currentTarget.contains(
+                  event.relatedTarget as Node | null,
+                ) &&
+                !event.currentTarget.matches(":hover")
+              ) {
+                setPortalVisible(false);
+              }
+            }
+          : undefined
+      }
+    >
       {children}
-      <span
-        role="tooltip"
-        className={`pointer-events-none z-[var(--z-dropdown)] whitespace-nowrap rounded-lg border border-[var(--nav-border)] bg-[var(--nav-bg)] px-2.5 py-1 text-xs font-medium text-[var(--nav-text)] opacity-0 shadow-md transition-opacity group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 ${
-          side === "right"
-            ? "absolute left-full top-1/2 -translate-y-1/2 ml-2.5"
-            : "absolute top-full left-1/2 -translate-x-1/2 mt-2"
-        }`}
-      >
-        {label}
-      </span>
+      {portal ? (
+        portalTooltip
+      ) : (
+        <span
+          role="tooltip"
+          className={`pointer-events-none z-[var(--z-dropdown)] whitespace-nowrap rounded-lg border border-[var(--nav-border)] bg-[var(--nav-bg)] px-2.5 py-1 text-xs font-medium text-[var(--nav-text)] opacity-0 shadow-md transition-opacity group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 ${
+            side === "right"
+              ? "absolute left-full top-1/2 -translate-y-1/2 ml-2.5"
+              : "absolute top-full left-1/2 -translate-x-1/2 mt-2"
+          }`}
+        >
+          {label}
+        </span>
+      )}
     </div>
   );
 }
