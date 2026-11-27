@@ -1,4 +1,5 @@
 import {
+  InternalRoleId,
   InternalUser,
   PermissionKey,
   RoleDefinition,
