@@ -1,15 +1,22 @@
 export type AccountStatus = 'Invited' | 'Active' | 'Suspended' | 'Disabled';
 
 export type InternalRoleId =
+  | 'administrator'
+  | 'business_owner'
+  | 'manager'
+  | 'sales_representative'
+  | 'procurement_officer'
+  | 'storekeeper'
+  | 'logistics_officer'
+  | 'finance_officer'
+  | 'viewer'
+  // Transitional IDs retained for existing demo fixtures and local data.
   | 'executive'
   | 'operations_manager'
   | 'sales_rep'
-  | 'procurement_officer'
-  | 'storekeeper'
   | 'accounts_clerk'
   | 'finance_manager'
-  | 'delivery_driver'
-  | 'administrator';
+  | 'delivery_driver';
 
 export type PermissionKey =
   | 'dashboard.view'
